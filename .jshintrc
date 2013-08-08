@@ -4,7 +4,7 @@
 	"globalstrict": true,
 	"node": true,
 	"browser": true,
-	"camelcase": true,
+	"camelcase": false,
 	"nonew": true,
 	"curly": true,
 	"eqeqeq": true,
