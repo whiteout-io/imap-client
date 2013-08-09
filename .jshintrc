@@ -19,6 +19,16 @@
 	"unused": true,
 
 	"predef": [
+			"mock",
+			"when",
+			"verify",
+			"anything",
+			"not",
+			"nil",
+            "before",
+            "beforeEach",
+            "after",
+            "afterEach",
 			"console",
 			"importScripts",
 			"process",

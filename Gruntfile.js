@@ -1,19 +1,30 @@
 module.exports = function(grunt) {
-	'use strict';
+    'use strict';
 
-	// Project configuration.
-	grunt.initConfig({
-		jshint: {
-			all: ['Gruntfile.js', 'index.js', 'test/imap-client-test.js'],
-			options: {
-				jshintrc: '.jshintrc'
-			}
-		}
-	});
+    // Add the grunt-mocha-test tasks.
+    grunt.loadNpmTasks('grunt-mocha-test');
 
-	// Load the plugin(s)
-	grunt.loadNpmTasks('grunt-contrib-jshint');
+    // Project configuration.
+    grunt.initConfig({
+        jshint: {
+            all: ['Gruntfile.js', 'index.js', 'test/imap-client-test.js'],
+            options: {
+                jshintrc: '.jshintrc'
+            }
+        },
+        mochaTest: {
+            test: {
+                options: {
+                    reporter: 'spec'
+                },
+                src: ['test/*.js']
+            }
+        }
+    });
 
-	// Default task(s).
-	grunt.registerTask('test', ['jshint']);
+    // Load the plugin(s)
+    grunt.loadNpmTasks('grunt-contrib-jshint');
+
+    // Default task(s).
+    grunt.registerTask('test', ['jshint', 'mochaTest']);
 };
