@@ -67,4 +67,5 @@ ic.ImapClient.prototype.getMessage = function(uid, callback) {
     var self = this;
     self._parser.on('end', callback);
     self._client.createMessageStream(uid).pipe(self._parser);
+    self._client.addFlags(uid, ["\\Seen"], function() {});
 };
