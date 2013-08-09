@@ -1,8 +1,8 @@
 'use strict';
 
 var ic = module.exports,
-    inbox = require('inbox');
-    // mp = require('mailparser');
+    inbox = require('inbox'),
+    MailParser = require('mailparser').MailParser;
 
 /**
  * Create an instance of ImapClient
@@ -19,28 +19,52 @@ ic.ImapClient = function(options) {
         secureConnection: options.secure,
         auth: options.auth
     });
+    self._parser = new MailParser();
 };
 
+/**
+ * Log out of the current IMAP session
+ */
 ic.ImapClient.prototype.logout = function() {
     var self = this;
 
     self._client.close();
 };
 
-// ic.ImapClient.prototype.listFolders = function(callback) {
-//     var self = this;
+/**
+ * List available IMAP folders
+ * @param callback [Function] callback(error, mailboxes) triggered when the folders are available
+ */
+ic.ImapClient.prototype.listFolders = function(callback) {
+    var self = this;
 
-//     self._client.listMailboxes(callback);
-// };
+    self._client.listMailboxes(callback);
+};
 
-// ic.ImapClient.prototype.listMessages = function(options, callback) {
-//     // options: folder, offset, length
-//     // client.openMailbox(path[, options], callback)
-//     // client.listMessages(from[, limit], callback)
-// };
+/**
+ * List messages in an IMAP folder
+ * @param options.folder [String] The folder name
+ * @param options.offset [String] The offset where to start reading. Positive offsets count from the beginning, negative offset count from the tail.
+ * @param options.length [String] Indicates how many messages you want to read
+ * @param callback [Function] callback(error, messages) triggered when the messages are available.
+ */
+ic.ImapClient.prototype.listMessages = function(options, callback) {
+    var self = this;
 
-// ic.ImapClient.prototype.getMessage = function(uuid, callback) {
-//     // mailparser = new mp.MailParser()
-//     // var stream = client.createMessageStream(uid)
-//     // stream.pipe(mailparser);
-// };
+    self._client.openMailbox(options.folder, {
+        readOnly: true
+    }, function() {
+        self._client.listMessages(options.offset, options.length, callback);
+    });
+};
+
+/**
+ * Get a certain message from the server.
+ * @param uid [String] The uid of the message
+ * @param callback [Function] callback(message) will be called the the message is ready;
+ */
+ic.ImapClient.prototype.getMessage = function(uid, callback) {
+    var self = this;
+    self._parser.on('end', callback);
+    self._client.createMessageStream(uid).pipe(self._parser);
+};

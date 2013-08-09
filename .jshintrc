@@ -20,6 +20,8 @@
 
 	"predef": [
 			"mock",
+			"mockFunction",
+			"equalTo",
 			"when",
 			"verify",
 			"anything",
