@@ -22,12 +22,20 @@ ic.ImapClient = function(options) {
     self._parser = new MailParser();
 };
 
+ic.ImapClient.prototype.login = function(callback) {
+    var self = this;
+
+    self._client.once('connect', callback);
+    self._client.connect();
+};
+
 /**
  * Log out of the current IMAP session
  */
-ic.ImapClient.prototype.logout = function() {
+ic.ImapClient.prototype.logout = function(callback) {
     var self = this;
 
+    self._client.once('close', callback);
     self._client.close();
 };
 

@@ -3,7 +3,7 @@
 var rewire = require('rewire'),
     expect = require('chai').expect,
     inbox = require('inbox'),
-    EventEmitter = require("events").EventEmitter,
+    EventEmitter = require('events').EventEmitter,
     imapClient = rewire('../../index'),
     JsMockito = require('jsmockito').JsMockito,
     JsHamcrest = require('jshamcrest').JsHamcrest,
@@ -30,9 +30,7 @@ dummyMail = {
 };
 
 ibMock = (function() {
-    var o;
-
-    o = {};
+    var o = new EventEmitter();
 
     o.expect = function(name) {
         o[name + 'Count']++;
@@ -42,6 +40,14 @@ ibMock = (function() {
     o.close = function() {
         expect(o.closeCount).to.be.ok;
         o.closeCount--;
+        o.emit('close');
+    };
+
+    o.connectCount = 0;
+    o.connect = function() {
+        expect(o.connectCount).to.be.ok;
+        o.connectCount--;
+        o.emit('connect');
     };
 
     o.listMailboxesCount = 0;
@@ -146,10 +152,17 @@ describe('ImapClient', function() {
         ibMock.resetMock();
     });
 
+    describe('login', function() {
+        it('should login', function(done) {
+            ibMock.expect('connect');
+            ic.login(done);
+        });
+    });
+
     describe('logout', function() {
-        it('should logout', function() {
+        it('should logout', function(done) {
             ibMock.expect('close');
-            ic.logout();
+            ic.logout(done);
         });
     });
 
