@@ -11,9 +11,6 @@ b.require('net-chromeify', {
 b.require('tls-chromeify', {
     expose: 'tls'
 });
-b.require('brfs', {
-    expose: 'fs'
-});
 b.require('browserify-mime', {
     expose: 'mime'
 });
