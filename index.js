@@ -68,12 +68,17 @@ ic.ImapClient.prototype.listMessages = function(options, callback) {
 
 /**
  * Get a certain message from the server.
- * @param uid [String] The uid of the message
+ * @param options.folder [String] The folder name
+ * @param options.uid [Number] The uid of the message
  * @param callback [Function] callback(message) will be called the the message is ready;
  */
-ic.ImapClient.prototype.getMessage = function(uid, callback) {
+ic.ImapClient.prototype.getMessage = function(options, callback) {
     var self = this;
-    self._parser.on('end', callback);
-    self._client.createMessageStream(uid).pipe(self._parser);
-    self._client.addFlags(uid, ["\\Seen"], function() {});
+
+    self._client.openMailbox(options.folder, {
+        readOnly: false
+    }, function() {
+        self._parser.on('end', callback);
+        self._client.createMessageStream(options.uid).pipe(self._parser);
+    });
 };

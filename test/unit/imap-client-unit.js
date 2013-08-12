@@ -65,7 +65,7 @@ ibMock = (function() {
         expect(o.openMailboxCount).to.be.ok;
         o.openMailboxCount--;
 
-        if (path === 'foobar' && options.readOnly && callback) {
+        if (path && callback) {
             callback(undefined, {
                 name: path,
                 path: path,
@@ -95,17 +95,6 @@ ibMock = (function() {
             }
         };
     };
-
-    o.addFlagsCount = 0;
-    o.addFlags = function(uid, flags, callback) {
-        expect(o.addFlagsCount).to.be.ok;
-        o.addFlagsCount--;
-
-        expect(uid).to.be.ok;
-        expect(flags).to.be.ok;
-        callback();
-    };
-
 
     o.resetMock = function() {
         o.closeCount = 0;
@@ -207,10 +196,13 @@ describe('ImapClient', function() {
     });
 
     describe('get message', function() {
-        it('should get a message and update seen flag', function(done) {
+        it('should get a specific message', function(done){
+            ibMock.expect('openMailbox');
             ibMock.expect('createMessageStream');
-            ibMock.expect('addFlags');
-            ic.getMessage(123, function(message) {
+            ic.getMessage({
+                folder: 'INBOX',
+                uid: 123
+            }, function(message) {
                 expect(message).to.equal(dummyMail);
                 done();
             });
