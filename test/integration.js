@@ -1,8 +1,14 @@
 'use strict';
 
-var ImapClient = require('../index').ImapClient,
-    expect = require('chai').expect,
-    loginOptions;
+var ImapClient, loginOptions, expect;
+
+if (typeof window === 'undefined') {
+    ImapClient = require('../index').ImapClient;
+    expect = require('chai').expect;
+} else {
+    ImapClient = window.ImapClient;
+    expect = window.chai.expect;
+}
 
 loginOptions = {
     port: 993,
@@ -41,7 +47,7 @@ describe('ImapClient integration tests', function() {
     describe('ImapClient.listMessages', function() {
         it('should list messages', function(done) {
             ic.listMessages({
-                folder:'INBOX',
+                folder: 'INBOX',
                 offset: 0,
                 length: 10
             }, function(error, messages) {
@@ -53,11 +59,11 @@ describe('ImapClient integration tests', function() {
     });
 
     describe('ImapClient.getMessage', function() {
-        it('should get a specific message', function(done){
+        it('should get a specific message', function(done) {
             ic.getMessage({
                 folder: 'INBOX',
                 uid: 127
-            }, function(message){
+            }, function(message) {
                 expect(message).to.exist;
                 done();
             });
