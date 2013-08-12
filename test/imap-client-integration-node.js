@@ -1,6 +1,6 @@
 'use strict';
 
-var ImapClient = require('../../index').ImapClient,
+var ImapClient = require('../index').ImapClient,
     expect = require('chai').expect,
     loginOptions;
 

@@ -4,7 +4,7 @@ var rewire = require('rewire'),
     expect = require('chai').expect,
     inbox = require('inbox'),
     EventEmitter = require('events').EventEmitter,
-    imapClient = rewire('../../index'),
+    imapClient = rewire('../index'),
     JsMockito = require('jsmockito').JsMockito,
     JsHamcrest = require('jshamcrest').JsHamcrest,
     ibNsMock, loginOptions, ibMock, MpMock, dummyMail;
@@ -119,7 +119,7 @@ imapClient.__set__({
 });
 
 
-describe('ImapClient', function() {
+describe('ImapClient unit tests', function() {
     describe('initialize with user and password', function() {
         it('should initialize', function() {
             var ic = new imapClient.ImapClient(loginOptions);
@@ -128,7 +128,7 @@ describe('ImapClient', function() {
     });
 });
 
-describe('ImapClient', function() {
+describe('ImapClient unit tests', function() {
     var ic;
 
     beforeEach(function() {

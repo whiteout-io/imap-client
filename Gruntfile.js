@@ -7,7 +7,7 @@ module.exports = function(grunt) {
     // Project configuration.
     grunt.initConfig({
         jshint: {
-            all: ['Gruntfile.js', 'index.js', 'test/*/*.js'],
+            all: ['Gruntfile.js', 'index.js', 'test/*.js'],
             options: {
                 jshintrc: '.jshintrc'
             }
@@ -17,7 +17,7 @@ module.exports = function(grunt) {
                 options: {
                     reporter: 'spec'
                 },
-                src: ['test/*/*.js']
+                src: ['test/imap-client-unit.js', 'test/imap-client-integration-node.js']
             }
         }
     });

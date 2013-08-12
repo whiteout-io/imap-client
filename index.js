@@ -1,8 +1,8 @@
 'use strict';
 
-var ic = module.exports,
-    inbox = require('inbox'),
-    MailParser = require('mailparser').MailParser;
+var inbox = require('inbox'),
+    MailParser = require('mailparser').MailParser,
+    ImapClient;
 
 /**
  * Create an instance of ImapClient
@@ -12,7 +12,7 @@ var ic = module.exports,
  * @param {String} options.host.auth.user Username for login
  * @param {String} options.host.auth.pass Password for login
  */
-ic.ImapClient = function(options) {
+ImapClient = function(options) {
     var self = this;
 
     self._client = inbox.createConnection(options.port, options.host, {
@@ -22,7 +22,7 @@ ic.ImapClient = function(options) {
     self._parser = new MailParser();
 };
 
-ic.ImapClient.prototype.login = function(callback) {
+ImapClient.prototype.login = function(callback) {
     var self = this;
 
     self._client.once('connect', callback);
@@ -32,7 +32,7 @@ ic.ImapClient.prototype.login = function(callback) {
 /**
  * Log out of the current IMAP session
  */
-ic.ImapClient.prototype.logout = function(callback) {
+ImapClient.prototype.logout = function(callback) {
     var self = this;
 
     self._client.once('close', callback);
@@ -43,7 +43,7 @@ ic.ImapClient.prototype.logout = function(callback) {
  * List available IMAP folders
  * @param callback [Function] callback(error, mailboxes) triggered when the folders are available
  */
-ic.ImapClient.prototype.listFolders = function(callback) {
+ImapClient.prototype.listFolders = function(callback) {
     var self = this;
 
     self._client.listMailboxes(callback);
@@ -56,7 +56,7 @@ ic.ImapClient.prototype.listFolders = function(callback) {
  * @param options.length [String] Indicates how many messages you want to read
  * @param callback [Function] callback(error, messages) triggered when the messages are available.
  */
-ic.ImapClient.prototype.listMessages = function(options, callback) {
+ImapClient.prototype.listMessages = function(options, callback) {
     var self = this;
 
     self._client.openMailbox(options.folder, {
@@ -72,7 +72,7 @@ ic.ImapClient.prototype.listMessages = function(options, callback) {
  * @param options.uid [Number] The uid of the message
  * @param callback [Function] callback(message) will be called the the message is ready;
  */
-ic.ImapClient.prototype.getMessage = function(options, callback) {
+ImapClient.prototype.getMessage = function(options, callback) {
     var self = this;
 
     self._client.openMailbox(options.folder, {
@@ -82,3 +82,8 @@ ic.ImapClient.prototype.getMessage = function(options, callback) {
         self._client.createMessageStream(options.uid).pipe(self._parser);
     });
 };
+
+module.exports.ImapClient = ImapClient;
+if (typeof window !== 'undefined') {
+    window.ImapClient = ImapClient;
+}
