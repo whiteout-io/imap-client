@@ -23,7 +23,7 @@ b.bundle(function(err, src) {
         throw err;
     }
 
-    var file = path.join(__dirname + '/index-browserified.js');
+    var file = path.join(__dirname + '/imap-client-browserified.js');
     fs.writeFileSync(file, src);
 
     console.log('bundle written to: ' + file);

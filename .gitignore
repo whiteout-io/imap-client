@@ -1,5 +1,5 @@
 .DS_Store
 node_modules
 
-index-browserified.js
-test/index-browserified.js
+imap-client-browserified.js
+test/imap-client-browserified.js
