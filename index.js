@@ -103,6 +103,10 @@ ImapClient.prototype.getMessage = function(options, callback) {
         readOnly: false
     }, function() {
         self._parser.on('end', function(email) {
+            if (!callback) {
+                return;
+            }
+            
             callback({
                 sentDate: email.headers.date,
                 id: email.messageId,
