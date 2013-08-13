@@ -51,7 +51,7 @@ ImapClient.prototype.listFolders = function(callback) {
 
 /**
  * List messages in an IMAP folder
- * @param options.folder [String] The folder name
+ * @param options.path [String] The folder's path
  * @param options.offset [String] The offset where to start reading. Positive offsets count from the beginning, negative offset count from the tail.
  * @param options.length [String] Indicates how many messages you want to read
  * @param callback [Function] callback(error, messages) triggered when the messages are available.
@@ -59,26 +59,61 @@ ImapClient.prototype.listFolders = function(callback) {
 ImapClient.prototype.listMessages = function(options, callback) {
     var self = this;
 
-    self._client.openMailbox(options.folder, {
+    self._client.openMailbox(options.path, {
         readOnly: true
     }, function() {
-        self._client.listMessages(options.offset, options.length, callback);
+        self._client.listMessages(options.offset, options.length, function(error, messages) {
+            var i, email, emails;
+
+            if (!callback) {
+                return;
+            }
+
+            emails = [];
+            i = messages.length;
+            while (i--) {
+                email = messages[i];
+                emails.push({
+                    uid: email.UID,
+                    id: email.messageId,
+                    from: [email.from],
+                    to: email.to,
+                    cc: email.cc,
+                    bcc: email.bcc,
+                    subject: email.title,
+                    body: null,
+                    sentDate: email.date
+                });
+            }
+            callback(error, emails);
+        });
     });
 };
 
 /**
  * Get a certain message from the server.
- * @param options.folder [String] The folder name
+ * @param options.path [String] The folder's path
  * @param options.uid [Number] The uid of the message
  * @param callback [Function] callback(message) will be called the the message is ready;
  */
 ImapClient.prototype.getMessage = function(options, callback) {
     var self = this;
 
-    self._client.openMailbox(options.folder, {
+    self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
-        self._parser.on('end', callback);
+        self._parser.on('end', function(email) {
+            callback({
+                sentDate: email.headers.date,
+                id: email.messageId,
+                from: email.from,
+                to: email.to,
+                cc: email.cc,
+                bcc: email.bcc,
+                subject: email.subject,
+                body: email.text,
+            });
+        });
         self._client.createMessageStream(options.uid).pipe(self._parser);
     });
 };

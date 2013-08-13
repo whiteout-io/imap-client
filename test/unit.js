@@ -7,7 +7,7 @@ var rewire = require('rewire'),
     imapClient = rewire('../index'),
     JsMockito = require('jsmockito').JsMockito,
     JsHamcrest = require('jshamcrest').JsHamcrest,
-    ibNsMock, loginOptions, ibMock, MpMock, dummyMail;
+    ibNsMock, loginOptions, ibMock, MpMock;
 
 JsMockito.Integration.Nodeunit();
 JsHamcrest.Integration.Nodeunit();
@@ -20,13 +20,6 @@ loginOptions = {
         pass: 'dummyPass'
     },
     secure: true
-};
-
-dummyMail = {
-    to: 'zuhause@aol.com',
-    from: 'zuhause@aol.com',
-    subject: 'dummy subject',
-    text: 'dummy text body'
 };
 
 ibMock = (function() {
@@ -80,7 +73,28 @@ ibMock = (function() {
         expect(o.listMessagesCount).to.be.ok;
         o.listMessagesCount--;
 
-        callback(undefined, [{}, {}, {}, {}]);
+        callback(undefined, [{
+            UID: 126,
+            date: new Date(),
+            from: {
+                address: "stuff@bla.io",
+                name: "Test Sender"
+            },
+            messageId: "<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>",
+            title: "Nodemailer Test",
+            to: [{
+                address: "testtest1@gmail.com",
+                name: "testtest1"
+            }],
+            cc: [{
+                address: "testtest2@gmail.com",
+                name: "testtest2"
+            }],
+            bcc: [{
+                address: "testtest3@gmail.com",
+                name: "testtest3"
+            }]
+        }]);
     };
 
     o.createMessageStreamCount = 0;
@@ -91,7 +105,30 @@ ibMock = (function() {
         expect(uid).to.be.ok;
         return {
             pipe: function(obj) {
-                obj.emit('end', dummyMail);
+                obj.emit('end', {
+                    headers: {
+                        date: new Date(),
+                    },
+                    messageId: "<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>",
+                    from: [{
+                        address: "stuff@bla.io",
+                        name: "Test Sender"
+                    }],
+                    to: [{
+                        address: "testtest1@gmail.com",
+                        name: "testtest1"
+                    }],
+                    cc: [{
+                        address: "testtest2@gmail.com",
+                        name: "testtest2"
+                    }],
+                    bcc: [{
+                        address: "testtest3@gmail.com",
+                        name: "testtest3"
+                    }],
+                    subject: "Nodemailer Test",
+                    text: "Lorem ipsum dolor sin amet..."
+                });
             }
         };
     };
@@ -155,8 +192,8 @@ describe('ImapClient unit tests', function() {
         });
     });
 
-    describe('list mailboxes', function() {
-        it('should list mailboxes', function(done) {
+    describe('list folders', function() {
+        it('should list folders', function(done) {
             ibMock.expect('listMailboxes');
             ic.listFolders(function(error, mailboxes) {
                 expect(mailboxes.length).to.equal(3);
@@ -170,40 +207,65 @@ describe('ImapClient unit tests', function() {
             ibMock.expect('openMailbox');
             ibMock.expect('listMessages');
             ic.listMessages({
-                folder: 'foobar',
+                path: 'foobar',
                 offset: 0,
-                length: 4
+                length: 1
             }, function(err, messages) {
-                expect(messages.length).to.equal(4);
-                done();
-            });
-        });
-    });
-
-    describe('list messages', function() {
-        it('should list messages', function(done) {
-            ibMock.expect('openMailbox');
-            ibMock.expect('listMessages');
-            ic.listMessages({
-                folder: 'foobar',
-                offset: 0,
-                length: 4
-            }, function(err, messages) {
-                expect(messages.length).to.equal(4);
+                expect(messages.length).to.equal(1);
+                expect(messages[0].id).to.equal("<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>");
+                expect(messages[0].uid).to.equal(126);
+                expect(messages[0].from).to.deep.equal([{
+                    address: "stuff@bla.io",
+                    name: "Test Sender"
+                }]);
+                expect(messages[0].to).to.deep.equal([{
+                    address: "testtest1@gmail.com",
+                    name: "testtest1"
+                }]);
+                expect(messages[0].cc).to.deep.equal([{
+                    address: "testtest2@gmail.com",
+                    name: "testtest2"
+                }]);
+                expect(messages[0].bcc).to.deep.equal([{
+                    address: "testtest3@gmail.com",
+                    name: "testtest3"
+                }]);
+                expect(messages[0].subject).to.equal("Nodemailer Test");
+                expect(messages[0].body).to.not.be.ok;
+                expect(messages[0].sentDate).to.be.ok;
                 done();
             });
         });
     });
 
     describe('get message', function() {
-        it('should get a specific message', function(done){
+        it('should get a specific message', function(done) {
             ibMock.expect('openMailbox');
             ibMock.expect('createMessageStream');
             ic.getMessage({
-                folder: 'INBOX',
+                path: 'INBOX',
                 uid: 123
             }, function(message) {
-                expect(message).to.equal(dummyMail);
+                expect(message.id).to.equal("<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>");
+                expect(message.from).to.deep.equal([{
+                    address: "stuff@bla.io",
+                    name: "Test Sender"
+                }]);
+                expect(message.to).to.deep.equal([{
+                    address: "testtest1@gmail.com",
+                    name: "testtest1"
+                }]);
+                expect(message.cc).to.deep.equal([{
+                    address: "testtest2@gmail.com",
+                    name: "testtest2"
+                }]);
+                expect(message.bcc).to.deep.equal([{
+                    address: "testtest3@gmail.com",
+                    name: "testtest3"
+                }]);
+                expect(message.subject).to.equal("Nodemailer Test");
+                expect(message.body).to.be.ok;
+                expect(message.sentDate).to.be.ok;
                 done();
             });
         });
