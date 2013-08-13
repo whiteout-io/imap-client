@@ -1,4 +1,5 @@
 .DS_Store
 node_modules
 
-test/integration-browserified.js
+index-browserified.js
+test/index-browserified.js

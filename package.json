@@ -2,6 +2,7 @@
 	"name": "imap-client",
 	"version": "0.0.1",
 	"scripts": {
+		"pretest": "node build.js && cp index-browserified.js test/",
 		"test": "grunt test"
 	},
 	"dependencies": {

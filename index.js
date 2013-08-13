@@ -83,7 +83,9 @@ ImapClient.prototype.getMessage = function(options, callback) {
     });
 };
 
+// export node module
 module.exports.ImapClient = ImapClient;
+// export module into global scope for use in a require.js shim
 if (typeof window !== 'undefined') {
     window.ImapClient = ImapClient;
 }

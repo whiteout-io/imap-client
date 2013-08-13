@@ -2,3 +2,11 @@ imap-client [![Build Status](https://magnum.travis-ci.com/whiteout-io/imap-clien
 ===========
 
 Browserifiable imap client module for node. Exposes a high-level API wrapping an IMAP client
+
+## Getting started
+
+Run the build script to get everything bundled up into a chrome packaged app
+
+    npm install && npm test
+
+Then open chrome -> extentions and add the app in developer mode.
