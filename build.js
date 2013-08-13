@@ -5,6 +5,9 @@ var browserify = require('browserify'),
     path = require('path');
 
 var b = browserify('./index.js');
+b.require('./iconv-dummy', {
+    expose: 'iconv'
+});
 b.require('net-chromeify', {
     expose: 'net'
 });
