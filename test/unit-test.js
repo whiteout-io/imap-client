@@ -270,4 +270,5 @@ describe('ImapClient unit tests', function() {
             });
         });
     });
+
 });
