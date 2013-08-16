@@ -9,8 +9,8 @@ var inbox = require('inbox'),
  * @param {Number} options.port Port is the port to the server (defaults to 143 on non-secure and to 993 on secure connection).
  * @param {String} options.host Hostname of the server.
  * @param {Boolean} options.secure Indicates if the connection is using TLS or not
- * @param {String} options.host.auth.user Username for login
- * @param {String} options.host.auth.pass Password for login
+ * @param {String} options.auth.user Username for login
+ * @param {String} options.auth.pass Password for login
  */
 ImapClient = function(options) {
     var self = this;
