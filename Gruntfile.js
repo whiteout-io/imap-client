@@ -4,7 +4,7 @@ module.exports = function(grunt) {
     // Project configuration.
     grunt.initConfig({
         jshint: {
-            all: ['Gruntfile.js', 'index.js', 'test/unit.js', 'test/integration.js', 'test/mocha-run.js', 'test/mocha-setup.js', 'build.js', 'build-test.js'],
+            all: ['*.js', 'src/*.js', 'test/*-test.js', 'test/mocha-*.js', 'test/background.js'],
             options: {
                 jshintrc: '.jshintrc'
             }
