@@ -21,10 +21,11 @@ loginOptions = {
 };
 
 describe('ImapClient integration tests', function() {
+    this.timeout(20000);
+
     var ic;
 
     beforeEach(function(done) {
-        this.timeout(5000);
         ic = new ImapClient(loginOptions);
         ic.login(done);
     });
