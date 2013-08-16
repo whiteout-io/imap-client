@@ -8,7 +8,7 @@
 	"dependencies": {
 		"net-chromeify": "https://github.com/whiteout-io/net-chromeify/tarball/rewrite",
 		"tls-chromeify": "https://github.com/whiteout-io/tls-chromeify/tarball/master",
-		"inbox": "https://github.com/whiteout-io/inbox/tarball/iconv-lite",
+		"inbox": "https://github.com/whiteout-io/inbox/tarball/encoding",
 		"mailparser": "~0.3.6",
 		"browserify-mime": "~1.2.9"
 	},
