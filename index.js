@@ -106,7 +106,7 @@ ImapClient.prototype.getMessage = function(options, callback) {
             if (!callback) {
                 return;
             }
-            
+
             callback({
                 sentDate: email.headers.date,
                 id: email.messageId,
@@ -122,9 +122,19 @@ ImapClient.prototype.getMessage = function(options, callback) {
     });
 };
 
-// export node module
-module.exports.ImapClient = ImapClient;
-// export module into global scope for use in a require.js shim
-if (typeof window !== 'undefined') {
+/**
+ * Export module
+ */
+if (typeof define !== 'undefined' && define.amd) {
+    // AMD
+    define(['forge'], function(forge) {
+        window.forge = forge;
+        return ImapClient;
+    });
+} else if (typeof window !== 'undefined') {
+    // export module into global scope
     window.ImapClient = ImapClient;
+} else if (typeof module !== 'undefined' && module.exports) {
+    // node.js
+    module.exports.ImapClient = ImapClient;
 }
