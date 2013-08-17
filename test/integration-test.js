@@ -12,6 +12,11 @@ if (typeof window === 'undefined') {
 
 loginOptions = {
     port: 993,
+    // host: 'secureimap.t-online.de',
+    // auth: {
+    //     user: "whiteout.test@t-online.de",
+    //     pass: "@6IyFg1SIlWH91Co"
+    // },
     host: 'imap.gmail.com',
     auth: {
         user: "safewithme.testuser@gmail.com",
@@ -48,7 +53,7 @@ describe('ImapClient integration tests', function() {
     describe('ImapClient.listMessages', function() {
         it('should list messages', function(done) {
             ic.listMessages({
-                folder: 'INBOX',
+                path: 'INBOX',
                 offset: 0,
                 length: 10
             }, function(error, messages) {
@@ -63,7 +68,7 @@ describe('ImapClient integration tests', function() {
     describe('ImapClient.getMessage', function() {
         it('should get a specific message', function(done) {
             ic.getMessage({
-                folder: 'INBOX',
+                path: 'INBOX',
                 uid: uid
             }, function(message) {
                 expect(message).to.exist;
