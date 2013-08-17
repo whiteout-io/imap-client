@@ -1,6 +1,6 @@
 'use strict';
 
-var ImapClient, loginOptions, expect;
+var ImapClient, loginOptions, expect, uid;
 
 if (typeof window === 'undefined') {
     ImapClient = require('../index').ImapClient;
@@ -54,6 +54,7 @@ describe('ImapClient integration tests', function() {
             }, function(error, messages) {
                 expect(error).to.not.exist;
                 expect(messages).to.exist;
+                uid = messages[0].uid;
                 done();
             });
         });
@@ -63,7 +64,7 @@ describe('ImapClient integration tests', function() {
         it('should get a specific message', function(done) {
             ic.getMessage({
                 folder: 'INBOX',
-                uid: 127
+                uid: uid
             }, function(message) {
                 expect(message).to.exist;
                 done();
