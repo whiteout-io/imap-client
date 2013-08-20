@@ -1,6 +1,6 @@
 'use strict';
 
-var ImapClient, loginOptions, expect, uid;
+var ImapClient, loginOptions, expect;
 
 if (typeof window === 'undefined') {
     ImapClient = require('../index').ImapClient;
@@ -55,11 +55,10 @@ describe('ImapClient integration tests', function() {
             ic.listMessages({
                 path: 'INBOX',
                 offset: 0,
-                length: 10
+                length: 50
             }, function(error, messages) {
                 expect(error).to.not.exist;
                 expect(messages).to.exist;
-                uid = messages[0].uid;
                 done();
             });
         });
@@ -67,13 +66,23 @@ describe('ImapClient integration tests', function() {
 
     describe('ImapClient.getMessage', function() {
         it('should get a specific message', function(done) {
+            var attachmentReady = function(error, attmt) {
+                expect(error).to.not.exist;
+                expect(attmt.fileName).to.exist;
+                expect(attmt.contentType).to.exist;
+                expect(attmt.uint8Array).to.exist;
+                done();
+            };
+
+            var messageReady = function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+            };
+
             ic.getMessage({
                 path: 'INBOX',
-                uid: uid
-            }, function(message) {
-                expect(message).to.exist;
-                done();
-            });
+                uid: 583
+            }, messageReady, attachmentReady);
         });
     });
 });

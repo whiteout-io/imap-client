@@ -19,7 +19,9 @@ ImapClient = function(options) {
         secureConnection: options.secure,
         auth: options.auth
     });
-    self._parser = new MailParser();
+    self._parser = new MailParser({
+        streamAttachments: true
+    });
 };
 
 ImapClient.prototype.login = function(callback) {
@@ -51,10 +53,10 @@ ImapClient.prototype.listFolders = function(callback) {
 
 /**
  * List messages in an IMAP folder
- * @param options.path [String] The folder's path
- * @param options.offset [String] The offset where to start reading. Positive offsets count from the beginning, negative offset count from the tail.
- * @param options.length [String] Indicates how many messages you want to read
- * @param callback [Function] callback(error, messages) triggered when the messages are available.
+ * @param {String} options.path The folder's path
+ * @param {String} options.offset The offset where to start reading. Positive offsets count from the beginning, negative offset count from the tail.
+ * @param {String} options.length Indicates how many messages you want to read
+ * @param {Function} callback(error, messages) triggered when the messages are available.
  */
 ImapClient.prototype.listMessages = function(options, callback) {
     var self = this;
@@ -92,22 +94,24 @@ ImapClient.prototype.listMessages = function(options, callback) {
 
 /**
  * Get a certain message from the server.
- * @param options.path [String] The folder's path
- * @param options.uid [Number] The uid of the message
- * @param callback [Function] callback(message) will be called the the message is ready;
+ * @param {String} options.path [String] The folder's path
+ * @param {Number} options.uid The uid of the message
+ * @param {Function} messageReady(error, message) will be called the message is ready
+ * @param {Function} attachmentReady(error, attachment) will be called the attachment
  */
-ImapClient.prototype.getMessage = function(options, callback) {
+ImapClient.prototype.getMessage = function(options, messageReady, attachmentReady) {
     var self = this;
 
     self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
         self._parser.on('end', function(email) {
-            if (!callback) {
+            var mail;
+            if (!messageReady) {
                 return;
             }
 
-            callback({
+            mail = {
                 sentDate: email.headers.date,
                 id: email.messageId,
                 from: email.from,
@@ -116,8 +120,53 @@ ImapClient.prototype.getMessage = function(options, callback) {
                 bcc: email.bcc,
                 subject: email.subject,
                 body: email.text,
+            };
+            if (typeof email.attachments !== 'undefined') {
+                mail.attachments = email.attachments;
+            }
+
+            messageReady(null, mail);
+        });
+
+        self._parser.on('attachment', function(attachment) {
+            var buffers = [];
+            attachment.stream.on('data', function(chunk) {
+                buffers.push(chunk.toString('binary'));
+            });
+
+            attachment.stream.on('end', function() {
+                var length = 0,
+                    offset = 0;
+
+                buffers.forEach(function(element) {
+                    length += element.length;
+                });
+                var buffer = new ArrayBuffer(length);
+                var view = new Uint8Array(buffer);
+                buffers.forEach(function(element) {
+                    for (var i = 0, len = element.length; i < len; i++) {
+                        view[offset + i] = element.charCodeAt(i);
+                    }
+                    offset += element.length;
+                });
+                attachmentReady(null, {
+                    fileName: attachment.generatedFileName,
+                    contentType: attachment.contentType,
+                    uint8Array: view
+                });
+            });
+
+            attachment.stream.on('error', function(error) {
+                console.error('Error during retrieving attachment', error);
+                attachmentReady(error);
             });
         });
+
+        self._parser.on('error', function(error) {
+            console.error('Error while recrieving message', error);
+            messageReady(error);
+        });
+
         self._client.createMessageStream(options.uid).pipe(self._parser);
     });
 };

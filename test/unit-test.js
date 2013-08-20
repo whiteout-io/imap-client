@@ -7,10 +7,18 @@ var rewire = require('rewire'),
     imapClient = rewire('../index'),
     JsMockito = require('jsmockito').JsMockito,
     JsHamcrest = require('jshamcrest').JsHamcrest,
-    ibNsMock, loginOptions, ibMock, MpMock;
+    ibNsMock, loginOptions, ibMock, MpMock, stream, attmt;
+
 
 JsMockito.Integration.Nodeunit();
 JsHamcrest.Integration.Nodeunit();
+
+stream = new EventEmitter();
+attmt = {
+    generatedFileName: 'poopoo',
+    contentType: 'text/poopoo',
+    stream: stream
+};
 
 loginOptions = {
     port: 1234,
@@ -127,8 +135,13 @@ ibMock = (function() {
                         name: "testtest3"
                     }],
                     subject: "Nodemailer Test",
-                    text: "Lorem ipsum dolor sin amet..."
+                    text: "Lorem ipsum dolor sin amet...",
+                    attachments: [attmt]
                 });
+                obj.emit('attachment', attmt);
+                stream.emit('data', new Buffer('poo'));
+                stream.emit('data', new Buffer('poo'));
+                stream.emit('end');
             }
         };
     };
@@ -245,7 +258,8 @@ describe('ImapClient unit tests', function() {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 123
-            }, function(message) {
+            }, function(error, message) {
+                expect(error).to.be.null;
                 expect(message.id).to.equal("<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>");
                 expect(message.from).to.deep.equal([{
                     address: "stuff@bla.io",
@@ -266,9 +280,15 @@ describe('ImapClient unit tests', function() {
                 expect(message.subject).to.equal("Nodemailer Test");
                 expect(message.body).to.be.ok;
                 expect(message.sentDate).to.be.ok;
+                expect(message.attachments.length).to.equal(1);
+                expect(message.attachments[0]).to.equal(attmt);
+            }, function(error, attachment) {
+                expect(error).to.not.exist;
+                expect(attachment.fileName).to.equal('poopoo');
+                expect(attachment.contentType).to.equal('text/poopoo');
+                expect(attachment.uint8Array).to.exist;
                 done();
             });
         });
     });
-
 });
