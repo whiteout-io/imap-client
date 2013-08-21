@@ -88,18 +88,29 @@ describe('ImapClient integration tests', function() {
 
     describe('ImapClient.getMessage', function() {
         it('should get a specific message', function(done) {
-            var attachmentReady = function(error, attmt) {
+            var attmtReceived = false, msgReceived = false;
+
+            function attachmentReady(error, attmt) {
                 expect(error).to.not.exist;
                 expect(attmt.fileName).to.exist;
                 expect(attmt.contentType).to.exist;
                 expect(attmt.uint8Array).to.exist;
-                done();
-            };
+                attmtReceived = true;
+                check();
+            }
 
-            var messageReady = function(error, message) {
+            function messageReady(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-            };
+                msgReceived = true;
+                check();
+            }
+
+            function check() {
+                if (attmtReceived && msgReceived) {
+                    done();
+                }
+            }
 
             ic.getMessage({
                 path: 'INBOX',
