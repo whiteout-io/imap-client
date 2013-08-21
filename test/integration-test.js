@@ -50,6 +50,28 @@ describe('ImapClient integration tests', function() {
         });
     });
 
+    describe('ImapClient.listFolders', function() {
+        it('should list an empty subfolder', function(done) {
+            ic.listFolders('[Gmail]/Gesendet', function(error, mailboxes) {
+                expect(error).to.not.exist;
+                expect(mailboxes).to.exist;
+                expect(mailboxes).to.be.empty;
+                done();
+            });
+        });
+    });
+
+    describe('ImapClient.listFolders', function() {
+        it('should list subfolders', function(done) {
+            ic.listFolders('[Gmail]', function(error, mailboxes) {
+                expect(error).to.not.exist;
+                expect(mailboxes).to.exist;
+                expect(mailboxes).to.not.be.empty;
+                done();
+            });
+        });
+    });
+
     describe('ImapClient.listMessages', function() {
         it('should list messages', function(done) {
             ic.listMessages({

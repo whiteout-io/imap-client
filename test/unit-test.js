@@ -53,11 +53,51 @@ ibMock = (function() {
 
     o.listMailboxesCount = 0;
     o.listMailboxes = function(callback) {
+        var hasNoChildren, listNoChildren;
+
+        hasNoChildren = function() {
+            return false;
+        };
+        listNoChildren = function(cb) {
+            cb(null, []);
+        };
+
         expect(o.listMailboxesCount).to.be.ok;
         o.listMailboxesCount--;
 
         if (callback) {
-            callback(undefined, [{}, {}, {}]);
+            callback(undefined, [{
+                path: 'AROUNDBOX',
+                listChildren: function(cb) {
+                    cb(null, [{
+                        path: 'AROUNDBOX/FooBar',
+                        listChildren: function(cb) {
+                            cb(null, [{}, {}, {}, {}, {}]);
+                        },
+                        hasChildren: hasNoChildren
+                    }, {
+                        path: 'AROUNDBOX/PooBar',
+                        hasChildren: hasNoChildren,
+                        listChildren: listNoChildren
+                    }, {
+                        path: 'AROUNDBOX/Duh',
+                        hasChildren: hasNoChildren,
+                        listChildren: listNoChildren
+                    }, {
+                        path: 'AROUNDBOX/asdasdasd',
+                        hasChildren: hasNoChildren,
+                        listChildren: listNoChildren
+                    }]);
+                }
+            }, {
+                path: 'INBOX',
+                hasChildren: hasNoChildren,
+                listChildren: listNoChildren
+            }, {
+                path: 'OUTBOX',
+                hasChildren: hasNoChildren,
+                listChildren: listNoChildren
+            }]);
         }
     };
 
@@ -210,6 +250,28 @@ describe('ImapClient unit tests', function() {
             ibMock.expect('listMailboxes');
             ic.listFolders(function(error, mailboxes) {
                 expect(mailboxes.length).to.equal(3);
+                done();
+            });
+        });
+    });
+
+    describe('list subfolders', function() {
+        it('should list subfolders', function(done) {
+            ibMock.expect('listMailboxes');
+            ic.listFolders('AROUNDBOX/FooBar', function(error, mailboxes) {
+                expect(mailboxes).to.not.be.empty;
+                done();
+            });
+        });
+    });
+
+    describe('list an empty subfolder', function() {
+        it('should list subfolders', function(done) {
+            ibMock.expect('listMailboxes');
+            ic.listFolders('AROUNDBOX/Duh', function(error, mailboxes) {
+                expect(error).to.not.exist;
+                expect(mailboxes).to.exist;
+                expect(mailboxes).to.be.empty;
                 done();
             });
         });

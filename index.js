@@ -43,12 +43,67 @@ ImapClient.prototype.logout = function(callback) {
 
 /**
  * List available IMAP folders
+ * @param {String} path [optional] If present, its subfolders will be listed
  * @param callback [Function] callback(error, mailboxes) triggered when the folders are available
  */
-ImapClient.prototype.listFolders = function(callback) {
+ImapClient.prototype.listFolders = function(path, callback) {
+    var self = this,
+        args = arguments;
+
+    if (typeof args[0] === 'function') {
+        listTopLevelFolders.bind(self)(args[0]); // called via ImapClient.listFolders(callback)
+    } else if (typeof args[0] === 'string') {
+        listSubFolders.bind(self)(path, callback); // called via ImapClient.listFolders(parent, callback)
+    }
+};
+
+var listTopLevelFolders = function(callback) {
     var self = this;
 
     self._client.listMailboxes(callback);
+};
+
+var listSubFolders = function(path, callback) {
+    var self = this,
+        pathComponents = path.split('/'),
+        maxDepth = pathComponents.length,
+        subfolders;
+
+    subfolders = function(error, mailboxes) {
+        var mailbox, mailboxPathComponents, currentDepth, i = mailboxes.length;
+
+        if (error) {
+            callback(error);
+            return;
+        }
+
+        while (i--) {
+            mailbox = mailboxes[i];
+            mailboxPathComponents = mailbox.path.split('/');
+            currentDepth = mailboxPathComponents.length;
+
+            if (pathComponents[currentDepth - 1] !== mailboxPathComponents[currentDepth - 1]) {
+                // we're on the wrong track, keep searching
+                continue;
+            }
+
+            // we're on the right track
+            if (currentDepth === maxDepth) {
+                // we're there, let's go.
+                if (mailbox.hasChildren) {
+                    mailbox.listChildren(callback);
+                } else {
+                    callback(null, []);
+                }
+                return;
+            }
+
+            // we have to go deeper
+            mailbox.listChildren(subfolders);
+        }
+    };
+
+    self._client.listMailboxes(subfolders);
 };
 
 /**
