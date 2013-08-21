@@ -74,10 +74,9 @@ var listTopLevelFolders = function(callback) {
 var listSubFolders = function(path, callback) {
     var self = this,
         pathComponents = path.split('/'),
-        maxDepth = pathComponents.length,
-        subfolders;
+        maxDepth = pathComponents.length;
 
-    subfolders = function(error, mailboxes) {
+    function subfolders(error, mailboxes) {
         var mailbox, mailboxPathComponents, currentDepth, i = mailboxes.length;
 
         if (error) {
@@ -112,7 +111,7 @@ var listSubFolders = function(path, callback) {
             // we have to go deeper
             mailbox.listChildren(subfolders);
         }
-    };
+    }
 
     self._client.listMailboxes(subfolders);
 };
