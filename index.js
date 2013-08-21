@@ -57,12 +57,20 @@ ImapClient.prototype.listFolders = function(path, callback) {
     }
 };
 
+/*
+ * This is the simple path, where we just list the top level folders and we're good
+ */
 var listTopLevelFolders = function(callback) {
     var self = this;
 
     self._client.listMailboxes(callback);
 };
 
+/*
+ * This path is a bit more complicated than listTopLevelFolders. Since inbox does not provide a nicer API, we'll do a
+ * search along the path until we've reached the target. The folders are always declared via L0/L1/L2/..., so we just 
+ * track how deep we're in the IMAP folder hierarchy and look for the next nested folders there.
+ */
 var listSubFolders = function(path, callback) {
     var self = this,
         pathComponents = path.split('/'),
@@ -93,6 +101,9 @@ var listSubFolders = function(path, callback) {
                 if (mailbox.hasChildren) {
                     mailbox.listChildren(callback);
                 } else {
+                    // there are no children... the inbox API doc is a bit unclear about the 
+                    // behavior if no children are present, also we do not want to do the
+                    // roundtrip to the server again, so we call back ourselves.
                     callback(null, []);
                 }
                 return;
@@ -160,7 +171,24 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
     self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
-        self._parser.on('end', function(email) {
+        self._parser.on('end', handleEmail);
+
+        if (typeof attachmentReady !== 'undefined') {
+            self._parser.on('attachment', handleAttachment);
+        }
+
+        self._parser.on('error', function(error) {
+            messageReady(error);
+        });
+
+        self._client.createMessageStream(options.uid).pipe(self._parser);
+
+        /*
+         * When the parser is done, format it into out email data
+         * model and invoke the messageReady callback
+         */
+
+        function handleEmail(email) {
             var mail;
             if (!messageReady) {
                 return;
@@ -181,18 +209,28 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
             }
 
             messageReady(null, mail);
-        });
+        }
 
-        self._parser.on('attachment', function(attachment) {
+        /*
+         * When the parser emits 'attachment', we listen to the stream,
+         * piece the attachment together and then invoke the attachmentReady callback
+         */
+
+        function handleAttachment(attachment) {
             var buffers = [];
+
             attachment.stream.on('data', function(chunk) {
+                // the attachment is delivered in chunks as binary Buffers
                 buffers.push(chunk.toString('binary'));
             });
 
+            // we've reached the end of the attachment, let's piece it together and invoke the callback
             attachment.stream.on('end', function() {
                 var length = 0,
                     offset = 0;
 
+                // piece the chunks of binary Buffers together and  put them conveniently 
+                // into a typed array which can be used in node and the browser alike
                 buffers.forEach(function(element) {
                     length += element.length;
                 });
@@ -204,6 +242,7 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
                     }
                     offset += element.length;
                 });
+
                 attachmentReady(null, {
                     fileName: attachment.generatedFileName,
                     contentType: attachment.contentType,
@@ -215,14 +254,7 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
                 console.error('Error during retrieving attachment', error);
                 attachmentReady(error);
             });
-        });
-
-        self._parser.on('error', function(error) {
-            console.error('Error while recrieving message', error);
-            messageReady(error);
-        });
-
-        self._client.createMessageStream(options.uid).pipe(self._parser);
+        }
     });
 };
 
