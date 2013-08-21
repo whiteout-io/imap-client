@@ -202,7 +202,7 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
                 cc: email.cc,
                 bcc: email.bcc,
                 subject: email.subject,
-                body: email.text,
+                body: email.html || email.text,
             };
             if (typeof email.attachments !== 'undefined') {
                 mail.attachments = email.attachments;
