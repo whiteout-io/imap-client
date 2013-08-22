@@ -147,12 +147,14 @@ ibMock = (function() {
 
     o.createMessageStreamCount = 0;
     o.createMessageStream = function(uid) {
+        var fakeStream = new EventEmitter();
+
         expect(o.createMessageStreamCount).to.be.ok;
         o.createMessageStreamCount--;
 
-        expect(uid).to.be.ok;
-        return {
-            pipe: function(parser) {
+        if (uid > 0) {
+            // this is the good case, a uid > 0 is valid in this test
+            fakeStream.pipe = function(parser) {
                 parser.emit('end', {
                     headers: {
                         date: new Date(),
@@ -182,8 +184,17 @@ ibMock = (function() {
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('end');
-            }
-        };
+            };
+            return fakeStream;
+        } else if (uid === 0) {
+            fakeStream.pipe = function() {};
+            setImmediate(function() {
+                fakeStream.emit('error', new Error('EVERYTHING IS BROKEN!!!'));
+            });
+            return fakeStream;
+        } else {
+            // in case of uid < 0, return nothing, i.e. undefined
+        }
     };
 
     o.resetMock = function() {
@@ -349,6 +360,34 @@ describe('ImapClient unit tests', function() {
                 expect(attachment.fileName).to.equal('poopoo');
                 expect(attachment.contentType).to.equal('text/poopoo');
                 expect(attachment.uint8Array).to.exist;
+                done();
+            });
+        });
+    });
+
+    describe('getMessage with nonexistent uid', function() {
+        it('should avoid invoking pipe on nonexistent stream', function(done) {
+            ibMock.expect('openMailbox');
+            ibMock.expect('createMessageStream');
+            ic.getMessage({
+                path: 'INBOX',
+                uid: -1
+            }, function(error, message) {
+                expect(error).to.exist;
+                expect(message).to.not.exist;
+                done();
+            });
+        });
+
+        it('should catch stream error', function(done) {
+            ibMock.expect('openMailbox');
+            ibMock.expect('createMessageStream');
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 0
+            }, function(error, message) {
+                expect(error).to.exist;
+                expect(message).to.not.exist;
                 done();
             });
         });

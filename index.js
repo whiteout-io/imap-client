@@ -167,21 +167,31 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
     self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
-        var parser = new MailParser({
+        var parser, stream;
+
+        stream = self._client.createMessageStream(options.uid);
+        if (!stream) {
+            messageReady(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+            return;
+        }
+        
+        stream.on('error', function(e) {
+            messageReady(e);
+        });
+
+        parser = new MailParser({
             streamAttachments: true
         });
 
         parser.on('end', handleEmail);
-
+        parser.on('error', function(e) {
+            messageReady(e);
+        });
         if (typeof attachmentReady !== 'undefined') {
             parser.on('attachment', handleAttachment);
         }
 
-        parser.on('error', function(error) {
-            messageReady(error);
-        });
-
-        self._client.createMessageStream(options.uid).pipe(parser);
+        stream.pipe(parser);
 
         /*
          * When the parser is done, format it into out email data

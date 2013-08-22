@@ -48,9 +48,7 @@ describe('ImapClient integration tests', function() {
                 done();
             });
         });
-    });
 
-    describe('ImapClient.listFolders', function() {
         it('should list an empty subfolder', function(done) {
             ic.listFolders('[Gmail]/Gesendet', function(error, mailboxes) {
                 expect(error).to.not.exist;
@@ -59,9 +57,7 @@ describe('ImapClient integration tests', function() {
                 done();
             });
         });
-    });
 
-    describe('ImapClient.listFolders', function() {
         it('should list subfolders', function(done) {
             ic.listFolders('[Gmail]', function(error, mailboxes) {
                 expect(error).to.not.exist;
@@ -117,6 +113,16 @@ describe('ImapClient integration tests', function() {
                 path: 'INBOX',
                 uid: 583
             }, messageReady, attachmentReady);
+        });
+        it('should not get a non-existent message', function(done) {
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 999
+            }, function(error, message) {
+                expect(error).to.exist;
+                expect(message).to.not.exist;
+                done();
+            });
         });
     });
 
