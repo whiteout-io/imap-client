@@ -19,9 +19,6 @@ ImapClient = function(options) {
         secureConnection: options.secure,
         auth: options.auth
     });
-    self._parser = new MailParser({
-        streamAttachments: true
-    });
 };
 
 ImapClient.prototype.login = function(callback) {
@@ -68,7 +65,7 @@ var listTopLevelFolders = function(callback) {
 
 /*
  * This path is a bit more complicated than listTopLevelFolders. Since inbox does not provide a nicer API, we'll do a
- * search along the path until we've reached the target. The folders are always declared via L0/L1/L2/..., so we just 
+ * search along the path until we've reached the target. The folders are always declared via L0/L1/L2/..., so we just
  * track how deep we're in the IMAP folder hierarchy and look for the next nested folders there.
  */
 var listSubFolders = function(path, callback) {
@@ -170,17 +167,21 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
     self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
-        self._parser.on('end', handleEmail);
+        var parser = new MailParser({
+            streamAttachments: true
+        });
+
+        parser.on('end', handleEmail);
 
         if (typeof attachmentReady !== 'undefined') {
-            self._parser.on('attachment', handleAttachment);
+            parser.on('attachment', handleAttachment);
         }
 
-        self._parser.on('error', function(error) {
+        parser.on('error', function(error) {
             messageReady(error);
         });
 
-        self._client.createMessageStream(options.uid).pipe(self._parser);
+        self._client.createMessageStream(options.uid).pipe(parser);
 
         /*
          * When the parser is done, format it into out email data

@@ -152,8 +152,8 @@ ibMock = (function() {
 
         expect(uid).to.be.ok;
         return {
-            pipe: function(obj) {
-                obj.emit('end', {
+            pipe: function(parser) {
+                parser.emit('end', {
                     headers: {
                         date: new Date(),
                     },
@@ -178,7 +178,7 @@ ibMock = (function() {
                     text: "Lorem ipsum dolor sin amet...",
                     attachments: [attmt]
                 });
-                obj.emit('attachment', attmt);
+                parser.emit('attachment', attmt);
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('end');

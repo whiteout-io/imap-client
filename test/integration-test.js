@@ -80,7 +80,7 @@ describe('ImapClient integration tests', function() {
                 length: 50
             }, function(error, messages) {
                 expect(error).to.not.exist;
-                expect(messages).to.exist;
+                expect(messages).to.not.be.empty;
                 done();
             });
         });
@@ -88,7 +88,8 @@ describe('ImapClient integration tests', function() {
 
     describe('ImapClient.getMessage', function() {
         it('should get a specific message', function(done) {
-            var attmtReceived = false, msgReceived = false;
+            var attmtReceived = false,
+                msgReceived = false;
 
             function attachmentReady(error, attmt) {
                 expect(error).to.not.exist;
@@ -116,6 +117,44 @@ describe('ImapClient integration tests', function() {
                 path: 'INBOX',
                 uid: 583
             }, messageReady, attachmentReady);
+        });
+    });
+
+    describe('get two consecutive messages', function() {
+        it('should receive the two messages', function(done) {
+            var msg1 = false, msg2 = false;
+
+            function firstMessageReady(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.id).to.equal('1376674819251.991dfde@Nodemailer');
+                msg1 = true;
+                check();
+            }
+
+            function secondMessageReady(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.id).to.equal('1376674818845.ee855fa8@Nodemailer');
+                msg2 = true;
+                check();
+            }
+
+            function check() {
+                if (msg1 && msg2) {
+                    done();
+                }
+            }
+
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 447
+            }, firstMessageReady);
+
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 448
+            }, secondMessageReady);
         });
     });
 });
