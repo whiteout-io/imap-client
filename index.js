@@ -196,6 +196,7 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
             mail = {
                 sentDate: email.headers.date,
                 id: email.messageId,
+                uid: options.uid,
                 from: email.from,
                 to: email.to,
                 cc: email.cc,
