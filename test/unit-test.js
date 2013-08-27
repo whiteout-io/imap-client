@@ -141,7 +141,24 @@ ibMock = (function() {
             bcc: [{
                 address: "testtest3@gmail.com",
                 name: "testtest3"
-            }]
+            }],
+            flags: ['\\Answered']
+        }, {
+            UID: 127,
+            date: new Date(),
+            from: {
+                address: "stuff@bla.io",
+                name: "Test Sender"
+            },
+            messageId: "<5c33bb30-042f-11e3-8ffd-0800200c9a66@foomail.com>",
+            title: "Nodemailer Test",
+            to: [{
+                address: "testtest1@gmail.com",
+                name: "testtest1"
+            }],
+            cc: [],
+            bcc: [],
+            flags: ['\\Seen']
         }]);
     };
 
@@ -295,30 +312,34 @@ describe('ImapClient unit tests', function() {
             ic.listMessages({
                 path: 'foobar',
                 offset: 0,
-                length: 1
+                length: 2
             }, function(err, messages) {
-                expect(messages.length).to.equal(1);
-                expect(messages[0].id).to.equal("<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>");
-                expect(messages[0].uid).to.equal(126);
-                expect(messages[0].from).to.deep.equal([{
+                expect(messages.length).to.equal(2);
+                expect(messages[1].id).to.equal("<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>");
+                expect(messages[1].uid).to.equal(126);
+                expect(messages[1].from).to.deep.equal([{
                     address: "stuff@bla.io",
                     name: "Test Sender"
                 }]);
-                expect(messages[0].to).to.deep.equal([{
+                expect(messages[1].to).to.deep.equal([{
                     address: "testtest1@gmail.com",
                     name: "testtest1"
                 }]);
-                expect(messages[0].cc).to.deep.equal([{
+                expect(messages[1].cc).to.deep.equal([{
                     address: "testtest2@gmail.com",
                     name: "testtest2"
                 }]);
-                expect(messages[0].bcc).to.deep.equal([{
+                expect(messages[1].bcc).to.deep.equal([{
                     address: "testtest3@gmail.com",
                     name: "testtest3"
                 }]);
-                expect(messages[0].subject).to.equal("Nodemailer Test");
-                expect(messages[0].body).to.not.be.ok;
-                expect(messages[0].sentDate).to.be.ok;
+                expect(messages[1].subject).to.equal("Nodemailer Test");
+                expect(messages[1].body).to.not.be.ok;
+                expect(messages[1].sentDate).to.be.ok;
+                expect(messages[1].unread).to.be.true;
+                expect(messages[1].answered).to.be.true;
+                expect(messages[0].unread).to.be.false;
+                expect(messages[0].answered).to.be.false;
                 done();
             });
         });
