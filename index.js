@@ -146,7 +146,9 @@ ImapClient.prototype.listMessages = function(options, callback) {
                     bcc: email.bcc,
                     subject: email.title,
                     body: null,
-                    sentDate: email.date
+                    sentDate: email.date,
+                    unread: email.flags.indexOf('\\Seen') === -1,
+                    answered: email.flags.indexOf('\\Answered') > -1
                 });
             }
             callback(error, emails);
@@ -174,7 +176,7 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
             messageReady(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
             return;
         }
-        
+
         stream.on('error', function(e) {
             messageReady(e);
         });
@@ -187,6 +189,7 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
         parser.on('error', function(e) {
             messageReady(e);
         });
+
         if (typeof attachmentReady !== 'undefined') {
             parser.on('attachment', handleAttachment);
         }
@@ -213,7 +216,7 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
                 cc: email.cc,
                 bcc: email.bcc,
                 subject: email.subject,
-                body: email.html || email.text,
+                body: email.html || email.text
             };
             if (typeof email.attachments !== 'undefined') {
                 mail.attachments = email.attachments;

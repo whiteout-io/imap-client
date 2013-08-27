@@ -8,10 +8,10 @@
 	"dependencies": {
 		"net-chromeify": "https://github.com/whiteout-io/net-chromeify/tarball/rewrite",
 		"tls-chromeify": "https://github.com/whiteout-io/tls-chromeify/tarball/master",
-		"inbox": "1.1.35",
+		"browserify": "https://github.com/whiteout-io/node-browserify/tarball/builtins",
+		"inbox": "https://github.com/whiteout-io/inbox/tarball/noattachment",
 		"mailparser": "0.3.6",
-		"browserify-mime": "1.2.9",
-		"browserify": "https://github.com/whiteout-io/node-browserify/tarball/builtins"
+		"browserify-mime": "1.2.9"
 	},
 	"devDependencies": {
 		"mocha": "~1.12.0",

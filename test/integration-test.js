@@ -75,8 +75,18 @@ describe('ImapClient integration tests', function() {
                 offset: 0,
                 length: 50
             }, function(error, messages) {
+                var message;
+
                 expect(error).to.not.exist;
                 expect(messages).to.not.be.empty;
+                for (var i = messages.length - 1; i >= 0; i--) {
+                    message = messages[i];
+                    if (message.uid === 653) {
+                        expect(message.unread).to.be.true;
+                    } else if (message.uid === 447) {
+                        expect(message.unread).to.be.false;
+                    }
+                }
                 done();
             });
         });
@@ -133,7 +143,7 @@ describe('ImapClient integration tests', function() {
             function firstMessageReady(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.id).to.equal('1376674819251.991dfde@Nodemailer');
+                expect(message.id).to.equal('1377622802704.8db37f1d@Nodemailer');
                 msg1 = true;
                 check();
             }
@@ -154,7 +164,7 @@ describe('ImapClient integration tests', function() {
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 447
+                uid: 652
             }, firstMessageReady);
 
             ic.getMessage({
