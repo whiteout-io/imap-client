@@ -164,7 +164,31 @@ ibMock = (function() {
 
     o.createMessageStreamCount = 0;
     o.createMessageStream = function(uid) {
-        var fakeStream = new EventEmitter();
+        var fakeStream = new EventEmitter(),
+            message, headers = {
+                id: '<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>',
+                sentDate: new Date(),
+                from: [{
+                    address: 'stuff@bla.io',
+                    name: 'Test Sender'
+                }],
+                to: [{
+                    address: 'testtest1@gmail.com',
+                    name: 'testtest1'
+                }],
+                cc: [{
+                    address: 'testtest2@gmail.com',
+                    name: 'testtest2'
+                }],
+                bcc: [{
+                    address: 'testtest3@gmail.com',
+                    name: 'testtest3'
+                }],
+                subject: 'Nodemailer Test'
+            }, body = {
+                type: 'text/plain',
+                content: 'Lorem ipsum dolor sin amet...'
+            };
 
         expect(o.createMessageStreamCount).to.be.ok;
         o.createMessageStreamCount--;
@@ -172,38 +196,15 @@ ibMock = (function() {
         if (uid > 0) {
             // this is the good case, a uid > 0 is valid in this test
             fakeStream.pipe = function(parser) {
-                parser.emit('body', {
-                    type: 'text/plain',
-                    content: 'Lorem ipsum dolor sin amet...'
-                });
+                parser.emit('headersReady', headers);
+                parser.emit('body', body);
                 parser.emit('attachment', attmt);
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('end');
-                parser.emit('end', {
-                    headers: {
-                        date: new Date()
-                    },
-                    messageId: '<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>',
-                    from: [{
-                        address: 'stuff@bla.io',
-                        name: 'Test Sender'
-                    }],
-                    to: [{
-                        address: 'testtest1@gmail.com',
-                        name: 'testtest1'
-                    }],
-                    cc: [{
-                        address: 'testtest2@gmail.com',
-                        name: 'testtest2'
-                    }],
-                    bcc: [{
-                        address: 'testtest3@gmail.com',
-                        name: 'testtest3'
-                    }],
-                    subject: 'Nodemailer Test',
-                    text: 'Lorem ipsum dolor sin amet...',
-                });
+                message = JSON.parse(JSON.stringify(headers));
+                message.text = body.content;
+                parser.emit('end', message);
             };
             return fakeStream;
         } else if (uid === 0) {
@@ -365,20 +366,12 @@ describe('ImapClient unit tests', function() {
                         address: 'stuff@bla.io',
                         name: 'Test Sender'
                     }]);
-                    expect(message.to).to.deep.equal([{
-                        address: 'testtest1@gmail.com',
-                        name: 'testtest1'
-                    }]);
-                    expect(message.cc).to.deep.equal([{
-                        address: 'testtest2@gmail.com',
-                        name: 'testtest2'
-                    }]);
-                    expect(message.bcc).to.deep.equal([{
-                        address: 'testtest3@gmail.com',
-                        name: 'testtest3'
-                    }]);
+                    expect(message.to).to.be.instanceof(Array);
+                    expect(message.cc).to.be.instanceof(Array);
+                    expect(message.bcc).to.be.instanceof(Array);
                     expect(message.subject).to.equal('Nodemailer Test');
-                    expect(message.body).to.be.ok;
+                    expect(message.body).to.equal('Lorem ipsum dolor sin amet...');
+                    expect(message.html).to.be.false;
                     expect(message.sentDate).to.be.ok;
                     expect(message.attachments.length).to.equal(1);
                     expect(message.attachments[0].fileName).to.equal('poopoo');
@@ -390,17 +383,24 @@ describe('ImapClient unit tests', function() {
 
                     done();
                 },
-                onAttachment: function(attachment) {
+                onAttachment: function(error, attachment) {
+                    expect(error).to.be.null;
                     expect(attachment.fileName).to.equal('poopoo');
                     expect(attachment.contentType).to.equal('text/poopoo');
                     expect(attachment.uint8Array).to.exist;
+
                     attachmentParsed = true;
                 },
-                onMessageBody: function(body) {
-                    expect(body).to.deep.equal({
-                        type: 'text/plain',
-                        content: 'Lorem ipsum dolor sin amet...'
-                    });
+                onMessageBody: function(error, message) {
+                    expect(error).to.be.null;
+                    expect(message.id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
+                    expect(message.to).to.be.instanceof(Array);
+                    expect(message.cc).to.be.instanceof(Array);
+                    expect(message.bcc).to.be.instanceof(Array);
+                    expect(message.subject).to.equal('Nodemailer Test');
+                    expect(message.body).to.equal('Lorem ipsum dolor sin amet...');
+                    expect(message.html).to.be.false;
+
                     bodyParsed = true;
                 }
             });

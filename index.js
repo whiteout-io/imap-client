@@ -161,8 +161,8 @@ ImapClient.prototype.listMessages = function(options, callback) {
  * @param {String} options.path [String] The folder's path
  * @param {Number} options.uid The uid of the message
  * @param {Function} options.onMessage(error, message) will be called the message and attachments are fully parsed
- * @param {Function} options.onAttachment(attachment) [optional] will be called when an attachment has been parsed
- * @param {Function} options.onMessageBody(body) [optional] will be called when the body is parsed. The attachments are not parsed at that point.
+ * @param {Function} options.onAttachment(error, attachment) [optional] will be called when an attachment has been parsed
+ * @param {Function} options.onMessageBody(error, body) [optional] will be called when the body is parsed. The attachments are not parsed at that point.
  */
 ImapClient.prototype.getMessage = function(options) {
     var self = this;
@@ -170,7 +170,7 @@ ImapClient.prototype.getMessage = function(options) {
     self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
-        var parser, stream, attachments = [];
+        var parser, stream, headers, attachments = [];
 
         stream = self._client.createMessageStream(options.uid);
         if (!stream) {
@@ -188,39 +188,46 @@ ImapClient.prototype.getMessage = function(options) {
 
         parser.on('end', handleEmail);
         parser.on('attachment', handleAttachment);
-        if (typeof options.onMessageBody === 'function') {
-            parser.on('body', options.onMessageBody);
-        }
+        parser.on('headersReady', handleHeaders);
+        parser.on('body', handleBody);
         parser.on('error', function(e) {
             options.onMessage(e);
         });
 
         stream.pipe(parser);
 
+        function handleHeaders(someHeaders) {
+            headers = someHeaders;
+            headers.uid = options.uid;
+        }
+
+        function handleBody(somebody) {
+            var body;
+            if (typeof options.onMessageBody !== 'function') {
+                return;
+            }
+
+            body = JSON.parse(JSON.stringify(headers));
+            body.html = somebody.type === 'text/html';
+            body.body = somebody.content;
+            body.attachments = null;
+            options.onMessageBody(null, body);
+        }
+
         /*
          * When the parser is done, format it into out email data
          * model and invoke the onMessage callback
          */
-
         function handleEmail(email) {
             var mail;
             if (!(options.onMessage)) {
                 return;
             }
 
-            mail = {
-                sentDate: email.headers.date,
-                id: email.messageId,
-                uid: options.uid,
-                from: email.from,
-                to: email.to,
-                cc: email.cc,
-                bcc: email.bcc,
-                subject: email.subject,
-                body: email.html || email.text,
-                attachments: attachments
-            };
-
+            mail = JSON.parse(JSON.stringify(headers));
+            mail.html = !! email.html;
+            mail.body = email.html || email.text;
+            mail.attachments = attachments;
             options.onMessage(null, mail);
         }
 
@@ -265,7 +272,7 @@ ImapClient.prototype.getMessage = function(options) {
 
                 attachments.push(attmt);
                 if (typeof options.onAttachment === 'function') {
-                    options.onAttachment(attmt);
+                    options.onAttachment(null, attmt);
                 }
 
             });

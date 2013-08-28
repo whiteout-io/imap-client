@@ -97,16 +97,22 @@ describe('ImapClient integration tests', function() {
             var attachmentParsed = false,
                 bodyParsed = false;
 
-            function onAttachment(attmt) {
+            function onAttachment(error, attmt) {
+                expect(error).to.be.null;
                 expect(attmt.fileName).to.exist;
                 expect(attmt.contentType).to.exist;
                 expect(attmt.uint8Array).to.exist;
                 attachmentParsed = true;
             }
 
-            function onMessageBody(body) {
-                expect(body.type).to.equal('text/plain');
-                expect(body.content).to.exist;
+            function onMessageBody(error, message) {
+                expect(error).to.be.null;
+                expect(message.id).to.exist;
+                expect(message.to).to.be.instanceof(Array);
+                expect(message.subject).to.equal('test');
+                expect(message.body).to.equal('asdasdasd\n\n');
+                expect(message.html).to.be.false;
+
                 bodyParsed = true;
             }
 
