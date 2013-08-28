@@ -10,7 +10,7 @@
 		"tls-chromeify": "https://github.com/whiteout-io/tls-chromeify/tarball/master",
 		"browserify": "https://github.com/whiteout-io/node-browserify/tarball/builtins",
 		"inbox": "~1.1.35",		
-		"mailparser": "~0.3.6",
+		"mailparser": "https://github.com/whiteout-io/mailparser/tarball/noattachment",
 		"browserify-mime": "~1.2.9"
 	},
 	"devDependencies": {
