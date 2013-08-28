@@ -125,36 +125,36 @@ ibMock = (function() {
             UID: 126,
             date: new Date(),
             from: {
-                address: "stuff@bla.io",
-                name: "Test Sender"
+                address: 'stuff@bla.io',
+                name: 'Test Sender'
             },
-            messageId: "<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>",
-            title: "Nodemailer Test",
+            messageId: '<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>',
+            title: 'Nodemailer Test',
             to: [{
-                address: "testtest1@gmail.com",
-                name: "testtest1"
+                address: 'testtest1@gmail.com',
+                name: 'testtest1'
             }],
             cc: [{
-                address: "testtest2@gmail.com",
-                name: "testtest2"
+                address: 'testtest2@gmail.com',
+                name: 'testtest2'
             }],
             bcc: [{
-                address: "testtest3@gmail.com",
-                name: "testtest3"
+                address: 'testtest3@gmail.com',
+                name: 'testtest3'
             }],
             flags: ['\\Answered']
         }, {
             UID: 127,
             date: new Date(),
             from: {
-                address: "stuff@bla.io",
-                name: "Test Sender"
+                address: 'stuff@bla.io',
+                name: 'Test Sender'
             },
-            messageId: "<5c33bb30-042f-11e3-8ffd-0800200c9a66@foomail.com>",
-            title: "Nodemailer Test",
+            messageId: '<5c33bb30-042f-11e3-8ffd-0800200c9a66@foomail.com>',
+            title: 'Nodemailer Test',
             to: [{
-                address: "testtest1@gmail.com",
-                name: "testtest1"
+                address: 'testtest1@gmail.com',
+                name: 'testtest1'
             }],
             cc: [],
             bcc: [],
@@ -172,35 +172,38 @@ ibMock = (function() {
         if (uid > 0) {
             // this is the good case, a uid > 0 is valid in this test
             fakeStream.pipe = function(parser) {
-                parser.emit('end', {
-                    headers: {
-                        date: new Date(),
-                    },
-                    messageId: "<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>",
-                    from: [{
-                        address: "stuff@bla.io",
-                        name: "Test Sender"
-                    }],
-                    to: [{
-                        address: "testtest1@gmail.com",
-                        name: "testtest1"
-                    }],
-                    cc: [{
-                        address: "testtest2@gmail.com",
-                        name: "testtest2"
-                    }],
-                    bcc: [{
-                        address: "testtest3@gmail.com",
-                        name: "testtest3"
-                    }],
-                    subject: "Nodemailer Test",
-                    text: "Lorem ipsum dolor sin amet...",
-                    attachments: [attmt]
+                parser.emit('body', {
+                    type: 'text/plain',
+                    content: 'Lorem ipsum dolor sin amet...'
                 });
                 parser.emit('attachment', attmt);
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('data', new Buffer('poo'));
                 stream.emit('end');
+                parser.emit('end', {
+                    headers: {
+                        date: new Date()
+                    },
+                    messageId: '<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>',
+                    from: [{
+                        address: 'stuff@bla.io',
+                        name: 'Test Sender'
+                    }],
+                    to: [{
+                        address: 'testtest1@gmail.com',
+                        name: 'testtest1'
+                    }],
+                    cc: [{
+                        address: 'testtest2@gmail.com',
+                        name: 'testtest2'
+                    }],
+                    bcc: [{
+                        address: 'testtest3@gmail.com',
+                        name: 'testtest3'
+                    }],
+                    subject: 'Nodemailer Test',
+                    text: 'Lorem ipsum dolor sin amet...',
+                });
             };
             return fakeStream;
         } else if (uid === 0) {
@@ -315,25 +318,25 @@ describe('ImapClient unit tests', function() {
                 length: 2
             }, function(err, messages) {
                 expect(messages.length).to.equal(2);
-                expect(messages[1].id).to.equal("<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>");
+                expect(messages[1].id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
                 expect(messages[1].uid).to.equal(126);
                 expect(messages[1].from).to.deep.equal([{
-                    address: "stuff@bla.io",
-                    name: "Test Sender"
+                    address: 'stuff@bla.io',
+                    name: 'Test Sender'
                 }]);
                 expect(messages[1].to).to.deep.equal([{
-                    address: "testtest1@gmail.com",
-                    name: "testtest1"
+                    address: 'testtest1@gmail.com',
+                    name: 'testtest1'
                 }]);
                 expect(messages[1].cc).to.deep.equal([{
-                    address: "testtest2@gmail.com",
-                    name: "testtest2"
+                    address: 'testtest2@gmail.com',
+                    name: 'testtest2'
                 }]);
                 expect(messages[1].bcc).to.deep.equal([{
-                    address: "testtest3@gmail.com",
-                    name: "testtest3"
+                    address: 'testtest3@gmail.com',
+                    name: 'testtest3'
                 }]);
-                expect(messages[1].subject).to.equal("Nodemailer Test");
+                expect(messages[1].subject).to.equal('Nodemailer Test');
                 expect(messages[1].body).to.not.be.ok;
                 expect(messages[1].sentDate).to.be.ok;
                 expect(messages[1].unread).to.be.true;
@@ -347,41 +350,59 @@ describe('ImapClient unit tests', function() {
 
     describe('get message', function() {
         it('should get a specific message', function(done) {
+            var attachmentParsed = false,
+                bodyParsed = false;
+
             ibMock.expect('openMailbox');
             ibMock.expect('createMessageStream');
             ic.getMessage({
                 path: 'INBOX',
-                uid: 123
-            }, function(error, message) {
-                expect(error).to.be.null;
-                expect(message.id).to.equal("<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>");
-                expect(message.from).to.deep.equal([{
-                    address: "stuff@bla.io",
-                    name: "Test Sender"
-                }]);
-                expect(message.to).to.deep.equal([{
-                    address: "testtest1@gmail.com",
-                    name: "testtest1"
-                }]);
-                expect(message.cc).to.deep.equal([{
-                    address: "testtest2@gmail.com",
-                    name: "testtest2"
-                }]);
-                expect(message.bcc).to.deep.equal([{
-                    address: "testtest3@gmail.com",
-                    name: "testtest3"
-                }]);
-                expect(message.subject).to.equal("Nodemailer Test");
-                expect(message.body).to.be.ok;
-                expect(message.sentDate).to.be.ok;
-                expect(message.attachments.length).to.equal(1);
-                expect(message.attachments[0]).to.equal(attmt);
-            }, function(error, attachment) {
-                expect(error).to.not.exist;
-                expect(attachment.fileName).to.equal('poopoo');
-                expect(attachment.contentType).to.equal('text/poopoo');
-                expect(attachment.uint8Array).to.exist;
-                done();
+                uid: 123,
+                onMessage: function(error, message) {
+                    expect(error).to.be.null;
+                    expect(message.id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
+                    expect(message.from).to.deep.equal([{
+                        address: 'stuff@bla.io',
+                        name: 'Test Sender'
+                    }]);
+                    expect(message.to).to.deep.equal([{
+                        address: 'testtest1@gmail.com',
+                        name: 'testtest1'
+                    }]);
+                    expect(message.cc).to.deep.equal([{
+                        address: 'testtest2@gmail.com',
+                        name: 'testtest2'
+                    }]);
+                    expect(message.bcc).to.deep.equal([{
+                        address: 'testtest3@gmail.com',
+                        name: 'testtest3'
+                    }]);
+                    expect(message.subject).to.equal('Nodemailer Test');
+                    expect(message.body).to.be.ok;
+                    expect(message.sentDate).to.be.ok;
+                    expect(message.attachments.length).to.equal(1);
+                    expect(message.attachments[0].fileName).to.equal('poopoo');
+                    expect(message.attachments[0].contentType).to.equal('text/poopoo');
+                    expect(message.attachments[0].uint8Array).to.exist;
+
+                    expect(attachmentParsed).to.be.true;
+                    expect(bodyParsed).to.be.true;
+
+                    done();
+                },
+                onAttachment: function(attachment) {
+                    expect(attachment.fileName).to.equal('poopoo');
+                    expect(attachment.contentType).to.equal('text/poopoo');
+                    expect(attachment.uint8Array).to.exist;
+                    attachmentParsed = true;
+                },
+                onMessageBody: function(body) {
+                    expect(body).to.deep.equal({
+                        type: 'text/plain',
+                        content: 'Lorem ipsum dolor sin amet...'
+                    });
+                    bodyParsed = true;
+                }
             });
         });
     });
@@ -392,11 +413,12 @@ describe('ImapClient unit tests', function() {
             ibMock.expect('createMessageStream');
             ic.getMessage({
                 path: 'INBOX',
-                uid: -1
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(message).to.not.exist;
-                done();
+                uid: -1,
+                onMessage: function(error, message) {
+                    expect(error).to.exist;
+                    expect(message).to.not.exist;
+                    done();
+                }
             });
         });
 
@@ -405,11 +427,12 @@ describe('ImapClient unit tests', function() {
             ibMock.expect('createMessageStream');
             ic.getMessage({
                 path: 'INBOX',
-                uid: 0
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(message).to.not.exist;
-                done();
+                uid: 0,
+                onMessage: function(error, message) {
+                    expect(error).to.exist;
+                    expect(message).to.not.exist;
+                    done();
+                }
             });
         });
     });

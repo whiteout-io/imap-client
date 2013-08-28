@@ -160,25 +160,26 @@ ImapClient.prototype.listMessages = function(options, callback) {
  * Get a certain message from the server.
  * @param {String} options.path [String] The folder's path
  * @param {Number} options.uid The uid of the message
- * @param {Function} messageReady(error, message) will be called the message is ready
- * @param {Function} attachmentReady(error, attachment) will be called the attachment
+ * @param {Function} options.onMessage(error, message) will be called the message and attachments are fully parsed
+ * @param {Function} options.onAttachment(attachment) [optional] will be called when an attachment has been parsed
+ * @param {Function} options.onMessageBody(body) [optional] will be called when the body is parsed. The attachments are not parsed at that point.
  */
-ImapClient.prototype.getMessage = function(options, messageReady, attachmentReady) {
+ImapClient.prototype.getMessage = function(options) {
     var self = this;
 
     self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
-        var parser, stream;
+        var parser, stream, attachments = [];
 
         stream = self._client.createMessageStream(options.uid);
         if (!stream) {
-            messageReady(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+            options.onMessage(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
             return;
         }
 
         stream.on('error', function(e) {
-            messageReady(e);
+            options.onMessage(e);
         });
 
         parser = new MailParser({
@@ -186,24 +187,24 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
         });
 
         parser.on('end', handleEmail);
-        parser.on('error', function(e) {
-            messageReady(e);
-        });
-
-        if (typeof attachmentReady !== 'undefined') {
-            parser.on('attachment', handleAttachment);
+        parser.on('attachment', handleAttachment);
+        if (typeof options.onMessageBody === 'function') {
+            parser.on('body', options.onMessageBody);
         }
+        parser.on('error', function(e) {
+            options.onMessage(e);
+        });
 
         stream.pipe(parser);
 
         /*
          * When the parser is done, format it into out email data
-         * model and invoke the messageReady callback
+         * model and invoke the onMessage callback
          */
 
         function handleEmail(email) {
             var mail;
-            if (!messageReady) {
+            if (!(options.onMessage)) {
                 return;
             }
 
@@ -216,22 +217,21 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
                 cc: email.cc,
                 bcc: email.bcc,
                 subject: email.subject,
-                body: email.html || email.text
+                body: email.html || email.text,
+                attachments: attachments
             };
-            if (typeof email.attachments !== 'undefined') {
-                mail.attachments = email.attachments;
-            }
 
-            messageReady(null, mail);
+            options.onMessage(null, mail);
         }
 
         /*
          * When the parser emits 'attachment', we listen to the stream,
-         * piece the attachment together and then invoke the attachmentReady callback
+         * piece the attachment together and then invoke the onAttachment callback
          */
 
         function handleAttachment(attachment) {
-            var buffers = [];
+            var buffers = [],
+                attmt;
 
             attachment.stream.on('data', function(chunk) {
                 // the attachment is delivered in chunks as binary Buffers
@@ -257,16 +257,21 @@ ImapClient.prototype.getMessage = function(options, messageReady, attachmentRead
                     offset += element.length;
                 });
 
-                attachmentReady(null, {
+                attmt = {
                     fileName: attachment.generatedFileName,
                     contentType: attachment.contentType,
                     uint8Array: view
-                });
+                };
+
+                attachments.push(attmt);
+                if (typeof options.onAttachment === 'function') {
+                    options.onAttachment(attmt);
+                }
+
             });
 
             attachment.stream.on('error', function(error) {
                 console.error('Error during retrieving attachment', error);
-                attachmentReady(error);
             });
         }
     });
