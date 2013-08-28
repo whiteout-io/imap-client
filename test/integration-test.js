@@ -83,7 +83,7 @@ describe('ImapClient integration tests', function() {
                     message = messages[i];
                     if (message.uid === 653) {
                         expect(message.unread).to.be.true;
-                    } else if (message.uid === 447) {
+                    } else if (message.uid === 655) {
                         expect(message.unread).to.be.false;
                     }
                 }
@@ -148,7 +148,7 @@ describe('ImapClient integration tests', function() {
             function firstMessageReady(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.id).to.equal('1377622802704.8db37f1d@Nodemailer');
+                expect(message.id).to.equal('7ADB0F57-B2D1-406B-963B-843530CC61DC@gmail.com');
                 msg1 = true;
                 check();
             }
@@ -156,7 +156,7 @@ describe('ImapClient integration tests', function() {
             function secondMessageReady(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.id).to.equal('1376674818845.ee855fa8@Nodemailer');
+                expect(message.id).to.equal('40A57DCE-BF14-468F-9AD3-18592AABC8E6@whiteout.io');
                 msg2 = true;
                 check();
             }
@@ -169,13 +169,13 @@ describe('ImapClient integration tests', function() {
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 652,
+                uid: 656,
                 onMessage: firstMessageReady
             });
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 448,
+                uid: 655,
                 onMessage: secondMessageReady
             });
         });
