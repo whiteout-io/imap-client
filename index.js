@@ -248,22 +248,16 @@ ImapClient.prototype.getMessage = function(options) {
 
             // we've reached the end of the attachment, let's piece it together and invoke the callback
             attachment.stream.on('end', function() {
-                var length = 0,
-                    offset = 0;
+                var attachmentString, i, len;
 
                 // piece the chunks of binary Buffers together and  put them conveniently 
                 // into a typed array which can be used in node and the browser alike
-                buffers.forEach(function(element) {
-                    length += element.length;
-                });
-                var buffer = new ArrayBuffer(length);
+                attachmentString = buffers.join('');
+                var buffer = new ArrayBuffer(attachmentString.length);
                 var view = new Uint8Array(buffer);
-                buffers.forEach(function(element) {
-                    for (var i = 0, len = element.length; i < len; i++) {
-                        view[offset + i] = element.charCodeAt(i);
-                    }
-                    offset += element.length;
-                });
+                for (i = 0, len = attachmentString.length; i < len; i++) {
+                    view[i] = attachmentString.charCodeAt(i);
+                }
 
                 attmt = {
                     fileName: attachment.generatedFileName,
