@@ -102,6 +102,8 @@ describe('ImapClient integration tests', function() {
                 expect(attmt.fileName).to.exist;
                 expect(attmt.contentType).to.exist;
                 expect(attmt.uint8Array).to.exist;
+
+                expect(bodyParsed).to.be.true;
                 attachmentParsed = true;
             }
 

@@ -188,7 +188,7 @@ ImapClient.prototype.getMessage = function(options) {
 
         parser.on('end', handleEmail);
         parser.on('attachment', handleAttachment);
-        parser.on('headersReady', handleHeaders);
+        parser.on('headers', handleHeaders);
         parser.on('body', handleBody);
         parser.on('error', function(e) {
             options.onMessage(e);
@@ -207,7 +207,7 @@ ImapClient.prototype.getMessage = function(options) {
                 return;
             }
 
-            body = JSON.parse(JSON.stringify(headers));
+            body = headers ? JSON.parse(JSON.stringify(headers)) : {};
             body.html = somebody.type === 'text/html';
             body.body = somebody.content;
             body.attachments = null;
@@ -224,7 +224,7 @@ ImapClient.prototype.getMessage = function(options) {
                 return;
             }
 
-            mail = JSON.parse(JSON.stringify(headers));
+            mail = headers ? JSON.parse(JSON.stringify(headers)) : {};
             mail.html = !! email.html;
             mail.body = email.html || email.text;
             mail.attachments = attachments;

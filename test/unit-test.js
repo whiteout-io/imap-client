@@ -196,7 +196,7 @@ ibMock = (function() {
         if (uid > 0) {
             // this is the good case, a uid > 0 is valid in this test
             fakeStream.pipe = function(parser) {
-                parser.emit('headersReady', headers);
+                parser.emit('headers', headers);
                 parser.emit('body', body);
                 parser.emit('attachment', attmt);
                 stream.emit('data', new Buffer('poo'));
@@ -389,6 +389,7 @@ describe('ImapClient unit tests', function() {
                     expect(attachment.contentType).to.equal('text/poopoo');
                     expect(attachment.uint8Array).to.exist;
 
+                    expect(bodyParsed).to.be.true;
                     attachmentParsed = true;
                 },
                 onMessageBody: function(error, message) {
