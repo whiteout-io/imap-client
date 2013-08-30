@@ -97,17 +97,7 @@ describe('ImapClient integration tests', function() {
             var attachmentParsed = false,
                 bodyParsed = false;
 
-            function onAttachment(error, attmt) {
-                expect(error).to.be.null;
-                expect(attmt.fileName).to.exist;
-                expect(attmt.contentType).to.exist;
-                expect(attmt.uint8Array).to.exist;
-
-                expect(bodyParsed).to.be.true;
-                attachmentParsed = true;
-            }
-
-            function onMessageBody(error, message) {
+            function onBody(error, message) {
                 expect(error).to.be.null;
                 expect(message.id).to.exist;
                 expect(message.to).to.be.instanceof(Array);
@@ -118,7 +108,17 @@ describe('ImapClient integration tests', function() {
                 bodyParsed = true;
             }
 
-            function onMessage(error, message) {
+            function onAttachment(error, attmt) {
+                expect(error).to.be.null;
+                expect(attmt.fileName).to.exist;
+                expect(attmt.contentType).to.exist;
+                expect(attmt.uint8Array).to.exist;
+
+                expect(bodyParsed).to.be.true;
+                attachmentParsed = true;
+            }
+
+            function onEnd(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
                 expect(message.attachments).to.not.be.empty;
@@ -131,9 +131,9 @@ describe('ImapClient integration tests', function() {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 583,
-                onMessage: onMessage,
+                onEnd: onEnd,
                 onAttachment: onAttachment,
-                onMessageBody: onMessageBody
+                onBody: onBody
             });
         });
 
@@ -141,7 +141,7 @@ describe('ImapClient integration tests', function() {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 999,
-                onMessage: function(error, message) {
+                onEnd: function(error, message) {
                     expect(error).to.exist;
                     expect(message).to.not.exist;
                     done();
@@ -178,13 +178,34 @@ describe('ImapClient integration tests', function() {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 656,
-                onMessage: firstMessageReady
+                onEnd: firstMessageReady
             });
 
             ic.getMessage({
                 path: 'INBOX',
                 uid: 655,
-                onMessage: secondMessageReady
+                onEnd: secondMessageReady
+            });
+        });
+
+        it('should receive onBody event from a non-multipart message', function(done) {
+            var bodyReceived = false;
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 655,
+                onBody: function(error, message) {
+                    expect(error).to.not.exist;
+                    expect(message).to.exist;
+
+                    bodyReceived = true;
+                },
+                onEnd: function(error, message) {
+                    expect(error).to.not.exist;
+                    expect(message).to.exist;
+                    expect(bodyReceived).to.be.true;
+
+                    done();
+                }
             });
         });
     });

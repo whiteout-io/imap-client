@@ -359,7 +359,7 @@ describe('ImapClient unit tests', function() {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 123,
-                onMessage: function(error, message) {
+                onEnd: function(error, message) {
                     expect(error).to.be.null;
                     expect(message.id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
                     expect(message.from).to.deep.equal([{
@@ -392,7 +392,7 @@ describe('ImapClient unit tests', function() {
                     expect(bodyParsed).to.be.true;
                     attachmentParsed = true;
                 },
-                onMessageBody: function(error, message) {
+                onBody: function(error, message) {
                     expect(error).to.be.null;
                     expect(message.id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
                     expect(message.to).to.be.instanceof(Array);
@@ -415,7 +415,7 @@ describe('ImapClient unit tests', function() {
             ic.getMessage({
                 path: 'INBOX',
                 uid: -1,
-                onMessage: function(error, message) {
+                onEnd: function(error, message) {
                     expect(error).to.exist;
                     expect(message).to.not.exist;
                     done();
@@ -429,7 +429,7 @@ describe('ImapClient unit tests', function() {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 0,
-                onMessage: function(error, message) {
+                onEnd: function(error, message) {
                     expect(error).to.exist;
                     expect(message).to.not.exist;
                     done();

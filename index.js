@@ -160,9 +160,9 @@ ImapClient.prototype.listMessages = function(options, callback) {
  * Get a certain message from the server.
  * @param {String} options.path [String] The folder's path
  * @param {Number} options.uid The uid of the message
- * @param {Function} options.onMessage(error, message) will be called the message and attachments are fully parsed
+ * @param {Function} options.onBody(error, body) [optional] will be called when the body is parsed. The attachments are not parsed at that point.
  * @param {Function} options.onAttachment(error, attachment) [optional] will be called when an attachment has been parsed
- * @param {Function} options.onMessageBody(error, body) [optional] will be called when the body is parsed. The attachments are not parsed at that point.
+ * @param {Function} options.onEnd(error, message) will be called the message and attachments are fully parsed
  */
 ImapClient.prototype.getMessage = function(options) {
     var self = this;
@@ -174,12 +174,12 @@ ImapClient.prototype.getMessage = function(options) {
 
         stream = self._client.createMessageStream(options.uid);
         if (!stream) {
-            options.onMessage(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+            options.onEnd(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
             return;
         }
 
         stream.on('error', function(e) {
-            options.onMessage(e);
+            options.onEnd(e);
         });
 
         parser = new MailParser({
@@ -191,7 +191,7 @@ ImapClient.prototype.getMessage = function(options) {
         parser.on('headers', handleHeaders);
         parser.on('body', handleBody);
         parser.on('error', function(e) {
-            options.onMessage(e);
+            options.onEnd(e);
         });
 
         stream.pipe(parser);
@@ -203,7 +203,8 @@ ImapClient.prototype.getMessage = function(options) {
 
         function handleBody(somebody) {
             var body;
-            if (typeof options.onMessageBody !== 'function') {
+
+            if (typeof options.onBody === 'undefined') {
                 return;
             }
 
@@ -211,24 +212,20 @@ ImapClient.prototype.getMessage = function(options) {
             body.html = somebody.type === 'text/html';
             body.body = somebody.content;
             body.attachments = null;
-            options.onMessageBody(null, body);
+            options.onBody(null, body);
         }
 
         /*
          * When the parser is done, format it into out email data
          * model and invoke the onMessage callback
          */
-        function handleEmail(email) {
-            var mail;
-            if (!(options.onMessage)) {
-                return;
-            }
 
-            mail = headers ? JSON.parse(JSON.stringify(headers)) : {};
+        function handleEmail(email) {
+            var mail = headers ? JSON.parse(JSON.stringify(headers)) : {};
             mail.html = !! email.html;
             mail.body = email.html || email.text;
             mail.attachments = attachments;
-            options.onMessage(null, mail);
+            options.onEnd(null, mail);
         }
 
         /*
@@ -239,6 +236,10 @@ ImapClient.prototype.getMessage = function(options) {
         function handleAttachment(attachment) {
             var buffers = [],
                 attmt;
+
+            if (typeof options.onAttachment === 'undefined') {
+                return;
+            }
 
             attachment.stream.on('data', function(chunk) {
                 // the attachment is delivered in chunks as binary Buffers
@@ -271,10 +272,8 @@ ImapClient.prototype.getMessage = function(options) {
                 };
 
                 attachments.push(attmt);
-                if (typeof options.onAttachment === 'function') {
-                    options.onAttachment(null, attmt);
-                }
 
+                options.onAttachment(null, attmt);
             });
 
             attachment.stream.on('error', function(error) {
