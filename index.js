@@ -157,6 +157,21 @@ ImapClient.prototype.listMessages = function(options, callback) {
 };
 
 /**
+ * Returns the number of unread messages in a folder
+ * @param {String} path The folder's path
+ * @param  {Function} callback(error, unreadCount) invoked with the number of unread messages, or an error object if an error occurred
+ */
+ImapClient.prototype.unreadMessages = function(path, callback) {
+    var self = this;
+
+    self._client.openMailbox(path, {
+        readOnly: true
+    }, function() {
+        self._client.unreadMessages(callback);
+    });
+};
+
+/**
  * Fetches a message with from the server
  * @param {String} options.path The folder's path
  * @param {Number} options.uid The uid of the message

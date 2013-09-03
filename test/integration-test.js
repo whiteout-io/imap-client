@@ -40,6 +40,16 @@ describe('ImapClient integration tests', function() {
         ic.logout(done);
     });
 
+    describe('ImapClient.unreadMessages', function(){
+        it('should return number of unread messages', function(done){
+            ic.unreadMessages('INBOX', function(error, unreadMessages){
+                expect(error).to.be.null;
+                expect(unreadMessages).to.equal(1);
+                done();
+            });
+        });
+    });
+
     describe('ImapClient.listFolders', function() {
         it('should list folders', function(done) {
             ic.listFolders(function(error, mailboxes) {

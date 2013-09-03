@@ -37,6 +37,13 @@ ibMock = (function() {
         o.emit('close');
     };
 
+    o.unreadMessagesCount = 0;
+    o.unreadMessages = function(cb) {
+        expect(o.unreadMessagesCount).to.be.ok;
+        o.unreadMessagesCount--;
+        cb(null, 1337);
+    };
+
     o.connectCount = 0;
     o.connect = function() {
         expect(o.connectCount).to.be.ok;
@@ -223,11 +230,12 @@ ibMock = (function() {
 
     o.resetMock = function() {
         o.closeCount = 0;
+        o.connectCount = 0;
+        o.unreadMessagesCount = 0;
         o.listMailboxesCount = 0;
         o.openMailboxCount = 0;
         o.listMessagesCount = 0;
         o.createMessageStreamCount = 0;
-        o.addFlagsCount = 0;
     };
 
     return o;
@@ -306,6 +314,19 @@ describe('ImapClient', function() {
                 });
             });
         });
+
+        describe('unread messages', function() {
+            it('should return number of unread messages', function(done) {
+                ibMock.expect('openMailbox');
+                ibMock.expect('unreadMessages');
+                ic.unreadMessages('INBOX', function(error, unreadMessages) {
+                    expect(error).to.be.null;
+                    expect(unreadMessages).to.equal(1337);
+                    done();
+                });
+            });
+        });
+
 
         describe('list messages', function() {
             it('should list messages', function(done) {
