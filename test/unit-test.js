@@ -7,18 +7,11 @@ var rewire = require('rewire'),
     imapClient = rewire('../index'),
     JsMockito = require('jsmockito').JsMockito,
     JsHamcrest = require('jshamcrest').JsHamcrest,
-    ibNsMock, loginOptions, ibMock, MpMock, stream, attmt;
+    ibNsMock, loginOptions, ibMock, MpMock;
 
 
 JsMockito.Integration.Nodeunit();
 JsHamcrest.Integration.Nodeunit();
-
-stream = new EventEmitter();
-attmt = {
-    generatedFileName: 'poopoo',
-    contentType: 'text/poopoo',
-    stream: stream
-};
 
 loginOptions = {
     port: 1234,
@@ -162,54 +155,64 @@ ibMock = (function() {
         }]);
     };
 
-    o.createMessageStreamCount = 0;
-    o.createMessageStream = function(uid) {
+    o.createStreamCount = 0;
+    o.createStream = function(options) {
         var fakeStream = new EventEmitter(),
-            message, headers = {
-                id: '<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>',
-                sentDate: new Date(),
-                from: [{
-                    address: 'stuff@bla.io',
-                    name: 'Test Sender'
-                }],
-                to: [{
-                    address: 'testtest1@gmail.com',
-                    name: 'testtest1'
-                }],
-                cc: [{
-                    address: 'testtest2@gmail.com',
-                    name: 'testtest2'
-                }],
-                bcc: [{
-                    address: 'testtest3@gmail.com',
-                    name: 'testtest3'
-                }],
-                subject: 'Nodemailer Test'
-            }, body = {
-                type: 'text/plain',
-                content: 'Lorem ipsum dolor sin amet...'
-            };
+            headers;
 
-        expect(o.createMessageStreamCount).to.be.ok;
-        o.createMessageStreamCount--;
+        expect(o.createStreamCount).to.be.ok;
+        o.createStreamCount--;
 
-        if (uid > 0) {
+        headers = {
+            messageId: '<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>',
+            date: new Date(),
+            from: [{
+                address: 'stuff@bla.io',
+                name: 'Test Sender'
+            }],
+            to: [{
+                address: 'testtest1@gmail.com',
+                name: 'testtest1'
+            }],
+            cc: [{
+                address: 'testtest2@gmail.com',
+                name: 'testtest2'
+            }],
+            bcc: [{
+                address: 'testtest3@gmail.com',
+                name: 'testtest3'
+            }],
+            subject: 'Nodemailer Test'
+        };
+
+        if (options.uid > 0) {
             // this is the good case, a uid > 0 is valid in this test
-            fakeStream.pipe = function(parser) {
-                parser.emit('headers', headers);
-                parser.emit('body', body);
-                parser.emit('attachment', attmt);
-                stream.emit('data', new Buffer('poo'));
-                stream.emit('data', new Buffer('poo'));
-                stream.emit('end');
-                message = JSON.parse(JSON.stringify(headers));
-                message.text = body.content;
-                parser.emit('end', message);
-            };
+
+            if (options.part === '') {
+                fakeStream.pipe = function(parser) {
+                    var fullMessage = JSON.parse(JSON.stringify(headers));
+                    fullMessage.text = 'Lorem ipsum dolor sin amet...';
+                    fullMessage.attachments = [{
+                        generatedFileName: 'poopoo',
+                        contentType: 'text/poopoo',
+                        content: new Buffer('poopoo')
+                    }];
+                    parser.emit('end', fullMessage);
+                };
+            } else if (options.part === 'HEADER') {
+                fakeStream.pipe = function(parser) {
+                    parser.emit('end', headers);
+                };
+            } else if (options.part === '1') {
+                process.nextTick(function() {
+                    fakeStream.emit('data', new Buffer('Lorem ipsum dolor sin amet...'));
+                    fakeStream.emit('end');
+                });
+            }
             return fakeStream;
-        } else if (uid === 0) {
+        } else if (options.uid === 0) {
             fakeStream.pipe = function() {};
-            setImmediate(function() {
+            process.nextTick(function() {
                 fakeStream.emit('error', new Error('EVERYTHING IS BROKEN!!!'));
             });
             return fakeStream;
@@ -241,125 +244,118 @@ imapClient.__set__({
 });
 
 
-describe('ImapClient unit tests', function() {
-    describe('initialize with user and password', function() {
-        it('should initialize', function() {
-            var ic = new imapClient.ImapClient(loginOptions);
+describe('ImapClient', function() {
+    var ic;
+
+    describe('initializer', function() {
+        it('should initialize with user and password', function() {
+            ic = new imapClient.ImapClient(loginOptions);
             expect(ic._client).to.equal(ibMock);
         });
     });
-});
 
-describe('ImapClient unit tests', function() {
-    var ic;
-
-    beforeEach(function() {
-        ic = new imapClient.ImapClient(loginOptions);
-        expect(ic._client).to.equal(ibMock);
-    });
-
-
-    afterEach(function() {
-        ibMock.resetMock();
-    });
-
-    describe('login', function() {
-        it('should login', function(done) {
-            ibMock.expect('connect');
-            ic.login(done);
+    describe('instance method', function() {
+        beforeEach(function() {
+            ic = new imapClient.ImapClient(loginOptions);
+            expect(ic._client).to.equal(ibMock);
         });
-    });
 
-    describe('logout', function() {
-        it('should logout', function(done) {
-            ibMock.expect('close');
-            ic.logout(done);
+
+        afterEach(function() {
+            ibMock.resetMock();
         });
-    });
 
-    describe('list folders', function() {
-        it('should list folders', function(done) {
-            ibMock.expect('listMailboxes');
-            ic.listFolders(function(error, mailboxes) {
-                expect(mailboxes.length).to.equal(3);
-                done();
+        describe('login', function() {
+            it('should login', function(done) {
+                ibMock.expect('connect');
+                ic.login(done);
             });
         });
-    });
 
-    describe('list subfolders', function() {
-        it('should list subfolders', function(done) {
-            ibMock.expect('listMailboxes');
-            ic.listFolders('AROUNDBOX/FooBar', function(error, mailboxes) {
-                expect(mailboxes).to.not.be.empty;
-                done();
+        describe('logout', function() {
+            it('should logout', function(done) {
+                ibMock.expect('close');
+                ic.logout(done);
             });
         });
-    });
 
-    describe('list an empty subfolder', function() {
-        it('should list subfolders', function(done) {
-            ibMock.expect('listMailboxes');
-            ic.listFolders('AROUNDBOX/Duh', function(error, mailboxes) {
-                expect(error).to.not.exist;
-                expect(mailboxes).to.exist;
-                expect(mailboxes).to.be.empty;
-                done();
+        describe('list folders', function() {
+            it('should list folders', function(done) {
+                ibMock.expect('listMailboxes');
+                ic.listFolders(function(error, mailboxes) {
+                    expect(mailboxes.length).to.equal(3);
+                    done();
+                });
+            });
+
+            it('should list subfolders', function(done) {
+                ibMock.expect('listMailboxes');
+                ic.listFolders('AROUNDBOX/FooBar', function(error, mailboxes) {
+                    expect(mailboxes).to.not.be.empty;
+                    done();
+                });
+            });
+
+            it('should an empty subfolder', function(done) {
+                ibMock.expect('listMailboxes');
+                ic.listFolders('AROUNDBOX/Duh', function(error, mailboxes) {
+                    expect(error).to.not.exist;
+                    expect(mailboxes).to.exist;
+                    expect(mailboxes).to.be.empty;
+                    done();
+                });
             });
         });
-    });
 
-    describe('list messages', function() {
-        it('should list messages', function(done) {
-            ibMock.expect('openMailbox');
-            ibMock.expect('listMessages');
-            ic.listMessages({
-                path: 'foobar',
-                offset: 0,
-                length: 2
-            }, function(err, messages) {
-                expect(messages.length).to.equal(2);
-                expect(messages[1].id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
-                expect(messages[1].uid).to.equal(126);
-                expect(messages[1].from).to.deep.equal([{
-                    address: 'stuff@bla.io',
-                    name: 'Test Sender'
-                }]);
-                expect(messages[1].to).to.deep.equal([{
-                    address: 'testtest1@gmail.com',
-                    name: 'testtest1'
-                }]);
-                expect(messages[1].cc).to.deep.equal([{
-                    address: 'testtest2@gmail.com',
-                    name: 'testtest2'
-                }]);
-                expect(messages[1].bcc).to.deep.equal([{
-                    address: 'testtest3@gmail.com',
-                    name: 'testtest3'
-                }]);
-                expect(messages[1].subject).to.equal('Nodemailer Test');
-                expect(messages[1].body).to.not.be.ok;
-                expect(messages[1].sentDate).to.be.ok;
-                expect(messages[1].unread).to.be.true;
-                expect(messages[1].answered).to.be.true;
-                expect(messages[0].unread).to.be.false;
-                expect(messages[0].answered).to.be.false;
-                done();
+        describe('list messages', function() {
+            it('should list messages', function(done) {
+                ibMock.expect('openMailbox');
+                ibMock.expect('listMessages');
+                ic.listMessages({
+                    path: 'foobar',
+                    offset: 0,
+                    length: 2
+                }, function(err, messages) {
+                    expect(messages.length).to.equal(2);
+                    expect(messages[1].id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
+                    expect(messages[1].uid).to.equal(126);
+                    expect(messages[1].from).to.deep.equal([{
+                        address: 'stuff@bla.io',
+                        name: 'Test Sender'
+                    }]);
+                    expect(messages[1].to).to.deep.equal([{
+                        address: 'testtest1@gmail.com',
+                        name: 'testtest1'
+                    }]);
+                    expect(messages[1].cc).to.deep.equal([{
+                        address: 'testtest2@gmail.com',
+                        name: 'testtest2'
+                    }]);
+                    expect(messages[1].bcc).to.deep.equal([{
+                        address: 'testtest3@gmail.com',
+                        name: 'testtest3'
+                    }]);
+                    expect(messages[1].subject).to.equal('Nodemailer Test');
+                    expect(messages[1].body).to.not.be.ok;
+                    expect(messages[1].sentDate).to.be.ok;
+                    expect(messages[1].unread).to.be.true;
+                    expect(messages[1].answered).to.be.true;
+                    expect(messages[0].unread).to.be.false;
+                    expect(messages[0].answered).to.be.false;
+                    done();
+                });
             });
         });
-    });
 
-    describe('get message', function() {
-        it('should get a specific message', function(done) {
-            var attachmentParsed = false,
-                bodyParsed = false;
-
-            ibMock.expect('openMailbox');
-            ibMock.expect('createMessageStream');
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 123,
-                onEnd: function(error, message) {
+        describe('get message', function() {
+            it('should get a specific message with text and attachment', function(done) {
+                ibMock.expect('openMailbox');
+                ibMock.expect('createStream');
+                ic.getMessage({
+                    path: 'INBOX',
+                    uid: 123,
+                    textOnly: false
+                }, function(error, message) {
                     expect(error).to.be.null;
                     expect(message.id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
                     expect(message.from).to.deep.equal([{
@@ -378,62 +374,64 @@ describe('ImapClient unit tests', function() {
                     expect(message.attachments[0].contentType).to.equal('text/poopoo');
                     expect(message.attachments[0].uint8Array).to.exist;
 
-                    expect(attachmentParsed).to.be.true;
-                    expect(bodyParsed).to.be.true;
-
                     done();
-                },
-                onAttachment: function(error, attachment) {
-                    expect(error).to.be.null;
-                    expect(attachment.fileName).to.equal('poopoo');
-                    expect(attachment.contentType).to.equal('text/poopoo');
-                    expect(attachment.uint8Array).to.exist;
+                });
+            });
 
-                    expect(bodyParsed).to.be.true;
-                    attachmentParsed = true;
-                },
-                onBody: function(error, message) {
+            it('should get a specific message with text only', function(done) {
+                ibMock.expect('openMailbox');
+                ibMock.expect('createStream');
+                ibMock.expect('createStream');
+                ic.getMessage({
+                    path: 'INBOX',
+                    uid: 123,
+                    textOnly: true
+                }, function(error, message) {
                     expect(error).to.be.null;
                     expect(message.id).to.equal('<5c4fbb30-042f-11e3-8ffd-0800200c9a66@foomail.com>');
+                    expect(message.from).to.deep.equal([{
+                        address: 'stuff@bla.io',
+                        name: 'Test Sender'
+                    }]);
                     expect(message.to).to.be.instanceof(Array);
                     expect(message.cc).to.be.instanceof(Array);
                     expect(message.bcc).to.be.instanceof(Array);
                     expect(message.subject).to.equal('Nodemailer Test');
                     expect(message.body).to.equal('Lorem ipsum dolor sin amet...');
                     expect(message.html).to.be.false;
+                    expect(message.sentDate).to.be.ok;
+                    expect(message.attachments).to.be.instanceof(Array);
 
-                    bodyParsed = true;
-                }
+                    done();
+                });
             });
-        });
-    });
 
-    describe('getMessage with nonexistent uid', function() {
-        it('should avoid invoking pipe on nonexistent stream', function(done) {
-            ibMock.expect('openMailbox');
-            ibMock.expect('createMessageStream');
-            ic.getMessage({
-                path: 'INBOX',
-                uid: -1,
-                onEnd: function(error, message) {
+            it('should avoid invoking pipe on nonexistent stream', function(done) {
+                ibMock.expect('openMailbox');
+                ibMock.expect('createStream');
+                ic.getMessage({
+                    path: 'INBOX',
+                    uid: -1,
+                    textOnly: false
+                }, function(error, message) {
                     expect(error).to.exist;
                     expect(message).to.not.exist;
                     done();
-                }
+                });
             });
-        });
 
-        it('should catch stream error', function(done) {
-            ibMock.expect('openMailbox');
-            ibMock.expect('createMessageStream');
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 0,
-                onEnd: function(error, message) {
+            it('should catch stream error', function(done) {
+                ibMock.expect('openMailbox');
+                ibMock.expect('createStream');
+                ic.getMessage({
+                    path: 'INBOX',
+                    uid: 0,
+                    textOnly: false
+                }, function(error, message) {
                     expect(error).to.exist;
                     expect(message).to.not.exist;
                     done();
-                }
+                });
             });
         });
     });

@@ -157,125 +157,137 @@ ImapClient.prototype.listMessages = function(options, callback) {
 };
 
 /**
- * Get a certain message from the server.
- * @param {String} options.path [String] The folder's path
+ * Fetches a message with from the server
+ * @param {String} options.path The folder's path
  * @param {Number} options.uid The uid of the message
- * @param {Function} options.onBody(error, body) [optional] will be called when the body is parsed. The attachments are not parsed at that point.
- * @param {Function} options.onAttachment(error, attachment) [optional] will be called when an attachment has been parsed
- * @param {Function} options.onEnd(error, message) will be called the message and attachments are fully parsed
+ * @param {Boolean} options.textOnly Fetches the message in plain text without attachments
+ * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
  */
-ImapClient.prototype.getMessage = function(options) {
+ImapClient.prototype.getMessage = function(options, callback) {
     var self = this;
 
     self._client.openMailbox(options.path, {
         readOnly: false
     }, function() {
-        var parser, stream, headers, attachments = [];
-
-        stream = self._client.createMessageStream(options.uid);
-        if (!stream) {
-            options.onEnd(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
-            return;
+        if (options.textOnly) {
+            fetchTextOnly();
+        } else {
+            fetchWholeBody();
         }
 
-        stream.on('error', function(e) {
-            options.onEnd(e);
-        });
+        function fetchTextOnly() {
+            var parser, stream;
 
-        parser = new MailParser({
-            streamAttachments: true
-        });
-
-        parser.on('end', handleEmail);
-        parser.on('attachment', handleAttachment);
-        parser.on('headers', handleHeaders);
-        parser.on('body', handleBody);
-        parser.on('error', function(e) {
-            options.onEnd(e);
-        });
-
-        stream.pipe(parser);
-
-        function handleHeaders(someHeaders) {
-            headers = someHeaders;
-            headers.uid = options.uid;
-        }
-
-        function handleBody(somebody) {
-            var body;
-
-            if (typeof options.onBody === 'undefined') {
-                return;
-            }
-
-            body = headers ? JSON.parse(JSON.stringify(headers)) : {};
-            body.html = somebody.type === 'text/html';
-            body.body = somebody.content;
-            body.attachments = null;
-            options.onBody(null, body);
-        }
-
-        /*
-         * When the parser is done, format it into out email data
-         * model and invoke the onMessage callback
-         */
-
-        function handleEmail(email) {
-            var mail = headers ? JSON.parse(JSON.stringify(headers)) : {};
-            mail.html = !! email.html;
-            mail.body = email.html || email.text;
-            mail.attachments = attachments;
-            options.onEnd(null, mail);
-        }
-
-        /*
-         * When the parser emits 'attachment', we listen to the stream,
-         * piece the attachment together and then invoke the onAttachment callback
-         */
-
-        function handleAttachment(attachment) {
-            var buffers = [],
-                attmt;
-
-            if (typeof options.onAttachment === 'undefined') {
-                return;
-            }
-
-            attachment.stream.on('data', function(chunk) {
-                // the attachment is delivered in chunks as binary Buffers
-                buffers.push(chunk.toString('binary'));
+            stream = self._client.createStream({
+                uid: options.uid,
+                part: 'HEADER'
             });
 
-            // we've reached the end of the attachment, let's piece it together and invoke the callback
-            attachment.stream.on('end', function() {
-                var attachmentString, i, len;
+            if (!stream) {
+                callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+                return;
+            }
+            stream.on('error', function(e) {
+                callback(e);
+            });
 
-                // piece the chunks of binary Buffers together and  put them conveniently 
-                // into a typed array which can be used in node and the browser alike
-                attachmentString = buffers.join('');
-                var buffer = new ArrayBuffer(attachmentString.length);
-                var view = new Uint8Array(buffer);
-                for (i = 0, len = attachmentString.length; i < len; i++) {
-                    view[i] = attachmentString.charCodeAt(i);
+            parser = new MailParser();
+
+            function handleHeader(email) {
+                var content = '';
+                stream = self._client.createStream({
+                    uid: options.uid,
+                    part: '1'
+                });
+                stream.on('data', function(chunk) {
+                    content += chunk.toString();
+                });
+                stream.on('end', function() {
+                    callback(null, {
+                        uid: options.uid,
+                        id: email.messageId,
+                        from: email.from,
+                        to: email.to,
+                        cc: email.cc,
+                        bcc: email.bcc,
+                        subject: email.subject,
+                        body: content,
+                        html: false,
+                        sentDate: email.date,
+                        attachments: []
+                    });
+                });
+            }
+
+            parser.once('end', handleHeader);
+            stream.pipe(parser);
+        }
+
+        function fetchWholeBody() {
+            var parser, stream;
+
+            stream = self._client.createStream({
+                uid: options.uid,
+                part: ''
+            });
+
+            if (!stream) {
+                callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+                return;
+            }
+            stream.on('error', function(e) {
+                callback(e);
+            });
+
+            parser = new MailParser();
+            parser.once('end', function(email) {
+                var attachments = [];
+
+                if (email.attachments instanceof Array) {
+                    email.attachments.forEach(function(attachment) {
+                        attachments.push({
+                            fileName: attachment.generatedFileName,
+                            contentType: attachment.contentType,
+                            uint8Array: bufferToTypedArray(attachment.content)
+                        });
+                    });
                 }
 
-                attmt = {
-                    fileName: attachment.generatedFileName,
-                    contentType: attachment.contentType,
-                    uint8Array: view
-                };
-
-                attachments.push(attmt);
-
-                options.onAttachment(null, attmt);
+                callback(null, {
+                    uid: options.uid,
+                    id: email.messageId,
+                    from: email.from,
+                    to: email.to,
+                    cc: email.cc,
+                    bcc: email.bcc,
+                    subject: email.subject,
+                    body: email.html || email.text,
+                    html: !! email.html,
+                    sentDate: email.date,
+                    attachments: attachments
+                });
+            });
+            parser.on('error', function(e) {
+                callback(e);
             });
 
-            attachment.stream.on('error', function(error) {
-                console.error('Error during retrieving attachment', error);
-            });
+            stream.pipe(parser);
         }
     });
 };
+
+/*
+ * Helper functions
+ */
+
+function bufferToTypedArray(buffer) {
+    var ab = new ArrayBuffer(buffer.length);
+    var view = new Uint8Array(ab);
+    for (var i = 0, len = buffer.length; i < len; i++) {
+        view[i] = buffer.readUInt8(i);
+    }
+    return view;
+}
 
 /**
  * Export module

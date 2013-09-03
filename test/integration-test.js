@@ -93,59 +93,50 @@ describe('ImapClient integration tests', function() {
     });
 
     describe('ImapClient.getMessage', function() {
-        it('should get a specific message', function(done) {
-            var attachmentParsed = false,
-                bodyParsed = false;
-
-            function onBody(error, message) {
-                expect(error).to.be.null;
-                expect(message.id).to.exist;
-                expect(message.to).to.be.instanceof(Array);
-                expect(message.subject).to.equal('test');
-                expect(message.body).to.equal('asdasdasd\n\n');
-                expect(message.html).to.be.false;
-
-                bodyParsed = true;
-            }
-
-            function onAttachment(error, attmt) {
-                expect(error).to.be.null;
-                expect(attmt.fileName).to.exist;
-                expect(attmt.contentType).to.exist;
-                expect(attmt.uint8Array).to.exist;
-
-                expect(bodyParsed).to.be.true;
-                attachmentParsed = true;
-            }
-
-            function onEnd(error, message) {
+        it('should get a message in text only', function(done) {
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 656,
+                textOnly: true
+            }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.attachments).to.not.be.empty;
+                done();
+            });
+        });
 
-                expect(attachmentParsed).to.be.true;
-                expect(bodyParsed).to.be.true;
+        it('should get full message with attachments', function(done) {
+            function onEnd(error, message) {
+                expect(error).to.be.null;
+
+                expect(message).to.exist;
+                expect(message.id).to.exist;
+                expect(message.uid).to.equal(583);
+                expect(message.to).to.be.instanceof(Array);
+                expect(message.from).to.be.instanceof(Array);
+                expect(message.subject).to.not.be.empty;
+                expect(message.body).to.not.be.empty;
+                expect(message.html).to.be.false;
+                expect(message.attachments).to.be.instanceof(Array);
+                expect(message.attachments).to.not.be.empty;
                 done();
             }
 
             ic.getMessage({
                 path: 'INBOX',
                 uid: 583,
-                onEnd: onEnd,
-                onAttachment: onAttachment,
-                onBody: onBody
-            });
+                textOnly: false
+            }, onEnd);
         });
 
         it('should not get a non-existent message', function(done) {
             ic.getMessage({
                 path: 'INBOX',
-                uid: 999,
-                onEnd: function(error, message) {
-                    expect(error).to.exist;
-                    expect(message).to.not.exist;
-                    done();
-                }
+                uid: 999
+            }, function(error, message) {
+                expect(error).to.exist;
+                expect(message).to.not.exist;
+                done();
             });
         });
 
@@ -177,36 +168,13 @@ describe('ImapClient integration tests', function() {
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 656,
-                onEnd: firstMessageReady
-            });
+                uid: 656
+            }, firstMessageReady);
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 655,
-                onEnd: secondMessageReady
-            });
-        });
-
-        it('should receive onBody event from a non-multipart message', function(done) {
-            var bodyReceived = false;
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 655,
-                onBody: function(error, message) {
-                    expect(error).to.not.exist;
-                    expect(message).to.exist;
-
-                    bodyReceived = true;
-                },
-                onEnd: function(error, message) {
-                    expect(error).to.not.exist;
-                    expect(message).to.exist;
-                    expect(bodyReceived).to.be.true;
-
-                    done();
-                }
-            });
+                uid: 655
+            }, secondMessageReady);
         });
     });
 });
