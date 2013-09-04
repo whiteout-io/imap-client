@@ -39,6 +39,59 @@ ImapClient.prototype.logout = function(callback) {
 };
 
 /**
+ * Will traverse all available IMAP folders via DFS and return their paths as Array
+ * @param {Function} callback(folders) will be invoked as soon as traversal is done;
+ */
+ImapClient.prototype.listAllFolders = function(callback) {
+    var self = this,
+        folders = [],
+        mbxQueue = [],
+        error;
+
+    function subfolders(someError, mailboxes) {
+        if (someError) {
+            // we have an error, so store it and stop processing. processQueue will catch this.
+            error = someError;
+        } else {
+            while (mailboxes.length) {
+                // add all mailboxes to the mbxQueue
+                mbxQueue.push(mailboxes.splice(0,1)[0]);
+            }
+        }
+
+        // done with this layer, process this subtree
+        process.nextTick(processQueue);
+    }
+
+    function processQueue() {
+        var mailbox;
+
+        if(typeof error !== 'undefined') {
+            callback(error);
+            return;
+        }
+
+        if (!mbxQueue.length) {
+            // nothing left to process, we're done
+            callback(null, folders);
+            return;
+        }
+
+        mailbox = mbxQueue.splice(0, 1)[0];
+        folders.push(mailbox.path);
+        if (mailbox.hasChildren) {
+            // we have reached an inner node, process the subtree
+            mailbox.listChildren(subfolders);
+        } else {
+            // we have reached a leaf, process the next sibling
+            process.nextTick(processQueue);
+        }
+    }
+
+    self._client.listMailboxes(subfolders);
+};
+
+/**
  * List available IMAP folders
  * @param {String} path [optional] If present, its subfolders will be listed
  * @param callback [Function] callback(error, mailboxes) triggered when the folders are available

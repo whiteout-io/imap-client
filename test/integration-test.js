@@ -40,9 +40,9 @@ describe('ImapClient integration tests', function() {
         ic.logout(done);
     });
 
-    describe('ImapClient.unreadMessages', function(){
-        it('should return number of unread messages', function(done){
-            ic.unreadMessages('INBOX', function(error, unreadMessages){
+    describe('ImapClient.unreadMessages', function() {
+        it('should return number of unread messages', function(done) {
+            ic.unreadMessages('INBOX', function(error, unreadMessages) {
                 expect(error).to.be.null;
                 expect(unreadMessages).to.equal(1);
                 done();
@@ -51,6 +51,15 @@ describe('ImapClient integration tests', function() {
     });
 
     describe('ImapClient.listFolders', function() {
+        it('should list all folders', function(done) {
+            ic.listAllFolders(function(error, paths) {
+                expect(error).to.not.exist;
+                expect(paths).to.be.instanceof(Array);
+                expect(paths).to.not.be.empty;
+                done();
+            });
+        });
+
         it('should list folders', function(done) {
             ic.listFolders(function(error, mailboxes) {
                 expect(error).to.not.exist;

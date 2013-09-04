@@ -53,10 +53,13 @@ ibMock = (function() {
 
     o.listMailboxesCount = 0;
     o.listMailboxes = function(callback) {
-        var hasNoChildren, listNoChildren;
+        var hasNoChildren, listNoChildren, hasChildren;
 
         hasNoChildren = function() {
             return false;
+        };
+        hasChildren = function() {
+            return true;
         };
         listNoChildren = function(cb) {
             cb(null, []);
@@ -68,13 +71,22 @@ ibMock = (function() {
         if (callback) {
             callback(undefined, [{
                 path: 'AROUNDBOX',
+                hasChildren: hasChildren,
                 listChildren: function(cb) {
                     cb(null, [{
                         path: 'AROUNDBOX/FooBar',
                         listChildren: function(cb) {
-                            cb(null, [{}, {}, {}, {}, {}]);
+                            cb(null, [{
+                                path: 'AROUNDBOX/FooBar/1',
+                                hasChildren: hasNoChildren,
+                                listChildren: listNoChildren
+                            }, {
+                                path: 'AROUNDBOX/FooBar/2',
+                                hasChildren: hasNoChildren,
+                                listChildren: listNoChildren
+                            }]);
                         },
-                        hasChildren: hasNoChildren
+                        hasChildren: hasChildren
                     }, {
                         path: 'AROUNDBOX/PooBar',
                         hasChildren: hasNoChildren,
@@ -300,6 +312,16 @@ describe('ImapClient', function() {
                 ibMock.expect('listMailboxes');
                 ic.listFolders('AROUNDBOX/FooBar', function(error, mailboxes) {
                     expect(mailboxes).to.not.be.empty;
+                    done();
+                });
+            });
+            
+            it('should list all folders', function(done) {
+                ibMock.expect('listMailboxes');
+                ic.listAllFolders(function(error, paths) {
+                    expect(error).to.not.exist;
+                    expect(paths).to.be.instanceof(Array);
+                    expect(paths.length).to.equal(9);
                     done();
                 });
             });
