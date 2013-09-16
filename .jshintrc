@@ -19,29 +19,18 @@
 	"unused": true,
 
 	"predef": [
-			"setImmediate",
+			"mocha",
+			"chrome",
 			"mock",
 			"mockFunction",
-			"equalTo",
 			"when",
-			"verify",
 			"anything",
-			"not",
-			"nil",
-            "before",
             "beforeEach",
-            "after",
             "afterEach",
 			"console",
-			"importScripts",
 			"process",
 			"describe",
-			"it",
-			"chai",
-			"chrome",
-			"define",
-			"self",
-			"mocha"
+			"it"
 	],
 
 	"globals": {

@@ -4,7 +4,7 @@ var rewire = require('rewire'),
     expect = require('chai').expect,
     inbox = require('inbox'),
     EventEmitter = require('events').EventEmitter,
-    imapClient = rewire('../index'),
+    ImapClient = rewire('..'),
     JsMockito = require('jsmockito').JsMockito,
     JsHamcrest = require('jshamcrest').JsHamcrest,
     ibNsMock, loginOptions, ibMock, MpMock;
@@ -258,7 +258,7 @@ when(ibNsMock).createConnection(anything()).thenReturn(ibMock);
 MpMock = mockFunction();
 when(MpMock)().thenReturn(new EventEmitter());
 
-imapClient.__set__({
+ImapClient.__set__({
     MailParser: MpMock,
     inbox: ibNsMock
 });
@@ -269,14 +269,14 @@ describe('ImapClient', function() {
 
     describe('initializer', function() {
         it('should initialize with user and password', function() {
-            ic = new imapClient.ImapClient(loginOptions);
+            ic = new ImapClient(loginOptions);
             expect(ic._client).to.equal(ibMock);
         });
     });
 
     describe('instance method', function() {
         beforeEach(function() {
-            ic = new imapClient.ImapClient(loginOptions);
+            ic = new ImapClient(loginOptions);
             expect(ic._client).to.equal(ibMock);
         });
 

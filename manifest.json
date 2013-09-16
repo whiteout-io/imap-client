@@ -1,0 +1,15 @@
+{
+  "name": "imap-client unit tests",
+  "description": "Testing the imap-client in the browser",
+  "version": "0.0.1",
+  "manifest_version": 2,
+  "offline_enabled": true,
+  "permissions": ["http://*/*", "https://*/*", {
+    "socket": ["tcp-connect"]
+  }],
+  "app": {
+    "background": {
+      "scripts": ["test/res/background.js"]
+    }
+  }
+}

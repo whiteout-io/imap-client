@@ -1,6 +1,6 @@
 'use strict';
 
-var ImapClient = require('../index').ImapClient,
+var ImapClient = require('..'),
     loginOptions, ic;
 
 loginOptions = {
