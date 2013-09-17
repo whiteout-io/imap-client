@@ -16,9 +16,7 @@
 		"grunt": "~0.4.1",
 		"grunt-contrib-jshint": "~0.5.3",
 		"grunt-mocha-test": "~0.6.2",
-		"rewire": "~1.1.3",
-		"jsmockito": "~1.0.4",
-		"jshamcrest": "~0.6.7",
+		"sinon": "1.7.3",
 		"requirejs": "*"
 	}
 }

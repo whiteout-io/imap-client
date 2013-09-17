@@ -17,8 +17,10 @@ define(function(require) {
      * @param {String} options.auth.user Username for login
      * @param {String} options.auth.pass Password for login
      */
-    ImapClient = function(options) {
+    ImapClient = function(options, ibx) {
         var self = this;
+
+        inbox = ibx || inbox;
 
         self._client = inbox.createConnection(options.port, options.host, {
             secureConnection: options.secure,
@@ -29,8 +31,8 @@ define(function(require) {
     ImapClient.prototype.login = function(callback) {
         var self = this;
 
-        self._client.once('connect', callback);
         self._client.connect();
+        self._client.once('connect', callback);
     };
 
     /**
@@ -39,8 +41,8 @@ define(function(require) {
     ImapClient.prototype.logout = function(callback) {
         var self = this;
 
-        self._client.once('close', callback);
         self._client.close();
+        self._client.once('close', callback);
     };
 
     /**
