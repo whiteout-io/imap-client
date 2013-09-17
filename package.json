@@ -8,6 +8,7 @@
 	"dependencies": {
 		"amdefine": ">=0.0.8",
 		"mailparser": "https://github.com/whiteout-io/mailparser/tarball/amd",
+		"setimmediate": ">=1.0.1",
 		"inbox": "https://github.com/whiteout-io/inbox/tarball/amd"
 	},
 	"devDependencies": {

@@ -9,6 +9,8 @@ define(function(require) {
         MailParser = require('mailparser').MailParser,
         ImapClient;
 
+    require('setimmediate');
+
     /**
      * Create an instance of ImapClient
      * @param {Number} options.port Port is the port to the server (defaults to 143 on non-secure and to 993 on secure connection).
@@ -67,7 +69,7 @@ define(function(require) {
             }
 
             // done with this layer, process this subtree
-            process.nextTick(processQueue);
+            setImmediate(processQueue);
         }
 
         function processQueue() {
@@ -91,7 +93,7 @@ define(function(require) {
                 mailbox.listChildren(subfolders);
             } else {
                 // we have reached a leaf, process the next sibling
-                process.nextTick(processQueue);
+                setImmediate(processQueue);
             }
         }
 

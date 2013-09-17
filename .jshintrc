@@ -19,6 +19,7 @@
 	"unused": true,
 
 	"predef": [
+			"setImmediate",
 			"mocha",
 			"chrome",
 			"mock",
