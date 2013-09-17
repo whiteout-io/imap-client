@@ -44,42 +44,42 @@ define(function(require) {
             });
         });
 
-        // describe('ImapClient.listFolders', function() {
-        //     it('should list all folders', function(done) {
-        //         ic.listAllFolders(function(error, paths) {
-        //             expect(error).to.not.exist;
-        //             expect(paths).to.be.instanceof(Array);
-        //             expect(paths).to.not.be.empty;
-        //             done();
-        //         });
-        //     });
+        describe('ImapClient.listFolders', function() {
+            it('should list all folders', function(done) {
+                ic.listAllFolders(function(error, paths) {
+                    expect(error).to.not.exist;
+                    expect(paths).to.be.instanceof(Array);
+                    expect(paths).to.not.be.empty;
+                    done();
+                });
+            });
 
-        //     it('should list folders', function(done) {
-        //         ic.listFolders(function(error, mailboxes) {
-        //             expect(error).to.not.exist;
-        //             expect(mailboxes).to.exist;
-        //             done();
-        //         });
-        //     });
+            it('should list folders', function(done) {
+                ic.listFolders(function(error, mailboxes) {
+                    expect(error).to.not.exist;
+                    expect(mailboxes).to.exist;
+                    done();
+                });
+            });
 
-        //     it('should list an empty subfolder', function(done) {
-        //         ic.listFolders('[Gmail]/Gesendet', function(error, mailboxes) {
-        //             expect(error).to.not.exist;
-        //             expect(mailboxes).to.exist;
-        //             expect(mailboxes).to.be.empty;
-        //             done();
-        //         });
-        //     });
+            it('should list an empty subfolder', function(done) {
+                ic.listFolders('[Gmail]/Gesendet', function(error, mailboxes) {
+                    expect(error).to.not.exist;
+                    expect(mailboxes).to.exist;
+                    expect(mailboxes).to.be.empty;
+                    done();
+                });
+            });
 
-        //     it('should list subfolders', function(done) {
-        //         ic.listFolders('[Gmail]', function(error, mailboxes) {
-        //             expect(error).to.not.exist;
-        //             expect(mailboxes).to.exist;
-        //             expect(mailboxes).to.not.be.empty;
-        //             done();
-        //         });
-        //     });
-        // });
+            it('should list subfolders', function(done) {
+                ic.listFolders('[Gmail]', function(error, mailboxes) {
+                    expect(error).to.not.exist;
+                    expect(mailboxes).to.exist;
+                    expect(mailboxes).to.not.be.empty;
+                    done();
+                });
+            });
+        });
 
         describe('ImapClient.listMessages', function() {
             it('should list messages', function(done) {
