@@ -223,14 +223,14 @@ define(function(require) {
             });
         });
 
-        it('should get a specific message with text only', function(done) {
+        it('should get a specific message with text only and decode quoted-printable', function(done) {
             var ee = {};
             ee.pipe = function(parser) {
-                parser.end("From: 'Sender Name' <sender@example.com>\r\nTo: 'Receiver Name' <receiver@example.com>\r\nSubject: Hello world!\r\n");
+                parser.end("Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nFrom: 'Sender Name' <sender@example.com>\r\nTo: 'Receiver Name' <receiver@example.com>\r\nSubject: Hello world!\r\n");
             };
             ee.on = function(ev, cb) {
                 if (ev === 'data') {
-                    cb('asdasd!');
+                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.');
                 } else if (ev === 'end') {
                     cb();
                 }
@@ -250,7 +250,7 @@ define(function(require) {
                 expect(msg.from).to.be.instanceof(Array);
                 expect(msg.to).to.be.instanceof(Array);
                 expect(msg.subject).to.equal('Hello world!');
-                expect(msg.body).to.equal('asdasd!');
+                expect(msg.body).to.equal('To read my encrypted message below, simply install Whiteout Mail for Chrome.');
 
                 done();
             });

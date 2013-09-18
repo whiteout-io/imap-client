@@ -7,8 +7,9 @@
 	"main": "src/imap-client.js",
 	"dependencies": {
 		"amdefine": ">=0.0.8",
-		"mailparser": "https://github.com/whiteout-io/mailparser/tarball/amd",
 		"setimmediate": ">=1.0.1",
+		"mimelib": "https://github.com/whiteout-io/mimelib/tarball/amd",
+		"mailparser": "https://github.com/whiteout-io/mailparser/tarball/amd",
 		"inbox": "https://github.com/whiteout-io/inbox/tarball/amd"
 	},
 	"devDependencies": {

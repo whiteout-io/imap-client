@@ -7,6 +7,7 @@ define(function(require) {
 
     var inbox = require('inbox'),
         MailParser = require('mailparser').MailParser,
+        mimelib = require('mimelib'),
         ImapClient;
 
     require('setimmediate');
@@ -274,12 +275,16 @@ define(function(require) {
                     var content = '';
                     stream = self._client.createStream({
                         uid: options.uid,
-                        part: '1'
+                        part: email.headers['content-type'].indexOf('multipart') > -1 ? '1.1' : '1'
                     });
+
                     stream.on('data', function(chunk) {
                         content += chunk.toString();
                     });
                     stream.on('end', function() {
+                        if (email.headers['content-transfer-encoding'] && email.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
+                            content = mimelib.decodeQuotedPrintable(content);
+                        }
                         callback(null, {
                             uid: options.uid,
                             id: email.messageId,
