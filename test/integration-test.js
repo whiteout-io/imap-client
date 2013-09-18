@@ -98,7 +98,7 @@ define(function(require) {
             });
         });
 
-        it('should get only plain text in multipart message in text only', function(done) {
+        it('should get only plain text in multipart/mixed message in text only', function(done) {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 658,
@@ -106,7 +106,20 @@ define(function(require) {
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.body.indexOf('do not delete me, i have got something here for you') > -1).to.be.true;
+                expect(message.body).to.equal('do not delete me, i have got something here for you\r\n');
+                done();
+            });
+        });
+
+        it('should get only plain text in multipart/alternative message in text only', function(done) {
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 689,
+                textOnly: true
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal('asdfasdfasdf');
                 done();
             });
         });
@@ -119,7 +132,7 @@ define(function(require) {
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.body.indexOf('To read my encrypted message below, simply install Whiteout Mail for Chrome.') > -1).to.be.true;
+                expect(message.body.indexOf('To read my encrypted message below, simply install Whiteout Mail for Chrome.') > -1).to.be.true; // this text contains a quoted-printable line wrap
                 done();
             });
         });

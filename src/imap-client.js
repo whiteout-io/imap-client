@@ -275,7 +275,7 @@ define(function(require) {
                     var content = '';
                     stream = self._client.createStream({
                         uid: options.uid,
-                        part: email.headers['content-type'].indexOf('multipart') > -1 ? '1.1' : '1'
+                        part: email.headers['content-type'].indexOf('multipart/mixed') > -1 ? '1.1' : '1'
                     });
 
                     stream.on('data', function(chunk) {
