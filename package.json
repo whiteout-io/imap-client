@@ -2,6 +2,7 @@
 	"name": "imap-client",
 	"version": "0.0.1",
 	"scripts": {
+		"pretest": "./build-test.sh",
 		"test": "grunt test"
 	},
 	"main": "src/imap-client.js",
