@@ -37,7 +37,7 @@ define(function(require) {
         it('should return number of unread messages', function(done) {
             ic.unreadMessages('INBOX', function(error, unreadMessages) {
                 expect(error).to.be.null;
-                expect(unreadMessages).to.equal(1);
+                expect(unreadMessages).to.be.at.least(1);
                 done();
             });
         });
