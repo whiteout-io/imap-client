@@ -5,7 +5,7 @@ if (typeof define !== 'function') {
 define(function(require) {
     'use strict';
 
-    var ImapClient = require('../src/imap-client'),
+    var ImapClient = require('imap-client'),
         expect = require('chai').expect,
         loginOptions;
 
@@ -127,7 +127,7 @@ define(function(require) {
         it('should decode quoted-printable in plain message in text only', function(done) {
             ic.getMessage({
                 path: 'INBOX',
-                uid: 688,
+                uid: 699,
                 textOnly: true
             }, function(error, message) {
                 expect(error).to.not.exist;

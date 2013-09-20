@@ -6,7 +6,7 @@ define(function(require) {
     'use strict';
 
     var inbox = require('inbox'),
-        MailParser = require('mailparser').MailParser,
+        parser = require('./parser'),
         mimelib = require('mimelib'),
         ImapClient;
 
@@ -254,7 +254,7 @@ define(function(require) {
             }
 
             function fetchTextOnly() {
-                var parser, stream;
+                var stream, raw = '';
 
                 stream = self._client.createStream({
                     uid: options.uid,
@@ -265,13 +265,25 @@ define(function(require) {
                     callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
                     return;
                 }
-                stream.on('error', function(e) {
-                    callback(e);
+                stream.on('error', callback);
+                stream.on('data', function(chunk) {
+                    raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                 });
 
-                parser = new MailParser();
+                stream.on('end', function(chunk) {
+                    if (chunk) {
+                        raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                    }
+                    parse(raw, handleHeader);
+                });
 
-                function handleHeader(email) {
+                function handleHeader(error, email) {
+                    if (error) {
+                        callback(error);
+                        return;
+                    }
+
+                    // we received the header, now it's time to process the rest...
                     var content = '';
                     stream = self._client.createStream({
                         uid: options.uid,
@@ -279,9 +291,13 @@ define(function(require) {
                     });
 
                     stream.on('data', function(chunk) {
-                        content += chunk.toString();
+                        content += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                     });
-                    stream.on('end', function() {
+                    stream.on('end', function(chunk) {
+                        if (chunk) {
+                            content += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                        }
+
                         if (email.headers['content-transfer-encoding'] && email.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
                             content = mimelib.decodeQuotedPrintable(content);
                         }
@@ -300,76 +316,79 @@ define(function(require) {
                         });
                     });
                 }
-
-                parser.once('end', handleHeader);
-                stream.pipe(parser);
             }
 
             function fetchWholeBody() {
-                var parser, stream;
+                var stream, raw = '';
 
                 stream = self._client.createStream({
                     uid: options.uid,
-                    part: ''
+                    part: false
                 });
 
                 if (!stream) {
                     callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
                     return;
                 }
+
                 stream.on('error', function(e) {
                     callback(e);
                 });
 
-                parser = new MailParser();
-                parser.once('end', function(email) {
-                    var attachments = [];
+                stream.on('data', function(chunk) {
+                    raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                });
 
-                    if (email.attachments instanceof Array) {
-                        email.attachments.forEach(function(attachment) {
-                            attachments.push({
-                                fileName: attachment.generatedFileName,
-                                contentType: attachment.contentType,
-                                uint8Array: bufferToTypedArray(attachment.content)
-                            });
-                        });
+                stream.on('end', function(chunk) {
+                    if (chunk) {
+                        raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                     }
+                    parse(raw, function(error, email) {
+                        if (error) {
+                            callback(error);
+                            return;
+                        }
 
-                    callback(null, {
-                        uid: options.uid,
-                        id: email.messageId,
-                        from: email.from,
-                        to: email.to,
-                        cc: email.cc,
-                        bcc: email.bcc,
-                        subject: email.subject,
-                        body: email.html || email.text,
-                        html: !! email.html,
-                        sentDate: email.date,
-                        attachments: attachments
+                        callback(null, {
+                            uid: options.uid,
+                            id: email.messageId,
+                            from: email.from,
+                            to: email.to,
+                            cc: email.cc,
+                            bcc: email.bcc,
+                            subject: email.subject,
+                            body: email.html || email.text,
+                            html: !! email.html,
+                            sentDate: email.date,
+                            attachments: email.attachments
+                        });
                     });
                 });
-                parser.on('error', function(e) {
-                    callback(e);
-                });
+            }
 
-                stream.pipe(parser);
+            function parse(raw, cb) {
+                if (typeof window === 'undefined' || !window.Worker) {
+                    // no WebWorker support... do synchronous call
+                    parser.parse(raw, function(parsed) {
+                        cb(null, parsed);
+                    });
+                    return;
+                }
+
+                var worker = new Worker('../lib/parser-worker.js');
+                worker.onmessage = function(e) {
+                    cb(null, e.data);
+                };
+                worker.onerror = function(e) {
+                    var error = new Error('Error handling web worker: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
+                    console.error(error);
+                    cb(error);
+                };
+
+                worker.postMessage(raw);
             }
         });
     };
-
-    /*
-     * Helper functions
-     */
-
-    function bufferToTypedArray(buffer) {
-        var ab = new ArrayBuffer(buffer.length);
-        var view = new Uint8Array(ab);
-        for (var i = 0, len = buffer.length; i < len; i++) {
-            view[i] = buffer.readUInt8(i);
-        }
-        return view;
-    }
 
     return ImapClient;
 });

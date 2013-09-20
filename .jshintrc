@@ -19,6 +19,8 @@
 	"unused": true,
 
 	"predef": [
+			"importScripts", 
+			"self",
 			"setImmediate",
 			"mocha",
 			"chrome",
