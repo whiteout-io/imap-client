@@ -2,7 +2,6 @@ require.config({
     baseUrl: '../lib',
     paths: {
         'test': '..',
-        'src':'../../src',
         'node-forge': 'forge',
         'chai': 'chai',
         'setimmediate': 'setImmediate'
