@@ -1,46 +1,55 @@
-'use strict';
-
-var ImapClient, loginOptions, expect;
-
-if (typeof window === 'undefined') {
-    ImapClient = require('../index').ImapClient;
-    expect = require('chai').expect;
-} else {
-    ImapClient = window.ImapClient;
-    expect = window.chai.expect;
+if (typeof define !== 'function') {
+    var define = require('amdefine')(module);
 }
 
-loginOptions = {
-    port: 993,
-    // host: 'secureimap.t-online.de',
-    // auth: {
-    //     user: "whiteout.test@t-online.de",
-    //     pass: "@6IyFg1SIlWH91Co"
-    // },
-    host: 'imap.gmail.com',
-    auth: {
-        user: "safewithme.testuser@gmail.com",
-        pass: "hellosafe"
-    },
-    secure: true
-};
+define(function(require) {
+    'use strict';
 
-describe('ImapClient integration tests', function() {
-    this.timeout(20000);
+    var ImapClient = require('imap-client'),
+        expect = require('chai').expect,
+        loginOptions;
 
-    var ic;
+    loginOptions = {
+        port: 993,
+        host: 'imap.gmail.com', // 'secureimap.t-online.de'
+        auth: {
+            user: 'safewithme.testuser@gmail.com', // whiteout.test@t-online.de
+            pass: 'hellosafe' // '@6IyFg1SIlWH91Co'
+        },
+        secure: true
+    };
 
-    beforeEach(function(done) {
-        ic = new ImapClient(loginOptions);
-        ic.login(done);
-    });
+    describe('ImapClient integration tests', function() {
+        this.timeout(5000);
+
+        var ic;
+
+        beforeEach(function(done) {
+            ic = new ImapClient(loginOptions);
+            ic.login(done);
+        });
 
 
-    afterEach(function(done) {
-        ic.logout(done);
-    });
+        afterEach(function(done) {
+            ic.logout(done);
+        });
 
-    describe('ImapClient.listFolders', function() {
+        it('should return number of unread messages', function(done) {
+            ic.unreadMessages('INBOX', function(error, unreadMessages) {
+                expect(error).to.be.null;
+                expect(unreadMessages).to.be.at.least(1);
+                done();
+            });
+        });
+        it('should list all folders', function(done) {
+            ic.listAllFolders(function(error, paths) {
+                expect(error).to.not.exist;
+                expect(paths).to.be.instanceof(Array);
+                expect(paths).to.not.be.empty;
+                done();
+            });
+        });
+
         it('should list folders', function(done) {
             ic.listFolders(function(error, mailboxes) {
                 expect(error).to.not.exist;
@@ -66,9 +75,7 @@ describe('ImapClient integration tests', function() {
                 done();
             });
         });
-    });
 
-    describe('ImapClient.listMessages', function() {
         it('should list messages', function(done) {
             ic.listMessages({
                 path: 'INBOX',
@@ -90,54 +97,78 @@ describe('ImapClient integration tests', function() {
                 done();
             });
         });
-    });
 
-    describe('ImapClient.getMessage', function() {
-        it('should get a specific message', function(done) {
-            var attachmentParsed = false,
-                bodyParsed = false;
-
-            function onAttachment(attmt) {
-                expect(attmt.fileName).to.exist;
-                expect(attmt.contentType).to.exist;
-                expect(attmt.uint8Array).to.exist;
-                attachmentParsed = true;
-            }
-
-            function onMessageBody(body) {
-                expect(body.type).to.equal('text/plain');
-                expect(body.content).to.exist;
-                bodyParsed = true;
-            }
-
-            function onMessage(error, message) {
+        it('should get only plain text in multipart/mixed message in text only', function(done) {
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 658,
+                textOnly: true
+            }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.attachments).to.not.be.empty;
+                expect(message.body).to.equal('do not delete me, i have got something here for you\r\n');
+                done();
+            });
+        });
 
-                expect(attachmentParsed).to.be.true;
-                expect(bodyParsed).to.be.true;
+        it('should get only plain text in multipart/alternative message in text only', function(done) {
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 689,
+                textOnly: true
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal('asdfasdfasdf');
+                done();
+            });
+        });
+        
+        it('should decode quoted-printable in plain message in text only', function(done) {
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 699,
+                textOnly: true
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body.indexOf('To read my encrypted message below, simply install Whiteout Mail for Chrome.') > -1).to.be.true; // this text contains a quoted-printable line wrap
+                done();
+            });
+        });
+
+        it('should get full message with attachments', function(done) {
+            function onEnd(error, message) {
+                expect(error).to.be.null;
+
+                expect(message).to.exist;
+                expect(message.id).to.exist;
+                expect(message.uid).to.equal(583);
+                expect(message.to).to.be.instanceof(Array);
+                expect(message.from).to.be.instanceof(Array);
+                expect(message.subject).to.not.be.empty;
+                expect(message.body).to.not.be.empty;
+                expect(message.html).to.be.false;
+                expect(message.attachments).to.be.instanceof(Array);
+                expect(message.attachments).to.not.be.empty;
                 done();
             }
 
             ic.getMessage({
                 path: 'INBOX',
                 uid: 583,
-                onMessage: onMessage,
-                onAttachment: onAttachment,
-                onMessageBody: onMessageBody
-            });
+                textOnly: false
+            }, onEnd);
         });
 
         it('should not get a non-existent message', function(done) {
             ic.getMessage({
                 path: 'INBOX',
-                uid: 999,
-                onMessage: function(error, message) {
-                    expect(error).to.exist;
-                    expect(message).to.not.exist;
-                    done();
-                }
+                uid: 999
+            }, function(error, message) {
+                expect(error).to.exist;
+                expect(message).to.not.exist;
+                done();
             });
         });
 
@@ -169,15 +200,13 @@ describe('ImapClient integration tests', function() {
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 656,
-                onMessage: firstMessageReady
-            });
+                uid: 656
+            }, firstMessageReady);
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 655,
-                onMessage: secondMessageReady
-            });
+                uid: 655
+            }, secondMessageReady);
         });
     });
 });

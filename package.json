@@ -2,16 +2,16 @@
 	"name": "imap-client",
 	"version": "0.0.1",
 	"scripts": {
-		"pretest": "node build.js && cp src-gen/imap-client-browserified.js test/",
+		"pretest": "./build-test.sh",
 		"test": "grunt test"
 	},
+	"main": "src/imap-client.js",
 	"dependencies": {
-		"net-chromeify": "https://github.com/whiteout-io/net-chromeify/tarball/rewrite",
-		"tls-chromeify": "https://github.com/whiteout-io/tls-chromeify/tarball/master",
-		"browserify": "2.26.0",
-		"inbox": "~1.1.35",		
-		"mailparser": "https://github.com/whiteout-io/mailparser/tarball/noattachment",
-		"browserify-mime": "~1.2.9"
+		"amdefine": ">=0.0.8",
+		"setimmediate": ">=1.0.1",
+		"mimelib": "https://github.com/whiteout-io/mimelib/tarball/amd",
+		"mailparser": "https://github.com/whiteout-io/mailparser/tarball/amd",
+		"inbox": "https://github.com/whiteout-io/inbox/tarball/amd"
 	},
 	"devDependencies": {
 		"mocha": "~1.12.0",
@@ -19,8 +19,7 @@
 		"grunt": "~0.4.1",
 		"grunt-contrib-jshint": "~0.5.3",
 		"grunt-mocha-test": "~0.6.2",
-		"rewire": "~1.1.3",
-		"jsmockito": "~1.0.4",
-		"jshamcrest": "~0.6.7"
+		"sinon": "1.7.3",
+		"requirejs": "*"
 	}
 }

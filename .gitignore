@@ -1,4 +1,5 @@
 .DS_Store
 node_modules
 
-imap-client-browserified.js
+test/lib/*
+test/res/mocha.css
