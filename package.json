@@ -2,8 +2,8 @@
 	"name": "imap-client",
 	"version": "0.0.1",
 	"scripts": {
-		"pretest": "./build-test.sh",
-		"test": "grunt test"
+		"pretest": "grunt integration",
+		"test": "grunt unit"
 	},
 	"main": "src/imap-client.js",
 	"dependencies": {
@@ -19,6 +19,9 @@
 		"grunt": "~0.4.1",
 		"grunt-contrib-jshint": "~0.5.3",
 		"grunt-mocha-test": "~0.6.2",
+		"grunt-contrib-watch": "*",
+		"grunt-contrib-copy": "*",
+		"grunt-contrib-clean": "*",
 		"sinon": "1.7.3",
 		"requirejs": "*"
 	}

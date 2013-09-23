@@ -1,12 +1,12 @@
 imap-client [![Build Status](https://magnum.travis-ci.com/whiteout-io/imap-client.png?token=g11Y5xe1ynqF5dzGqgB8&branch=master)](https://magnum.travis-ci.com/whiteout-io/imap-client)
 ===========
 
-Browserifiable imap client module for node. Exposes a high-level API wrapping an IMAP client
+IMAP client as an AMD module written with node API for the browser.
 
 ## Getting started
 
-Run the build script to get everything bundled up into a chrome packaged app
+Run the following commands to get started
 
-    npm install && npm test
+    npm install && grunt
 
-Then open chrome -> extentions and add the app in developer mode.
+Then open chrome -> extentions, check developer mode, and add the root folder as packaged app and see the integration tests fly!
