@@ -88,7 +88,7 @@ define(function(require) {
             }
 
             mailbox = mbxQueue.splice(0, 1)[0];
-            folders.push(mailbox.path);
+            folders.push(mailbox);
             if (mailbox.hasChildren) {
                 // we have reached an inner node, process the subtree
                 mailbox.listChildren(subfolders);

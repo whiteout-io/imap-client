@@ -154,11 +154,24 @@ define(function(require) {
             }]);
 
             // execute test case
-            imap.listAllFolders(function(error, paths) {
+            imap.listAllFolders(function(error, mailboxes) {
                 expect(error).to.not.exist;
-                expect(paths).to.not.be.empty;
-                expect(paths.length).to.equal(5);
+                expect(mailboxes).to.not.be.empty;
+                expect(mailboxes.length).to.equal(5);
                 expect(inboxMock.listMailboxes.calledOnce).to.be.true;
+
+                done();
+            });
+        });
+
+        it('should error while listing all folders', function(done) {
+            // setup fixture
+            inboxMock.listMailboxes.yields(new Error('fubar'));
+
+            // execute test case
+            imap.listAllFolders(function(error, mailboxes) {
+                expect(error).to.exist;
+                expect(mailboxes).to.not.exist;
 
                 done();
             });

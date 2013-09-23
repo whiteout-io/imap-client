@@ -42,10 +42,10 @@ define(function(require) {
             });
         });
         it('should list all folders', function(done) {
-            ic.listAllFolders(function(error, paths) {
+            ic.listAllFolders(function(error, mailboxes) {
                 expect(error).to.not.exist;
-                expect(paths).to.be.instanceof(Array);
-                expect(paths).to.not.be.empty;
+                expect(mailboxes).to.be.instanceof(Array);
+                expect(mailboxes).to.not.be.empty;
                 done();
             });
         });
