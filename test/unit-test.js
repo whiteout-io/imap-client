@@ -7,7 +7,6 @@ define(function(require) {
 
     var expect = require('chai').expect,
         inbox = require('inbox'),
-        Mailparser = require('mailparser').MailParser,
         sinon = require('sinon'),
         ImapClient = require('..'),
         loginOptions = {
@@ -21,14 +20,12 @@ define(function(require) {
         };
 
     describe('ImapClient', function() {
-        var imap, mailparserMock, inboxMock;
+        var imap, inboxMock;
 
         beforeEach(function() {
             var createConnectionStub;
 
-            mailparserMock = sinon.createStubInstance(Mailparser);
             inboxMock = sinon.createStubInstance(inbox.IMAPClient);
-
             createConnectionStub = sinon.stub(inbox, 'createConnection', function() {
                 return inboxMock;
             });
