@@ -239,6 +239,7 @@ define(function(require) {
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
      * @param {Boolean} options.textOnly Fetches the message in plain text without attachments
+     * @param {Number} options.timeout Timeout if an error occurs during the message retrieval
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
     ImapClient.prototype.getMessage = function(options, callback) {
@@ -274,34 +275,54 @@ define(function(require) {
                     if (chunk) {
                         raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                     }
-                    parse(raw, handleHeader);
+                    parse(raw, onHeader);
                 });
 
-                function handleHeader(error, email) {
+                function onHeader(error, email) { // we received the header, now it's time to process the rest...
+                    var content = '',
+                        timeoutId,
+                        timeoutFired = false;
+
                     if (error) {
                         callback(error);
                         return;
                     }
 
-                    // we received the header, now it's time to process the rest...
-                    var content = '';
+                    timeoutId = setTimeout(function() {
+                        timeoutFired = true;
+                        informDelegate();
+                    }, options.timeout ? options.timeout : 5000);
+
                     stream = self._client.createStream({
                         uid: options.uid,
                         part: email.headers['content-type'].indexOf('multipart/mixed') > -1 ? '1.1' : '1'
                     });
 
                     stream.on('data', function(chunk) {
+                        clearTimeout(timeoutId);
                         content += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                     });
+
                     stream.on('end', function(chunk) {
+                        if (timeoutFired) {
+                            return;
+                        }
+
+                        clearTimeout(timeoutId);
+
                         if (chunk) {
-                            content += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                            content += (typeof chunk === 'string') ? chunk : chunk.toString('utf8');
                         }
 
                         if (email.headers['content-transfer-encoding'] && email.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
                             content = mimelib.decodeQuotedPrintable(content);
                         }
-                        callback(null, {
+
+                        informDelegate();
+                    });
+
+                    function informDelegate () {
+                        var emailObj = {
                             uid: options.uid,
                             id: email.messageId,
                             from: email.from,
@@ -313,8 +334,14 @@ define(function(require) {
                             html: false,
                             sentDate: email.date,
                             attachments: []
-                        });
-                    });
+                        };
+
+                        if (timeoutFired) {
+                            delete emailObj.body;
+                        }
+
+                        callback(null, emailObj);
+                    }
                 }
             }
 

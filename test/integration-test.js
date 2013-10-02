@@ -166,6 +166,22 @@ define(function(require) {
             }, function(error, message) {
                 expect(error).to.exist;
                 expect(message).to.not.exist;
+
+                done();
+            });
+        });
+
+        it('should timeout due to non-existent body part', function(done){
+            ic.getMessage({
+                path: 'INBOX',
+                uid: 781,
+                timeout: 500,
+                textOnly: true
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.not.exist;
+
                 done();
             });
         });

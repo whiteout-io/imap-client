@@ -268,6 +268,42 @@ define(function(require) {
             });
         });
 
+        it('should timeout when a non-existent body part should be retrieved', function(done) {
+            var ee = {}, count = 0;
+            ee.on = function(ev, cb) {
+                if (ev === 'data') {
+                    if (count === 0) {
+                        cb("Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nFrom: 'Sender Name' <sender@example.com>\r\nTo: 'Receiver Name' <receiver@example.com>\r\nSubject: Hello world!\r\n");
+                    }
+                    count++;
+                } else if (ev === 'end') {
+                    if (count === 1) {
+                        cb();
+                    }
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.returns(ee);
+
+            imap.getMessage({
+                path: 'INBOX',
+                uid: 123,
+                textOnly: true,
+                timeout: 10
+            }, function(error, msg) {
+                expect(error).to.be.null;
+                expect(inboxMock.createStream.calledTwice).to.be.true;
+                expect(msg.uid).to.equal(123);
+                expect(msg.from).to.be.instanceof(Array);
+                expect(msg.to).to.be.instanceof(Array);
+                expect(msg.subject).to.equal('Hello world!');
+                expect(msg.body).to.not.exist;
+
+                done();
+            });
+        });
+
         it('should get a complete message', function(done) {
             var ee = {};
             ee.on = function(ev, cb) {
