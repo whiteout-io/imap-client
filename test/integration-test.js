@@ -88,10 +88,8 @@ define(function(require) {
                 expect(messages).to.not.be.empty;
                 for (var i = messages.length - 1; i >= 0; i--) {
                     message = messages[i];
-                    if (message.uid === 653) {
+                    if (message.uid === 780) {
                         expect(message.unread).to.be.true;
-                    } else if (message.uid === 655) {
-                        expect(message.unread).to.be.false;
                     }
                 }
                 done();
@@ -101,7 +99,7 @@ define(function(require) {
         it('should get only plain text in multipart/mixed message in text only', function(done) {
             ic.getMessage({
                 path: 'INBOX',
-                uid: 658,
+                uid: 772,
                 textOnly: true
             }, function(error, message) {
                 expect(error).to.not.exist;
@@ -114,7 +112,7 @@ define(function(require) {
         it('should get only plain text in multipart/alternative message in text only', function(done) {
             ic.getMessage({
                 path: 'INBOX',
-                uid: 689,
+                uid: 773,
                 textOnly: true
             }, function(error, message) {
                 expect(error).to.not.exist;
@@ -127,7 +125,7 @@ define(function(require) {
         it('should decode quoted-printable in plain message in text only', function(done) {
             ic.getMessage({
                 path: 'INBOX',
-                uid: 699,
+                uid: 779,
                 textOnly: true
             }, function(error, message) {
                 expect(error).to.not.exist;
@@ -143,12 +141,12 @@ define(function(require) {
 
                 expect(message).to.exist;
                 expect(message.id).to.exist;
-                expect(message.uid).to.equal(583);
+                expect(message.uid).to.equal(772);
                 expect(message.to).to.be.instanceof(Array);
                 expect(message.from).to.be.instanceof(Array);
                 expect(message.subject).to.not.be.empty;
                 expect(message.body).to.not.be.empty;
-                expect(message.html).to.be.false;
+                expect(message.html).to.be.true;
                 expect(message.attachments).to.be.instanceof(Array);
                 expect(message.attachments).to.not.be.empty;
                 done();
@@ -156,7 +154,7 @@ define(function(require) {
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 583,
+                uid: 772,
                 textOnly: false
             }, onEnd);
         });
@@ -200,12 +198,12 @@ define(function(require) {
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 656
+                uid: 777
             }, firstMessageReady);
 
             ic.getMessage({
                 path: 'INBOX',
-                uid: 655
+                uid: 776
             }, secondMessageReady);
         });
     });
