@@ -239,7 +239,7 @@ define(function(require) {
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
      * @param {Boolean} options.textOnly Fetches the message in plain text without attachments
-     * @param {Number} options.timeout Timeout if an error occurs during the message retrieval
+     * @param {Number} options.timeout Timeout if an error occurs during the message retrieval, only relevant if options.textOnly is true
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
     ImapClient.prototype.getMessage = function(options, callback) {
