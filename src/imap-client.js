@@ -246,7 +246,7 @@ define(function(require) {
         var self = this;
 
         self._client.openMailbox(options.path, {
-            readOnly: false
+            readOnly: true
         }, function() {
             if (options.textOnly) {
                 fetchTextOnly();
@@ -278,7 +278,7 @@ define(function(require) {
                     parse(raw, onHeader);
                 });
 
-                function onHeader(error, email) { // we received the header, now it's time to process the rest...
+                function onHeader(error, header) { // we received the header, now it's time to process the rest...
                     var content = '',
                         timeoutId,
                         timeoutFired = false;
@@ -288,51 +288,76 @@ define(function(require) {
                         return;
                     }
 
-                    timeoutId = setTimeout(function() {
-                        timeoutFired = true;
-                        informDelegate();
-                    }, options.timeout ? options.timeout : 5000);
+                    streamContent('1');
+                    armTimeout();
 
-                    stream = self._client.createStream({
-                        uid: options.uid,
-                        part: email.headers['content-type'].indexOf('multipart/mixed') > -1 ? '1.1' : '1'
-                    });
+                    function onData(chunk) {
+                        disarmTimeout(); // we have received anything, so the timeout can be discarded, even if it was only an 'end' event
 
-                    stream.on('data', function(chunk) {
-                        clearTimeout(timeoutId);
-                        content += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
-                    });
-
-                    stream.on('end', function(chunk) {
-                        if (timeoutFired) {
+                        if (typeof chunk === 'undefined') {
                             return;
                         }
 
-                        clearTimeout(timeoutId);
+                        content += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                    }
 
-                        if (chunk) {
-                            content += (typeof chunk === 'string') ? chunk : chunk.toString('utf8');
+                    function onEnd(chunk) {
+                        if (timeoutFired) {
+                            return;
+                        }
+                        onData(chunk);
+
+                        if (header.headers['content-type'].indexOf('multipart/mixed') > -1) {
+                            if (content.slice(0,2) === '--') {
+                                // the body part 1 most likely contains a nested part. start again with body part 1.1
+                                content = '';
+                                streamContent('1.1');
+                                armTimeout();
+
+                                return;
+                            }
                         }
 
-                        if (email.headers['content-transfer-encoding'] && email.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
+                        if (header.headers['content-transfer-encoding'] && header.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
                             content = mimelib.decodeQuotedPrintable(content);
                         }
 
                         informDelegate();
-                    });
+                    }
 
-                    function informDelegate () {
+                    function streamContent(part) {
+                        stream = self._client.createStream({
+                            uid: options.uid,
+                            part: part
+                        });
+
+                        stream.on('data', onData);
+                        stream.on('end', onEnd);
+                    }
+
+                    function armTimeout() {
+                        timeoutId = setTimeout(function() {
+                            timeoutFired = true;
+                            informDelegate();
+                        }, options.timeout ? options.timeout : 5000);
+                    }
+
+                    function disarmTimeout() {
+                        clearTimeout(timeoutId);
+                    }
+
+                    function informDelegate() {
                         var emailObj = {
                             uid: options.uid,
-                            id: email.messageId,
-                            from: email.from,
-                            to: email.to,
-                            cc: email.cc,
-                            bcc: email.bcc,
-                            subject: email.subject,
+                            id: header.messageId,
+                            from: header.from,
+                            to: header.to,
+                            cc: header.cc,
+                            bcc: header.bcc,
+                            subject: header.subject,
                             body: content,
                             html: false,
-                            sentDate: email.date,
+                            sentDate: header.date,
                             attachments: []
                         };
 

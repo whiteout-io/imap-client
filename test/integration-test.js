@@ -171,7 +171,7 @@ define(function(require) {
             });
         });
 
-        it('should timeout due to non-existent body part', function(done){
+        it('should get a message with multipart/mixed and non-nested body part 1', function(done){
             ic.getMessage({
                 path: 'INBOX',
                 uid: 781,
@@ -180,7 +180,7 @@ define(function(require) {
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.body).to.not.exist;
+                expect(message.body).to.equal('Hello world');
 
                 done();
             });

@@ -268,6 +268,43 @@ define(function(require) {
             });
         });
 
+        it('should get nested body parts', function(done) {
+            var ee = {}, count = 0;
+            ee.on = function(ev, cb) {
+                if (ev === 'data') {
+                    if (count === 0) {
+                        cb("Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nFrom: 'Sender Name' <sender@example.com>\r\nTo: 'Receiver Name' <receiver@example.com>\r\nSubject: Hello world!\r\n");
+                    } else if (count === 0) {
+                        cb('--047d7b2e4c46a8395c04e5048cce\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nasdasdasdasd\r\n\r\n--047d7b2e4c46a8395c04e5048cce\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n<div dir="ltr">asdasdasdasd</div>\r\n\r\n--047d7b2e4c46a8395c04e5048cce--');
+                    } else {
+                        cb('asdasdasdasd');
+                    }
+                    count++;
+                } else if (ev === 'end') {
+                    cb();
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.returns(ee);
+
+            imap.getMessage({
+                path: 'INBOX',
+                uid: 123,
+                textOnly: true
+            }, function(error, msg) {
+                expect(error).to.be.null;
+                expect(inboxMock.createStream.calledTwice).to.be.true;
+                expect(msg.uid).to.equal(123);
+                expect(msg.from).to.be.instanceof(Array);
+                expect(msg.to).to.be.instanceof(Array);
+                expect(msg.subject).to.equal('Hello world!');
+                expect(msg.body).to.equal('asdasdasdasd');
+
+                done();
+            });
+        });
+
         it('should timeout when a non-existent body part should be retrieved', function(done) {
             var ee = {}, count = 0;
             ee.on = function(ev, cb) {
