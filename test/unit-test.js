@@ -447,5 +447,38 @@ define(function(require) {
                 done();
             });
         });
+
+        it('should get flags', function(done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.fetchFlags.yields(null, ['\\Seen', '\\Answered']);
+
+            imap.getFlags({
+                path: 'INBOX',
+                uid: 123,
+            }, function(error, flags) {
+                expect(error).to.be.null;
+                expect(flags.unread).to.be.false;
+                expect(flags.answered).to.be.true;
+                done();
+            });
+        });
+
+        it('should update flags', function(done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.removeFlags.yields(null, []);
+            inboxMock.addFlags.yields(null, ['\\Seen', '\\Answered']);
+
+            imap.updateFlags({
+                path: 'INBOX',
+                uid: 123,
+                unread: false,
+                answered: true
+            }, function(error, flags) {
+                expect(error).to.be.null;
+                expect(flags.unread).to.be.false;
+                expect(flags.answered).to.be.true;
+                done();
+            });
+        });
     });
 });

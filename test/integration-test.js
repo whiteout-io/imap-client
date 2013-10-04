@@ -121,7 +121,7 @@ define(function(require) {
                 done();
             });
         });
-        
+
         it('should decode quoted-printable in plain message in text only', function(done) {
             ic.getMessage({
                 path: 'INBOX',
@@ -171,7 +171,7 @@ define(function(require) {
             });
         });
 
-        it('should get a message with multipart/mixed and non-nested body part 1', function(done){
+        it('should get a message with multipart/mixed and non-nested body part 1', function(done) {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 781,
@@ -221,6 +221,31 @@ define(function(require) {
                 path: 'INBOX',
                 uid: 776
             }, secondMessageReady);
+        });
+
+        it('should get flags', function(done) {
+            ic.getFlags({
+                path: 'INBOX',
+                uid: 780
+            }, function(error, flags) {
+                expect(error).to.be.null;
+                expect(flags.unread).to.be.true;
+                expect(flags.answered).to.be.false;
+                done();
+            });
+        });
+        it('should update flags', function(done) {
+            ic.updateFlags({
+                path: 'INBOX',
+                uid: 776,
+                unread: true,
+                answered: true
+            }, function(error, flags) {
+                expect(error).to.be.null;
+                expect(flags.unread).to.be.true;
+                expect(flags.answered).to.be.false;
+                done();
+            });
         });
     });
 });

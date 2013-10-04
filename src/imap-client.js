@@ -308,7 +308,7 @@ define(function(require) {
                         onData(chunk);
 
                         if (header.headers['content-type'].indexOf('multipart/mixed') > -1) {
-                            if (content.slice(0,2) === '--') {
+                            if (content.slice(0, 2) === '--') {
                                 // the body part 1 most likely contains a nested part. start again with body part 1.1
                                 content = '';
                                 streamContent('1.1');
@@ -439,6 +439,70 @@ define(function(require) {
 
                 worker.postMessage(raw);
             }
+        });
+    };
+
+    /**
+     * Fetches IMAP flags for a message with a given UID from the server
+     * @param {String} options.path The folder's path
+     * @param {Number} options.uid The uid of the message
+     * @param {Function} callback(error, flags) will be called the flags have been received from the server
+     */
+    ImapClient.prototype.getFlags = function(options, callback) {
+        var self = this;
+
+        self._client.openMailbox(options.path, {
+            readOnly: true
+        }, function() {
+            self._client.fetchFlags(options.uid, function(error, flags) {
+                callback(null, {
+                    unread: flags.indexOf('\\Seen') === -1,
+                    answered: flags.indexOf('\\Answered') > -1
+                });
+            });
+        });
+    };
+
+    /**
+     * Update IMAP flags for a message with a given UID
+     * @param {String} options.path The folder's path
+     * @param {Number} options.uid The uid of the message
+     * @param {Boolean} options.unread (optional) Marks the message as unread
+     * @param {Boolean} options.answered (optional) Marks the message as answered
+     * @param {Function} callback(error, flags) will be called the flags have been received from the server
+     */
+    ImapClient.prototype.updateFlags = function(options, callback) {
+        var self = this,
+            READ_FLAG = '\\Seen',
+            ANSWERED_FLAG = '\\Answered';
+
+        self._client.openMailbox(options.path, {
+            readOnly: false
+        }, function() {
+            var remove = [],
+                add = [];
+
+            if (typeof options.unread !== 'undefined') {
+                options.unread ? remove.push(READ_FLAG) : add.push(READ_FLAG);
+            }
+
+            if (typeof options.answered !== 'undefined') {
+                options.answered ? add.push() : remove.push(ANSWERED_FLAG);
+            }
+
+            self._client.removeFlags(options.uid, remove, function(error) {
+                if (error) {
+                    callback(error);
+                    return;
+                }
+
+                self._client.addFlags(options.uid, add, function(error, flags) {
+                    callback(null, {
+                        unread: flags.indexOf(READ_FLAG) === -1,
+                        answered: flags.indexOf(ANSWERED_FLAG) > -1
+                    });
+                });
+            });
         });
     };
 
