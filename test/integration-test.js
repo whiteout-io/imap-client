@@ -96,8 +96,8 @@ define(function(require) {
             });
         });
 
-        it('should get only plain text in multipart/mixed message in text only', function(done) {
-            ic.getMessage({
+        it('should get preview of multipart/mixed message', function(done) {
+            ic.getMessagePreview({
                 path: 'INBOX',
                 uid: 772,
                 textOnly: true
@@ -109,8 +109,8 @@ define(function(require) {
             });
         });
 
-        it('should get only plain text in multipart/alternative message in text only', function(done) {
-            ic.getMessage({
+        it('should get preview of multipart/alternative message', function(done) {
+            ic.getMessagePreview({
                 path: 'INBOX',
                 uid: 773,
                 textOnly: true
@@ -122,8 +122,8 @@ define(function(require) {
             });
         });
 
-        it('should decode quoted-printable in plain message in text only', function(done) {
-            ic.getMessage({
+        it('should decode quoted-printable in message preview', function(done) {
+            ic.getMessagePreview({
                 path: 'INBOX',
                 uid: 779,
                 textOnly: true
@@ -131,6 +131,33 @@ define(function(require) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
                 expect(message.body.indexOf('To read my encrypted message below, simply install Whiteout Mail for Chrome.') > -1).to.be.true; // this text contains a quoted-printable line wrap
+                done();
+            });
+        });
+
+        it('should not get preview of a non-existent message', function(done) {
+            ic.getMessagePreview({
+                path: 'INBOX',
+                uid: 999
+            }, function(error, message) {
+                expect(error).to.exist;
+                expect(message).to.not.exist;
+
+                done();
+            });
+        });
+
+        it('should get preview with multipart/mixed and non-nested body part 1', function(done) {
+            ic.getMessagePreview({
+                path: 'INBOX',
+                uid: 781,
+                timeout: 500,
+                textOnly: true
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal('Hello world');
+
                 done();
             });
         });
@@ -155,72 +182,7 @@ define(function(require) {
             ic.getMessage({
                 path: 'INBOX',
                 uid: 772,
-                textOnly: false
             }, onEnd);
-        });
-
-        it('should not get a non-existent message', function(done) {
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 999
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(message).to.not.exist;
-
-                done();
-            });
-        });
-
-        it('should get a message with multipart/mixed and non-nested body part 1', function(done) {
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 781,
-                timeout: 500,
-                textOnly: true
-            }, function(error, message) {
-                expect(error).to.not.exist;
-                expect(message).to.exist;
-                expect(message.body).to.equal('Hello world');
-
-                done();
-            });
-        });
-
-        it('should receive the two consecutive messages', function(done) {
-            var msg1 = false,
-                msg2 = false;
-
-            function firstMessageReady(error, message) {
-                expect(error).to.not.exist;
-                expect(message).to.exist;
-                expect(message.id).to.equal('7ADB0F57-B2D1-406B-963B-843530CC61DC@gmail.com');
-                msg1 = true;
-                check();
-            }
-
-            function secondMessageReady(error, message) {
-                expect(error).to.not.exist;
-                expect(message).to.exist;
-                expect(message.id).to.equal('40A57DCE-BF14-468F-9AD3-18592AABC8E6@whiteout.io');
-                msg2 = true;
-                check();
-            }
-
-            function check() {
-                if (msg1 && msg2) {
-                    done();
-                }
-            }
-
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 777
-            }, firstMessageReady);
-
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 776
-            }, secondMessageReady);
         });
 
         it('should get flags', function(done) {

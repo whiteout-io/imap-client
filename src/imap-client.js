@@ -289,7 +289,7 @@ define(function(require) {
                 onData(chunk);
                 parse({
                     raw: raw,
-                    noWorker: true
+                    nonConcurrent: true
                 }, onHeader);
             }
 
@@ -387,6 +387,51 @@ define(function(require) {
         });
     };
 
+    /**
+     * Fetches a full message from the server and parses it
+     * @param {String} options.path The folder's path
+     * @param {Number} options.uid The uid of the message
+     * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
+     */
+    ImapClient.prototype.getMessage = function(options, callback) {
+        var self = this;
+
+        self.getRawMessage(options, onRaw);
+
+        function onRaw(error, raw) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            parse({
+                raw: raw
+            }, onMessage);
+        }
+
+        function onMessage(error, email) {
+            callback(null, {
+                uid: options.uid,
+                id: email.messageId,
+                from: email.from,
+                to: email.to,
+                cc: email.cc,
+                bcc: email.bcc,
+                subject: email.subject,
+                body: email.html || email.text,
+                html: !! email.html,
+                sentDate: email.date,
+                attachments: email.attachments
+            });
+        }
+    };
+
+    /**
+     * Fetches a full message from the server and parses it
+     * @param {String} options.path The folder's path
+     * @param {Number} options.uid The uid of the message
+     * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
+     */
     ImapClient.prototype.getRawMessage = function(options, callback) {
         var self = this;
 
@@ -414,6 +459,9 @@ define(function(require) {
             stream.on('end', onEnd);
 
             function onData(chunk) {
+                if (typeof chunk === 'undefined') {
+                    return;
+                }
                 raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
             }
 
@@ -423,11 +471,9 @@ define(function(require) {
             }
         });
     };
-    // ImapClient.prototype.batchParseRawMessages = function(options, callback) {};
 
     function parse(options, cb) {
-        if (options.noWorker || typeof window === 'undefined' || !window.Worker) {
-            // no WebWorker support... do synchronous call
+        if (options.nonConcurrent || typeof window === 'undefined' || !window.Worker) {
             parser.parse(options.raw, function(parsed) {
                 cb(null, parsed);
             });
