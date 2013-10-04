@@ -203,6 +203,29 @@ define(function(require) {
             });
         });
 
+        it('should error when querying unread messages', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.unreadMessages('INBOX', function(error, unreadMessages) {
+                expect(error).to.exist;
+                expect(unreadMessages).to.not.exist;
+                done();
+            });
+        });
+
+        it('should not list messages due to error', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.listMessages({
+                path: 'foobar',
+                offset: 0,
+                length: 2
+            }, function(error, msg) {
+                expect(error).to.exist;
+                expect(msg).to.not.exist;
+                done();
+            });
+        });
 
         it('should list messages', function(done) {
             inboxMock.openMailbox.yields();
@@ -229,6 +252,20 @@ define(function(require) {
                 expect(unreadMessages[0].subject).to.equal('SHIAAAT');
                 expect(unreadMessages[0].unread).to.be.false;
                 expect(unreadMessages[0].answered).to.be.true;
+                done();
+            });
+        });
+
+        it('should not get messages due to error', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.getMessage({
+                path: 'INBOX',
+                uid: 123,
+                textOnly: true
+            }, function(error, msg) {
+                expect(error).to.exist;
+                expect(msg).to.not.exist;
                 done();
             });
         });
@@ -448,6 +485,19 @@ define(function(require) {
             });
         });
 
+        it('should not get flags due to error', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.getFlags({
+                path: 'INBOX',
+                uid: 123,
+            }, function(error, flags) {
+                expect(error).to.exist;
+                expect(flags).to.not.exist;
+                done();
+            });
+        });
+
         it('should get flags', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.fetchFlags.yields(null, ['\\Seen', '\\Answered']);
@@ -459,6 +509,21 @@ define(function(require) {
                 expect(error).to.be.null;
                 expect(flags.unread).to.be.false;
                 expect(flags.answered).to.be.true;
+                done();
+            });
+        });
+
+        it('should not get flags due to error', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.updateFlags({
+                path: 'INBOX',
+                uid: 123,
+                unread: false,
+                answered: true
+            }, function(error, flags) {
+                expect(error).to.exist;
+                expect(flags).to.not.exist;
                 done();
             });
         });

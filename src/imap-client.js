@@ -188,7 +188,12 @@ define(function(require) {
 
         self._client.openMailbox(options.path, {
             readOnly: true
-        }, function() {
+        }, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+            
             self._client.listMessages(options.offset, options.length, function(error, messages) {
                 var i, email, emails;
 
@@ -229,7 +234,12 @@ define(function(require) {
 
         self._client.openMailbox(path, {
             readOnly: true
-        }, function() {
+        }, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
             self._client.unreadMessages(callback);
         });
     };
@@ -247,7 +257,12 @@ define(function(require) {
 
         self._client.openMailbox(options.path, {
             readOnly: true
-        }, function() {
+        }, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
             if (options.textOnly) {
                 fetchTextOnly();
             } else {
@@ -453,8 +468,18 @@ define(function(require) {
 
         self._client.openMailbox(options.path, {
             readOnly: true
-        }, function() {
+        }, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+            
             self._client.fetchFlags(options.uid, function(error, flags) {
+                if (error) {
+                    callback(error);
+                    return;
+                }
+                
                 callback(null, {
                     unread: flags.indexOf('\\Seen') === -1,
                     answered: flags.indexOf('\\Answered') > -1
@@ -478,7 +503,12 @@ define(function(require) {
 
         self._client.openMailbox(options.path, {
             readOnly: false
-        }, function() {
+        }, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+            
             var remove = [],
                 add = [];
 
