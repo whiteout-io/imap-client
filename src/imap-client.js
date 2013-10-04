@@ -193,7 +193,7 @@ define(function(require) {
                 callback(error);
                 return;
             }
-            
+
             self._client.listMessages(options.offset, options.length, function(error, messages) {
                 var i, email, emails;
 
@@ -245,14 +245,13 @@ define(function(require) {
     };
 
     /**
-     * Fetches a message with from the server
+     * Fetches the preview of a message from the server
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
-     * @param {Boolean} options.textOnly Fetches the message in plain text without attachments
      * @param {Number} options.timeout Timeout if an error occurs during the message retrieval, only relevant if options.textOnly is true
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
-    ImapClient.prototype.getMessage = function(options, callback) {
+    ImapClient.prototype.getMessagePreview = function(options, callback) {
         var self = this;
 
         self._client.openMailbox(options.path, {
@@ -263,199 +262,190 @@ define(function(require) {
                 return;
             }
 
-            if (options.textOnly) {
-                fetchTextOnly();
-            } else {
-                fetchWholeBody();
+            var stream, raw = '';
+
+            stream = self._client.createStream({
+                uid: options.uid,
+                part: 'HEADER'
+            });
+
+            if (!stream) {
+                callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+                return;
             }
+            stream.on('error', callback);
+            stream.on('data', onData);
+            stream.on('end', onEnd);
 
-            function fetchTextOnly() {
-                var stream, raw = '';
-
-                stream = self._client.createStream({
-                    uid: options.uid,
-                    part: 'HEADER'
-                });
-
-                if (!stream) {
-                    callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+            function onData(chunk) {
+                if (typeof chunk === 'undefined') {
                     return;
                 }
-                stream.on('error', callback);
-                stream.on('data', function(chunk) {
-                    raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
-                });
 
-                stream.on('end', function(chunk) {
-                    if (chunk) {
-                        raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
-                    }
-                    parse(raw, onHeader);
-                });
+                raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+            }
 
-                function onHeader(error, header) { // we received the header, now it's time to process the rest...
-                    var content = '',
-                        timeoutId,
-                        timeoutFired = false;
+            function onEnd(chunk) {
+                onData(chunk);
+                parse({
+                    raw: raw,
+                    noWorker: true
+                }, onHeader);
+            }
 
-                    if (error) {
-                        callback(error);
+            function onHeader(error, header) { // we received the header, now it's time to process the rest...
+                var rawBody = '',
+                    timeoutId,
+                    timeoutFired = false;
+
+                if (error) {
+                    callback(error);
+                    return;
+                }
+
+                streamBodyPart('1');
+                armTimeout();
+
+                function streamBodyPart(part) {
+                    stream = self._client.createStream({
+                        uid: options.uid,
+                        part: part
+                    });
+
+                    stream.on('data', onBodyData);
+                    stream.on('end', onBodyEnd);
+                    stream.on('error', callback);
+                }
+
+                function onBodyData(chunk) {
+                    disarmTimeout(); // we have received anything, so the timeout can be discarded, even if it was only an 'end' event
+
+                    if (typeof chunk === 'undefined') {
                         return;
                     }
 
-                    streamContent('1');
-                    armTimeout();
+                    rawBody += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                }
 
-                    function onData(chunk) {
-                        disarmTimeout(); // we have received anything, so the timeout can be discarded, even if it was only an 'end' event
+                function onBodyEnd(chunk) {
+                    if (timeoutFired) {
+                        return;
+                    }
+                    onBodyData(chunk);
 
-                        if (typeof chunk === 'undefined') {
+                    if (header.headers['content-type'].indexOf('multipart/mixed') > -1) {
+                        if (rawBody.slice(0, 2) === '--') {
+                            // the body part 1 most likely contains a nested part. start again with body part 1.1
+                            rawBody = '';
+                            streamBodyPart('1.1');
+                            armTimeout();
+
                             return;
                         }
-
-                        content += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                     }
 
-                    function onEnd(chunk) {
-                        if (timeoutFired) {
-                            return;
-                        }
-                        onData(chunk);
+                    if (header.headers['content-transfer-encoding'] && header.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
+                        rawBody = mimelib.decodeQuotedPrintable(rawBody);
+                    }
 
-                        if (header.headers['content-type'].indexOf('multipart/mixed') > -1) {
-                            if (content.slice(0, 2) === '--') {
-                                // the body part 1 most likely contains a nested part. start again with body part 1.1
-                                content = '';
-                                streamContent('1.1');
-                                armTimeout();
+                    informDelegate();
+                }
 
-                                return;
-                            }
-                        }
-
-                        if (header.headers['content-transfer-encoding'] && header.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
-                            content = mimelib.decodeQuotedPrintable(content);
-                        }
-
+                function armTimeout() {
+                    timeoutId = setTimeout(function() {
+                        timeoutFired = true;
                         informDelegate();
-                    }
-
-                    function streamContent(part) {
-                        stream = self._client.createStream({
-                            uid: options.uid,
-                            part: part
-                        });
-
-                        stream.on('data', onData);
-                        stream.on('end', onEnd);
-                    }
-
-                    function armTimeout() {
-                        timeoutId = setTimeout(function() {
-                            timeoutFired = true;
-                            informDelegate();
-                        }, options.timeout ? options.timeout : 5000);
-                    }
-
-                    function disarmTimeout() {
-                        clearTimeout(timeoutId);
-                    }
-
-                    function informDelegate() {
-                        var emailObj = {
-                            uid: options.uid,
-                            id: header.messageId,
-                            from: header.from,
-                            to: header.to,
-                            cc: header.cc,
-                            bcc: header.bcc,
-                            subject: header.subject,
-                            body: content,
-                            html: false,
-                            sentDate: header.date,
-                            attachments: []
-                        };
-
-                        if (timeoutFired) {
-                            delete emailObj.body;
-                        }
-
-                        callback(null, emailObj);
-                    }
-                }
-            }
-
-            function fetchWholeBody() {
-                var stream, raw = '';
-
-                stream = self._client.createStream({
-                    uid: options.uid,
-                    part: false
-                });
-
-                if (!stream) {
-                    callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
-                    return;
+                    }, options.timeout ? options.timeout : 5000);
                 }
 
-                stream.on('error', function(e) {
-                    callback(e);
-                });
-
-                stream.on('data', function(chunk) {
-                    raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
-                });
-
-                stream.on('end', function(chunk) {
-                    if (chunk) {
-                        raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
-                    }
-                    parse(raw, function(error, email) {
-                        if (error) {
-                            callback(error);
-                            return;
-                        }
-
-                        callback(null, {
-                            uid: options.uid,
-                            id: email.messageId,
-                            from: email.from,
-                            to: email.to,
-                            cc: email.cc,
-                            bcc: email.bcc,
-                            subject: email.subject,
-                            body: email.html || email.text,
-                            html: !! email.html,
-                            sentDate: email.date,
-                            attachments: email.attachments
-                        });
-                    });
-                });
-            }
-
-            function parse(raw, cb) {
-                if (typeof window === 'undefined' || !window.Worker) {
-                    // no WebWorker support... do synchronous call
-                    parser.parse(raw, function(parsed) {
-                        cb(null, parsed);
-                    });
-                    return;
+                function disarmTimeout() {
+                    clearTimeout(timeoutId);
                 }
 
-                var worker = new Worker('../lib/parser-worker.js');
-                worker.onmessage = function(e) {
-                    cb(null, e.data);
-                };
-                worker.onerror = function(e) {
-                    var error = new Error('Error handling web worker: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
-                    console.error(error);
-                    cb(error);
-                };
+                function informDelegate() {
+                    var emailObj = {
+                        uid: options.uid,
+                        id: header.messageId,
+                        from: header.from,
+                        to: header.to,
+                        cc: header.cc,
+                        bcc: header.bcc,
+                        subject: header.subject,
+                        body: rawBody,
+                        html: false,
+                        sentDate: header.date,
+                        attachments: []
+                    };
 
-                worker.postMessage(raw);
+                    if (timeoutFired) {
+                        delete emailObj.body;
+                    }
+
+                    callback(null, emailObj);
+                }
             }
         });
     };
+
+    ImapClient.prototype.getRawMessage = function(options, callback) {
+        var self = this;
+
+        self._client.openMailbox(options.path, {
+            readOnly: true
+        }, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+            var stream, raw = '';
+
+            stream = self._client.createStream({
+                uid: options.uid,
+                part: false
+            });
+
+            if (!stream) {
+                callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+                return;
+            }
+
+            stream.on('error', callback);
+            stream.on('data', onData);
+            stream.on('end', onEnd);
+
+            function onData(chunk) {
+                raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+            }
+
+            function onEnd(chunk) {
+                onData(chunk);
+                callback(null, raw);
+            }
+        });
+    };
+    // ImapClient.prototype.batchParseRawMessages = function(options, callback) {};
+
+    function parse(options, cb) {
+        if (options.noWorker || typeof window === 'undefined' || !window.Worker) {
+            // no WebWorker support... do synchronous call
+            parser.parse(options.raw, function(parsed) {
+                cb(null, parsed);
+            });
+            return;
+        }
+
+        var worker = new Worker('../lib/parser-worker.js');
+        worker.onmessage = function(e) {
+            cb(null, e.data);
+        };
+        worker.onerror = function(e) {
+            var error = new Error('Error handling web worker: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
+            console.error(error);
+            cb(error);
+        };
+
+        worker.postMessage(options.raw);
+    }
 
     /**
      * Fetches IMAP flags for a message with a given UID from the server
@@ -473,13 +463,13 @@ define(function(require) {
                 callback(error);
                 return;
             }
-            
+
             self._client.fetchFlags(options.uid, function(error, flags) {
                 if (error) {
                     callback(error);
                     return;
                 }
-                
+
                 callback(null, {
                     unread: flags.indexOf('\\Seen') === -1,
                     answered: flags.indexOf('\\Answered') > -1
@@ -508,7 +498,7 @@ define(function(require) {
                 callback(error);
                 return;
             }
-            
+
             var remove = [],
                 add = [];
 

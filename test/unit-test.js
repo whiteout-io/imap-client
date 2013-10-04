@@ -256,13 +256,12 @@ define(function(require) {
             });
         });
 
-        it('should not get messages due to error', function(done) {
+        it('should not get preview due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
-            imap.getMessage({
+            imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-                textOnly: true
             }, function(error, msg) {
                 expect(error).to.exist;
                 expect(msg).to.not.exist;
@@ -270,7 +269,7 @@ define(function(require) {
             });
         });
 
-        it('should get a specific message with text only and decode quoted-printable', function(done) {
+        it('should get a preview and decode quoted-printable', function(done) {
             var ee = {}, count = 0;
             ee.on = function(ev, cb) {
                 if (ev === 'data') {
@@ -288,10 +287,9 @@ define(function(require) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(ee);
 
-            imap.getMessage({
+            imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-                textOnly: true
             }, function(error, msg) {
                 expect(error).to.be.null;
                 expect(inboxMock.createStream.calledTwice).to.be.true;
@@ -305,7 +303,7 @@ define(function(require) {
             });
         });
 
-        it('should get nested body parts', function(done) {
+        it('should get preview with nested body parts', function(done) {
             var ee = {}, count = 0;
             ee.on = function(ev, cb) {
                 if (ev === 'data') {
@@ -325,10 +323,9 @@ define(function(require) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(ee);
 
-            imap.getMessage({
+            imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-                textOnly: true
             }, function(error, msg) {
                 expect(error).to.be.null;
                 expect(inboxMock.createStream.calledTwice).to.be.true;
@@ -360,10 +357,9 @@ define(function(require) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(ee);
 
-            imap.getMessage({
+            imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-                textOnly: true,
                 timeout: 10
             }, function(error, msg) {
                 expect(error).to.be.null;
@@ -378,38 +374,62 @@ define(function(require) {
             });
         });
 
-        it('should get a complete message', function(done) {
-            var ee = {};
-            ee.on = function(ev, cb) {
-                if (ev === 'data') {
-                    cb("From: Felix Hammerl <felix.hammerl@gmail.com>\nContent-Type: multipart/mixed; boundary='Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A'\nSubject: test\nMessage-Id: <CAEB0027-379C-4E08-9367-8764B9A93D60@gmail.com>\nDate: Tue, 20 Aug 2013 13:47:05 +0200\nTo: 'safewithme.testuser@gmail.com' <safewithme.testuser@gmail.com>\nMime-Version: 1.0 (Mac OS X Mail 6.5)\n\n\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A\nContent-Transfer-Encoding: 7bit\nContent-Type: text/plain;\n    charset=us-ascii\n\nasdasdasd\n\n\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A\nContent-Disposition: attachment;\n    filename=README.md\nContent-Type: application/octet-stream;\n    x-unix-mode=0644;\n    name='README.md'\nContent-Transfer-Encoding: 7bit\n\nhtml5-mail\n==========\n\nHTML5 Mail App with Client-side Encryption\n\n## Getting started\nRequired packages: nodejs, npm\n\n    npm install\n    grunt dev\n    \nbrowse to http://localhost:8585\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A--");
-                } else if (ev === 'end') {
-                    cb();
-                }
-            };
+        // it('should get a complete message', function(done) {
+        //     var ee = {};
+        //     ee.on = function(ev, cb) {
+        //         if (ev === 'data') {
+        //             cb("From: Felix Hammerl <felix.hammerl@gmail.com>\nContent-Type: multipart/mixed; boundary='Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A'\nSubject: test\nMessage-Id: <CAEB0027-379C-4E08-9367-8764B9A93D60@gmail.com>\nDate: Tue, 20 Aug 2013 13:47:05 +0200\nTo: 'safewithme.testuser@gmail.com' <safewithme.testuser@gmail.com>\nMime-Version: 1.0 (Mac OS X Mail 6.5)\n\n\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A\nContent-Transfer-Encoding: 7bit\nContent-Type: text/plain;\n    charset=us-ascii\n\nasdasdasd\n\n\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A\nContent-Disposition: attachment;\n    filename=README.md\nContent-Type: application/octet-stream;\n    x-unix-mode=0644;\n    name='README.md'\nContent-Transfer-Encoding: 7bit\n\nhtml5-mail\n==========\n\nHTML5 Mail App with Client-side Encryption\n\n## Getting started\nRequired packages: nodejs, npm\n\n    npm install\n    grunt dev\n    \nbrowse to http://localhost:8585\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A--");
+        //         } else if (ev === 'end') {
+        //             cb();
+        //         }
+        //     };
 
-            inboxMock.openMailbox.yields();
-            inboxMock.createStream.returns(ee);
+        //     inboxMock.openMailbox.yields();
+        //     inboxMock.createStream.returns(ee);
 
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 1234,
-                textOnly: false
-            }, function(error, msg) {
-                expect(error).to.be.null;
-                expect(inboxMock.createStream.calledOnce).to.be.true;
-                expect(msg.uid).to.equal(1234);
-                expect(msg.from).to.be.instanceof(Array);
-                expect(msg.to).to.be.instanceof(Array);
-                expect(msg.subject).to.equal('test');
-                expect(msg.body).to.equal('asdasdasd\n\n');
-                expect(msg.attachments).to.not.be.empty;
+        //     imap.getMessage({
+        //         path: 'INBOX',
+        //         uid: 1234,
+        //         textOnly: false
+        //     }, function(error, msg) {
+        //         expect(error).to.be.null;
+        //         expect(inboxMock.createStream.calledOnce).to.be.true;
+        //         expect(msg.uid).to.equal(1234);
+        //         expect(msg.from).to.be.instanceof(Array);
+        //         expect(msg.to).to.be.instanceof(Array);
+        //         expect(msg.subject).to.equal('test');
+        //         expect(msg.body).to.equal('asdasdasd\n\n');
+        //         expect(msg.attachments).to.not.be.empty;
 
-                done();
-            });
-        });
+        //         done();
+        //     });
+        // });
 
-        it('should catch stream error in full message mode', function(done) {
+        // it('should catch stream error in full message mode', function(done) {
+        //     var ee = {};
+        //     ee.pipe = function() {};
+        //     ee.on = function(event, cb) {
+        //         if (event === 'error') {
+        //             cb(new Error('New Shit Has Come To Light!'));
+        //         }
+        //     };
+
+        //     inboxMock.openMailbox.yields();
+        //     inboxMock.createStream.returns(ee);
+
+        //     imap.getMessage({
+        //         path: 'INBOX',
+        //         uid: 123,
+        //         textOnly: true
+        //     }, function(error, message) {
+        //         expect(error).to.exist;
+        //         expect(error.message).to.equal('New Shit Has Come To Light!');
+        //         expect(message).to.not.exist;
+        //         done();
+        //     });
+        // });
+
+        it('should catch stream error at preview', function(done) {
             var ee = {};
             ee.pipe = function() {};
             ee.on = function(event, cb) {
@@ -421,10 +441,9 @@ define(function(require) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(ee);
 
-            imap.getMessage({
+            imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-                textOnly: true
             }, function(error, message) {
                 expect(error).to.exist;
                 expect(error.message).to.equal('New Shit Has Come To Light!');
@@ -433,37 +452,13 @@ define(function(require) {
             });
         });
 
-        it('should catch stream error in text-only mode', function(done) {
-            var ee = {};
-            ee.pipe = function() {};
-            ee.on = function(event, cb) {
-                if (event === 'error') {
-                    cb(new Error('New Shit Has Come To Light!'));
-                }
-            };
-
-            inboxMock.openMailbox.yields();
-            inboxMock.createStream.returns(ee);
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-                textOnly: false
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(error.message).to.equal('New Shit Has Come To Light!');
-                expect(message).to.not.exist;
-                done();
-            });
-        });
-
-        it('should avoid invoking pipe on nonexistent stream in text-only mode', function(done) {
+        it('should avoid invoking pipe on nonexistent stream in preview', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(null);
-            imap.getMessage({
+
+            imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-                textOnly: true
             }, function(error, message) {
                 expect(error).to.exist;
                 expect(message).to.not.exist;
@@ -471,19 +466,19 @@ define(function(require) {
             });
         });
 
-        it('should avoid invoking pipe on nonexistent stream in full message mode', function(done) {
-            inboxMock.openMailbox.yields();
-            inboxMock.createStream.returns(null);
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-                textOnly: false
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(message).to.not.exist;
-                done();
-            });
-        });
+        // it('should avoid invoking pipe on nonexistent stream in full message mode', function(done) {
+        //     inboxMock.openMailbox.yields();
+        //     inboxMock.createStream.returns(null);
+        //     imap.getMessage({
+        //         path: 'INBOX',
+        //         uid: 123,
+        //         textOnly: false
+        //     }, function(error, message) {
+        //         expect(error).to.exist;
+        //         expect(message).to.not.exist;
+        //         done();
+        //     });
+        // });
 
         it('should not get flags due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
