@@ -5,7 +5,8 @@ if (typeof define !== 'function') {
 define(function(require) {
     'use strict';
 
-    var expect = require('chai').expect,
+    var chai = require('chai'),
+        expect = chai.expect,
         inbox = require('inbox'),
         sinon = require('sinon'),
         ImapClient = require('..'),
@@ -18,6 +19,8 @@ define(function(require) {
             },
             secure: true
         };
+
+    chai.Assertion.includeStack = true;
 
     describe('ImapClient', function() {
         var imap, inboxMock;
@@ -461,7 +464,7 @@ define(function(require) {
                 done();
             });
         });
-        
+
         it('should avoid invoking pipe on nonexistent stream in full message mode', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(null);

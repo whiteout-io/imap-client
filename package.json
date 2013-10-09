@@ -23,6 +23,7 @@
 		"grunt-contrib-copy": "*",
 		"grunt-contrib-clean": "*",
 		"sinon": "1.7.3",
-		"requirejs": "*"
+		"requirejs": "2.1.x",
+		"hoodiecrow": "0.1.x"
 	}
 }

@@ -125,7 +125,7 @@ define(function(require) {
         it('should decode quoted-printable in message preview', function(done) {
             ic.getMessagePreview({
                 path: 'INBOX',
-                uid: 779,
+                uid: 787,
                 textOnly: true
             }, function(error, message) {
                 expect(error).to.not.exist;

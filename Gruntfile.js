@@ -14,7 +14,7 @@ module.exports = function(grunt) {
                 options: {
                     reporter: 'spec'
                 },
-                src: ['test/unit-test.js']
+                src: ['test/unit-test.js', 'test/local-integration-test.js']
             }
         },
         watch: {

@@ -30,6 +30,8 @@
 			"anything",
             "beforeEach",
             "afterEach",
+            "before",
+            "after",
 			"console",
 			"process",
 			"describe",
