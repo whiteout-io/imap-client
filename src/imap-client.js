@@ -80,6 +80,7 @@ define(function(require) {
             for (i = folders.length - 1; i >= 0; i--) {
                 folder = {
                     name: folders[i].name,
+                    type: folders[i].type,
                     path: folders[i].path
                 };
                 switch (folders[i].type) {

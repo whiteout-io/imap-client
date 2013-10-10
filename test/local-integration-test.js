@@ -107,6 +107,10 @@ describe('ImapClient integration tests', function() {
 
             expect(folders).to.exist;
             expect(folders.drafts).to.exist;
+            expect(folders.drafts.name).to.exist;
+            expect(folders.drafts.type).to.exist;
+            expect(folders.drafts.path).to.exist;
+
             expect(folders.sent).to.exist;
             expect(folders.trash).to.exist;
             expect(folders.junk).to.exist;

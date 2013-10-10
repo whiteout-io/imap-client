@@ -49,6 +49,10 @@ define(function(require) {
 
                 expect(folders).to.exist;
                 expect(folders.inbox).to.exist;
+                expect(folders.inbox.name).to.exist;
+                expect(folders.inbox.type).to.exist;
+                expect(folders.inbox.path).to.exist;
+
                 expect(folders.drafts).to.exist;
                 expect(folders.sent).to.exist;
                 expect(folders.trash).to.exist;
