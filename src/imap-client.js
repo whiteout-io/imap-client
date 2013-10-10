@@ -49,8 +49,73 @@ define(function(require) {
     };
 
     /**
+     * Provides the well known folders: Drafts, Sent, Inbox, Trash
+     * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
+     */
+    ImapClient.prototype.listWellKnownFolders = function(callback) {
+        var self = this,
+            types = {
+                INBOX: 'Inbox',
+                DRAFTS: 'Drafts',
+                SENT: 'Sent',
+                TRASH: 'Trash',
+                FLAGGED: 'Flagged',
+                JUNK: 'Junk',
+                NORMAL: 'Normal'
+            };
+
+        self.listAllFolders(filterWellKnownFolders);
+
+        function filterWellKnownFolders(error, folders) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            var wellKnownFolders = {}, folder, i;
+            wellKnownFolders.normal = [];
+            wellKnownFolders.flagged = [];
+            wellKnownFolders.other = [];
+
+            for (i = folders.length - 1; i >= 0; i--) {
+                folder = {
+                    name: folders[i].name,
+                    path: folders[i].path
+                };
+                switch (folders[i].type) {
+                case types.INBOX:
+                    wellKnownFolders.inbox = folder;
+                    break;
+                case types.DRAFTS:
+                    wellKnownFolders.drafts = folder;
+                    break;
+                case types.SENT:
+                    wellKnownFolders.sent = folder;
+                    break;
+                case types.TRASH:
+                    wellKnownFolders.trash = folder;
+                    break;
+                case types.JUNK:
+                    wellKnownFolders.junk = folder;
+                    break;
+                case types.FLAGGED:
+                    wellKnownFolders.flagged.push(folder);
+                    break;
+                case types.NORMAL:
+                    wellKnownFolders.normal.push(folder);
+                    break;
+                default:
+                    wellKnownFolders.other.push(folder);
+                }
+            }
+
+            callback(null, wellKnownFolders);
+        }
+    };
+
+    /**
      * Will traverse all available IMAP folders via DFS and return their paths as Array
-     * @param {Function} callback(folders) will be invoked as soon as traversal is done;
+     * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
      */
     ImapClient.prototype.listAllFolders = function(callback) {
         var self = this,

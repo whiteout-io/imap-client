@@ -41,16 +41,13 @@ describe('ImapClient integration tests', function() {
                         "[Gmail]": {
                             "flags": ["\\Noselect"],
                             "folders": {
-                                "All Mail": {
-                                    "special-use": "\\All"
-                                },
                                 "Drafts": {
                                     "special-use": "\\Drafts"
                                 },
                                 "Important": {
                                     "special-use": "\\Important"
                                 },
-                                "Sent Mail": {
+                                "Sent": {
                                     "special-use": "\\Sent"
                                 },
                                 "Spam": {
@@ -100,6 +97,20 @@ describe('ImapClient integration tests', function() {
             expect(error).to.not.exist;
             expect(mailboxes).to.be.instanceof(Array);
             expect(mailboxes).to.not.be.empty;
+            done();
+        });
+    });
+
+    it('should list well known folders', function(done) {
+        ic.listWellKnownFolders(function(error, folders) {
+            expect(error).to.not.exist;
+
+            expect(folders).to.exist;
+            expect(folders.drafts).to.exist;
+            expect(folders.sent).to.exist;
+            expect(folders.trash).to.exist;
+            expect(folders.junk).to.exist;
+
             done();
         });
     });

@@ -41,6 +41,33 @@ define(function(require) {
                 done();
             });
         });
+
+        it('should list well known folders', function(done) {
+            this.timeout(60000);
+            ic.listWellKnownFolders(function(error, folders) {
+                expect(error).to.not.exist;
+
+                expect(folders).to.exist;
+                expect(folders.inbox).to.exist;
+                expect(folders.drafts).to.exist;
+                expect(folders.sent).to.exist;
+                expect(folders.trash).to.exist;
+                expect(folders.junk).to.exist;
+
+                expect(folders.flagged).to.be.instanceof(Array);
+                expect(folders.flagged).to.not.be.empty;
+
+                expect(folders.other).to.be.instanceof(Array);
+                expect(folders.other).to.not.be.empty;
+
+                expect(folders.normal).to.be.instanceof(Array);
+                expect(folders.normal).to.not.be.empty;
+
+                done();
+            });
+        });
+
+
         it('should list all folders', function(done) {
             ic.listAllFolders(function(error, mailboxes) {
                 expect(error).to.not.exist;
@@ -125,12 +152,12 @@ define(function(require) {
         it('should decode quoted-printable in message preview', function(done) {
             ic.getMessagePreview({
                 path: 'INBOX',
-                uid: 787,
+                uid: 797,
                 textOnly: true
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.body.indexOf('To read my encrypted message below, simply install Whiteout Mail for Chrome.') > -1).to.be.true; // this text contains a quoted-printable line wrap
+                expect(message.body.indexOf('Lorem ipsum Tempor non Duis Excepteur dolor tempor ut incididunt irure magna sed Excepteur ad culpa tempor pariatur laborum sunt dolor anim') > -1).to.be.true; // this text contains a quoted-printable line wrap
                 done();
             });
         });

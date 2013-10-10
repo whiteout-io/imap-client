@@ -164,6 +164,82 @@ define(function(require) {
             });
         });
 
+        it('should list well known folders', function(done) {
+            // setup fixture
+            inboxMock.listMailboxes.yields(null, [{
+                name: 'Posteingang',
+                path: 'INBOX',
+                type: 'Inbox'
+            }, {
+                name: 'Stuff',
+                path: 'Stuff',
+                type: 'Normal'
+            }, {
+                name: 'Foobar',
+                path: 'Foobar',
+                type: 'Normal'
+            }, {
+                name: '[Gmail]',
+                path: '[Gmail]',
+                hasChildren: true,
+                listChildren: function(cb) {
+                    cb(null, [{
+                        name: 'Entwürfe',
+                        path: '[Gmail]/Entw&APw-rfe',
+                        type: 'Drafts'
+                    }, {
+                        name: 'Papierkorb',
+                        path: '[Gmail]/Papierkorb',
+                        type: 'Trash'
+                    }, {
+                        name: 'Gesendet',
+                        path: '[Gmail]/Gesendet',
+                        type: 'Sent'
+                    }, {
+                        name: 'Spam',
+                        path: '[Gmail]/Spam',
+                        type: 'Junk'
+                    }, {
+                        name: 'Besonders',
+                        path: '[Gmail]/Besonders',
+                        type: 'Flagged'
+                    }, {
+                        name: 'Lala',
+                        path: '[Gmail]/lala',
+                        type: 'Flagged'
+                    }, {
+                        name: 'Foobar',
+                        path: '[Gmail]/Foobar',
+                        type: 'Normal'
+                    }]);
+                }
+            }]);
+
+            // execute test case
+            imap.listWellKnownFolders(function(error, folders) {
+                expect(error).to.not.exist;
+                expect(folders).to.exist;
+                expect(folders.inbox).to.exist;
+                expect(folders.drafts).to.exist;
+                expect(folders.sent).to.exist;
+                expect(folders.trash).to.exist;
+                expect(folders.junk).to.exist;
+
+                expect(folders.flagged).to.be.instanceof(Array);
+                expect(folders.flagged.length).to.equal(2);
+
+                expect(folders.other).to.be.instanceof(Array);
+                expect(folders.other.length).to.equal(1);
+
+                expect(folders.normal).to.be.instanceof(Array);
+                expect(folders.normal.length).to.equal(3);
+
+                expect(inboxMock.listMailboxes.calledOnce).to.be.true;
+
+                done();
+            });
+        });
+
         it('should error while listing all folders', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields(new Error('fubar'));
