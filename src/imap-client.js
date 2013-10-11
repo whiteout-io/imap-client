@@ -2,7 +2,7 @@ if (typeof define !== 'function') {
     var define = require('amdefine')(module);
 }
 
-define(function(require) {
+define(function (require) {
     'use strict';
 
     var inbox = require('inbox'),
@@ -20,39 +20,63 @@ define(function(require) {
      * @param {String} options.auth.user Username for login
      * @param {String} options.auth.pass Password for login
      */
-    ImapClient = function(options, ibx) {
+    ImapClient = function (options, ibx) {
         var self = this;
 
-        inbox = ibx || inbox;
+        /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
+         * @private */
+        self._loggedIn = false;
 
-        self._client = inbox.createConnection(options.port, options.host, {
+        /* Instance of our imap library
+         * @private */
+        self._client = (ibx || inbox).createConnection(options.port, options.host, {
             secureConnection: options.secure,
             auth: options.auth
         });
     };
 
-    ImapClient.prototype.login = function(callback) {
+    /**
+     * Log in to an IMAP Session. No-op if already logged in.
+     *
+     * @param  {Function} callback [description]
+     * @return {[type]}            [description]
+     */
+    ImapClient.prototype.login = function (callback) {
         var self = this;
 
+        if (self._loggedIn) {
+            callback(new Error('Already logged in!'));
+            return;
+        }
+
         self._client.connect();
-        self._client.once('connect', callback);
+        self._client.on('error', callback);
+        self._client.once('connect', function () {
+            self._loggedIn = true;
+            callback();
+        });
     };
 
     /**
      * Log out of the current IMAP session
      */
-    ImapClient.prototype.logout = function(callback) {
+    ImapClient.prototype.logout = function (callback) {
         var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not log out, cause: Not logged in!'));
+            return;
+        }
 
         self._client.close();
         self._client.once('close', callback);
     };
 
     /**
-     * Provides the well known folders: Drafts, Sent, Inbox, Trash
+     * Provides the well known folders: Drafts, Sent, Inbox, Trash, Flagged, etc. No-op if not logged in.
      * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
      */
-    ImapClient.prototype.listWellKnownFolders = function(callback) {
+    ImapClient.prototype.listWellKnownFolders = function (callback) {
         var self = this,
             types = {
                 INBOX: 'Inbox',
@@ -63,6 +87,11 @@ define(function(require) {
                 JUNK: 'Junk',
                 NORMAL: 'Normal'
             };
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not list well known folders, cause: Not logged in!'));
+            return;
+        }
 
         self.listAllFolders(filterWellKnownFolders);
 
@@ -118,11 +147,16 @@ define(function(require) {
      * Will traverse all available IMAP folders via DFS and return their paths as Array
      * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
      */
-    ImapClient.prototype.listAllFolders = function(callback) {
+    ImapClient.prototype.listAllFolders = function (callback) {
         var self = this,
             folders = [],
             mbxQueue = [],
             error;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not list all folders, cause: Not logged in!'));
+            return;
+        }
 
         function subfolders(someError, mailboxes) {
             if (someError) {
@@ -172,13 +206,22 @@ define(function(require) {
      * @param {String} path [optional] If present, its subfolders will be listed
      * @param callback [Function] callback(error, mailboxes) triggered when the folders are available
      */
-    ImapClient.prototype.listFolders = function(path, callback) {
+    ImapClient.prototype.listFolders = function (path, callback) {
         var self = this,
             args = arguments;
 
         if (typeof args[0] === 'function') {
+            if (!self._loggedIn) {
+                args[0](new Error('Can not list folders, cause: Not logged in!'));
+                return;
+            }
             listTopLevelFolders.bind(self)(args[0]); // called via ImapClient.listFolders(callback)
         } else if (typeof args[0] === 'string') {
+            if (!self._loggedIn) {
+                callback(new Error('Can not list folders, cause: Not logged in!'));
+                return;
+            }
+
             listSubFolders.bind(self)(path, callback); // called via ImapClient.listFolders(parent, callback)
         }
     };
@@ -186,7 +229,7 @@ define(function(require) {
     /*
      * This is the simple path, where we just list the top level folders and we're good
      */
-    var listTopLevelFolders = function(callback) {
+    var listTopLevelFolders = function (callback) {
         var self = this;
 
         self._client.listMailboxes(callback);
@@ -197,7 +240,7 @@ define(function(require) {
      * search along the path until we've reached the target. The folders are always declared via L0/L1/L2/..., so we just
      * track how deep we're in the IMAP folder hierarchy and look for the next nested folders there.
      */
-    var listSubFolders = function(path, callback) {
+    var listSubFolders = function (path, callback) {
         var self = this,
             pathComponents = path.split('/'),
             maxDepth = pathComponents.length;
@@ -249,18 +292,23 @@ define(function(require) {
      * @param {String} options.length Indicates how many messages you want to read
      * @param {Function} callback(error, messages) triggered when the messages are available.
      */
-    ImapClient.prototype.listMessages = function(options, callback) {
+    ImapClient.prototype.listMessages = function (options, callback) {
         var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not list messages, cause: Not logged in!'));
+            return;
+        }
 
         self._client.openMailbox(options.path, {
             readOnly: true
-        }, function(error) {
+        }, function (error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.listMessages(options.offset, options.length, function(error, messages) {
+            self._client.listMessages(options.offset, options.length, function (error, messages) {
                 var i, email, emails;
 
                 if (!callback) {
@@ -295,12 +343,17 @@ define(function(require) {
      * @param {String} path The folder's path
      * @param  {Function} callback(error, unreadCount) invoked with the number of unread messages, or an error object if an error occurred
      */
-    ImapClient.prototype.unreadMessages = function(path, callback) {
+    ImapClient.prototype.unreadMessages = function (path, callback) {
         var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not retrieve unread count, cause: Not logged in!'));
+            return;
+        }
 
         self._client.openMailbox(path, {
             readOnly: true
-        }, function(error) {
+        }, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -317,12 +370,17 @@ define(function(require) {
      * @param {Number} options.timeout Timeout if an error occurs during the message retrieval, only relevant if options.textOnly is true
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
-    ImapClient.prototype.getMessagePreview = function(options, callback) {
+    ImapClient.prototype.getMessagePreview = function (options, callback) {
         var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not get message preview for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            return;
+        }
 
         self._client.openMailbox(options.path, {
             readOnly: true
-        }, function(error) {
+        }, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -418,7 +476,7 @@ define(function(require) {
                 }
 
                 function armTimeout() {
-                    timeoutId = setTimeout(function() {
+                    timeoutId = setTimeout(function () {
                         timeoutFired = true;
                         informDelegate();
                     }, options.timeout ? options.timeout : 5000);
@@ -459,8 +517,13 @@ define(function(require) {
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
-    ImapClient.prototype.getMessage = function(options, callback) {
+    ImapClient.prototype.getMessage = function (options, callback) {
         var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not get message for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            return;
+        }
 
         self.getRawMessage(options, onRaw);
 
@@ -498,12 +561,12 @@ define(function(require) {
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
-    ImapClient.prototype.getRawMessage = function(options, callback) {
+    ImapClient.prototype.getRawMessage = function (options, callback) {
         var self = this;
 
         self._client.openMailbox(options.path, {
             readOnly: true
-        }, function(error) {
+        }, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -540,17 +603,17 @@ define(function(require) {
 
     function parse(options, cb) {
         if (options.nonConcurrent || typeof window === 'undefined' || !window.Worker) {
-            parser.parse(options.raw, function(parsed) {
+            parser.parse(options.raw, function (parsed) {
                 cb(null, parsed);
             });
             return;
         }
 
         var worker = new Worker('../lib/parser-worker.js');
-        worker.onmessage = function(e) {
+        worker.onmessage = function (e) {
             cb(null, e.data);
         };
-        worker.onerror = function(e) {
+        worker.onerror = function (e) {
             var error = new Error('Error handling web worker: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
             console.error(error);
             cb(error);
@@ -565,18 +628,23 @@ define(function(require) {
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error, flags) will be called the flags have been received from the server
      */
-    ImapClient.prototype.getFlags = function(options, callback) {
+    ImapClient.prototype.getFlags = function (options, callback) {
         var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not get flags, cause: Not logged in!'));
+            return;
+        }
 
         self._client.openMailbox(options.path, {
             readOnly: true
-        }, function(error) {
+        }, function (error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.fetchFlags(options.uid, function(error, flags) {
+            self._client.fetchFlags(options.uid, function (error, flags) {
                 if (error) {
                     callback(error);
                     return;
@@ -598,14 +666,19 @@ define(function(require) {
      * @param {Boolean} options.answered (optional) Marks the message as answered
      * @param {Function} callback(error, flags) will be called the flags have been received from the server
      */
-    ImapClient.prototype.updateFlags = function(options, callback) {
+    ImapClient.prototype.updateFlags = function (options, callback) {
         var self = this,
             READ_FLAG = '\\Seen',
             ANSWERED_FLAG = '\\Answered';
 
+        if (!self._loggedIn) {
+            callback(new Error('Can not update flags, cause: Not logged in!'));
+            return;
+        }
+
         self._client.openMailbox(options.path, {
             readOnly: false
-        }, function(error) {
+        }, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -622,13 +695,13 @@ define(function(require) {
                 options.answered ? add.push() : remove.push(ANSWERED_FLAG);
             }
 
-            self._client.removeFlags(options.uid, remove, function(error) {
+            self._client.removeFlags(options.uid, remove, function (error) {
                 if (error) {
                     callback(error);
                     return;
                 }
 
-                self._client.addFlags(options.uid, add, function(error, flags) {
+                self._client.addFlags(options.uid, add, function (error, flags) {
                     callback(null, {
                         unread: flags.indexOf(READ_FLAG) === -1,
                         answered: flags.indexOf(ANSWERED_FLAG) > -1

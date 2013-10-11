@@ -43,7 +43,6 @@ define(function(require) {
         });
 
         it('should list well known folders', function(done) {
-            this.timeout(60000);
             ic.listWellKnownFolders(function(error, folders) {
                 expect(error).to.not.exist;
 
