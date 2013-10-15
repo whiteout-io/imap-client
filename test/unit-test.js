@@ -9,21 +9,22 @@ define(function (require) {
         expect = chai.expect,
         inbox = require('inbox'),
         sinon = require('sinon'),
-        ImapClient = require('..'),
-        loginOptions = {
-            port: 1234,
-            host: 'spiegel.de',
-            auth: {
-                user: 'dummyUser',
-                pass: 'dummyPass'
-            },
-            secure: true
-        };
+        ImapClient = require('..');
 
     chai.Assertion.includeStack = true;
 
     describe('ImapClient', function () {
-        var imap, inboxMock;
+        var imap, inboxMock,
+            loginOptions = {
+                port: 1234,
+                host: 'spiegel.de',
+                auth: {
+                    user: 'dummyUser',
+                    pass: 'dummyPass'
+                },
+                errorHandler: function () {},
+                secure: true
+            };
 
         beforeEach(function () {
             var createConnectionStub;
@@ -37,6 +38,8 @@ define(function (require) {
             imap._loggedIn = true;
 
             expect(createConnectionStub.called).to.be.true;
+            expect(inboxMock.on.calledOnce).to.be.true;
+            expect(inboxMock.on.calledWith('error', loginOptions.errorHandler)).to.be.true;
         });
 
         afterEach(function () {

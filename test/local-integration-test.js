@@ -15,13 +15,14 @@ loginOptions = {
         user: 'testuser',
         pass: 'testpass'
     },
-    secure: false
+    secure: false,
+    timeout: 20
 };
 
-describe('ImapClient integration tests', function() {
+describe('ImapClient integration tests', function () {
     var ic, server;
 
-    before(function(done) {
+    beforeEach(function (done) {
         var messages = [{
             raw: 'Delivered-To: receiver@example.com\r\nMIME-Version: 1.0\r\nX-Mailer: Nodemailer (0.5.3-dev; +http://www.nodemailer.com/)\r\nDate: Mon, 07 Oct 2013 02:04:29 -0700 (PDT)\r\nMessage-Id: <1381136667884.3c5d64c9@Nodemailer>\r\nFrom: sender@example.com\r\nTo: receiver@example.com\r\nSubject: [whiteout] Encrypted message\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHi receiver,\r\n\r\nthis is a private conversation. To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome. The app is really easy to use and =\r\nautomatically encrypts sent emails, so that only the two of us can read =\r\nthem: https://chrome.google.com/webstore/detail/whiteout-mail/jjgghafhamhol=\r\njigjoghcfcekhkonijg\r\n\r\n\r\n-----BEGIN ENCRYPTED MESSAGE-----\r\nYADDAYADDACRYPTOBLABLA123\r\n-----END ENCRYPTED MESSAGE-----\r\n\r\n\r\nSent securely from whiteout mail\r\nhttp://whiteout.io\r\n\r\n',
             flags: ['\\Seen']
@@ -29,7 +30,6 @@ describe('ImapClient integration tests', function() {
             raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: "Whiteout Test" <whiteout.test@t-online.de>\r\nTo: safewithme.testuser@gmail.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
             flags: []
         }];
-
         server = hoodiecrow({
             storage: {
                 "INBOX": {
@@ -65,35 +65,28 @@ describe('ImapClient integration tests', function() {
                 }
             }
         });
-        server.listen(12345, function() {
-            done();
+        server.listen(12345, function () {
+            ic = new ImapClient(loginOptions);
+            ic.login(done);
         });
     });
 
-    beforeEach(function(done) {
-        ic = new ImapClient(loginOptions);
-        ic.login(done);
+    afterEach(function (done) {
+        ic.logout(function () {
+            server.close(done);
+        });
     });
 
-
-    afterEach(function(done) {
-        ic.logout(done);
-    });
-
-    after(function(done) {
-        server.close(done);
-    });
-
-    it('should return number of unread messages', function(done) {
-        ic.unreadMessages('INBOX', function(error, unreadMessages) {
+    it('should return number of unread messages', function (done) {
+        ic.unreadMessages('INBOX', function (error, unreadMessages) {
             expect(error).to.be.null;
             expect(unreadMessages).to.equal(1);
             done();
         });
     });
 
-    it('should list all folders', function(done) {
-        ic.listAllFolders(function(error, mailboxes) {
+    it('should list all folders', function (done) {
+        ic.listAllFolders(function (error, mailboxes) {
             expect(error).to.not.exist;
             expect(mailboxes).to.be.instanceof(Array);
             expect(mailboxes).to.not.be.empty;
@@ -101,8 +94,8 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should list well known folders', function(done) {
-        ic.listWellKnownFolders(function(error, folders) {
+    it('should list well known folders', function (done) {
+        ic.listWellKnownFolders(function (error, folders) {
             expect(error).to.not.exist;
 
             expect(folders).to.exist;
@@ -119,8 +112,8 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should list folders', function(done) {
-        ic.listFolders(function(error, mailboxes) {
+    it('should list folders', function (done) {
+        ic.listFolders(function (error, mailboxes) {
             expect(error).to.not.exist;
             expect(mailboxes).to.exist;
             expect(mailboxes).to.not.be.empty;
@@ -128,8 +121,8 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should list an empty subfolder', function(done) {
-        ic.listFolders('[Gmail]/Important', function(error, mailboxes) {
+    it('should list an empty subfolder', function (done) {
+        ic.listFolders('[Gmail]/Important', function (error, mailboxes) {
             expect(error).to.not.exist;
             expect(mailboxes).to.exist;
             expect(mailboxes).to.be.empty;
@@ -137,8 +130,8 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should list subfolders', function(done) {
-        ic.listFolders('[Gmail]', function(error, mailboxes) {
+    it('should list subfolders', function (done) {
+        ic.listFolders('[Gmail]', function (error, mailboxes) {
             expect(error).to.not.exist;
             expect(mailboxes).to.exist;
             expect(mailboxes).to.not.be.empty;
@@ -146,12 +139,12 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should list messages', function(done) {
+    it('should list messages', function (done) {
         ic.listMessages({
             path: 'INBOX',
             offset: 0,
             length: 50
-        }, function(error, messages) {
+        }, function (error, messages) {
             expect(error).to.not.exist;
             expect(messages).to.not.be.empty;
             done();
@@ -174,11 +167,11 @@ describe('ImapClient integration tests', function() {
     //     });
     // });
 
-    it('should not get preview of a non-existent message', function(done) {
+    it('should not get preview of a non-existent message', function (done) {
         ic.getMessagePreview({
             path: 'INBOX',
             uid: 999
-        }, function(error, message) {
+        }, function (error, message) {
             expect(error).to.exist;
             expect(message).to.not.exist;
 
@@ -186,7 +179,7 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should get full message with attachments', function(done) {
+    it('should get full message with attachments', function (done) {
         function onEnd(error, message) {
             expect(error).to.be.null;
 
@@ -209,24 +202,24 @@ describe('ImapClient integration tests', function() {
         }, onEnd);
     });
 
-    it('should get flags', function(done) {
+    it('should get flags', function (done) {
         ic.getFlags({
             path: 'INBOX',
             uid: 1
-        }, function(error, flags) {
+        }, function (error, flags) {
             expect(error).to.be.null;
             expect(flags.unread).to.be.false;
             expect(flags.answered).to.be.false;
             done();
         });
     });
-    it('should update flags', function(done) {
+    it('should update flags', function (done) {
         ic.updateFlags({
             path: 'INBOX',
             uid: 1,
             unread: true,
             answered: true
-        }, function(error, flags) {
+        }, function (error, flags) {
             expect(error).to.be.null;
             expect(flags.unread).to.be.true;
             expect(flags.answered).to.be.false;

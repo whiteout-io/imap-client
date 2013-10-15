@@ -19,6 +19,8 @@ define(function (require) {
      * @param {Boolean} options.secure Indicates if the connection is using TLS or not
      * @param {String} options.auth.user Username for login
      * @param {String} options.auth.pass Password for login
+     * @param {Number} options.timeout (optional) Timeout to wait for server communication
+     * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
      */
     ImapClient = function (options, ibx) {
         var self = this;
@@ -30,16 +32,20 @@ define(function (require) {
         /* Instance of our imap library
          * @private */
         self._client = (ibx || inbox).createConnection(options.port, options.host, {
+            timeout: options.timeout,
             secureConnection: options.secure,
             auth: options.auth
         });
+
+        if (typeof options.errorHandler !== 'undefined') {
+            self._client.on('error', options.errorHandler);
+        }
     };
 
     /**
      * Log in to an IMAP Session. No-op if already logged in.
      *
-     * @param  {Function} callback [description]
-     * @return {[type]}            [description]
+     * @param {Function} callback Callback when the login was successful
      */
     ImapClient.prototype.login = function (callback) {
         var self = this;
@@ -50,7 +56,6 @@ define(function (require) {
         }
 
         self._client.connect();
-        self._client.on('error', callback);
         self._client.once('connect', function () {
             self._loggedIn = true;
             callback();
