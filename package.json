@@ -24,6 +24,6 @@
 		"grunt-contrib-clean": "*",
 		"sinon": "1.7.3",
 		"requirejs": "2.1.x",
-		"hoodiecrow": "0.1.x"
+		"hoodiecrow": "1.1.x"
 	}
 }

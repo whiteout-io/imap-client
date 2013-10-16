@@ -234,18 +234,17 @@ describe('ImapClient integration tests', function () {
         });
     });
 
-    // uncomment when https://github.com/andris9/hoodiecrow/pull/3 made it into a release
-    // it('should move message', function (done) {
-    //     ic.moveMessage({
-    //         path: 'INBOX',
-    //         uid: 1,
-    //         destination: '[Gmail]/Trash'
-    //     }, function (error) {
-    //         expect(error).to.not.exist;
+    it('should move message', function (done) {
+        ic.moveMessage({
+            path: 'INBOX',
+            uid: 1,
+            destination: '[Gmail]/Trash'
+        }, function (error) {
+            expect(error).to.not.exist;
 
-    //         done();
-    //     });
-    // });
+            done();
+        });
+    });
 
     it('should purge message', function (done) {
         ic.listMessages({
