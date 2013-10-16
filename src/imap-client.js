@@ -697,7 +697,7 @@ define(function (require) {
             }
 
             if (typeof options.answered !== 'undefined') {
-                options.answered ? add.push() : remove.push(ANSWERED_FLAG);
+                options.answered ? add.push(ANSWERED_FLAG) : remove.push(ANSWERED_FLAG);
             }
 
             self._client.removeFlags(options.uid, remove, function (error) {
@@ -713,6 +713,33 @@ define(function (require) {
                     });
                 });
             });
+        });
+    };
+
+    /**
+     * Move a message to a destination folder
+     * @param {String} options.path The origin path where the message resides
+     * @param {Number} options.uid The uid of the message
+     * @param {String} options.destination The destination folder
+     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     */
+    ImapClient.prototype.moveMessage = function (options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can move message, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.openMailbox(options.path, {
+            readOnly: false
+        }, function (error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._client.moveMessage(options.uid, options.destination, callback);
         });
     };
 

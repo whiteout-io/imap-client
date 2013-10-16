@@ -22,7 +22,7 @@ loginOptions = {
 describe('ImapClient integration tests', function () {
     var ic, server;
 
-    beforeEach(function (done) {
+    before(function (done) {
         var messages = [{
             raw: 'Delivered-To: receiver@example.com\r\nMIME-Version: 1.0\r\nX-Mailer: Nodemailer (0.5.3-dev; +http://www.nodemailer.com/)\r\nDate: Mon, 07 Oct 2013 02:04:29 -0700 (PDT)\r\nMessage-Id: <1381136667884.3c5d64c9@Nodemailer>\r\nFrom: sender@example.com\r\nTo: receiver@example.com\r\nSubject: [whiteout] Encrypted message\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHi receiver,\r\n\r\nthis is a private conversation. To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome. The app is really easy to use and =\r\nautomatically encrypts sent emails, so that only the two of us can read =\r\nthem: https://chrome.google.com/webstore/detail/whiteout-mail/jjgghafhamhol=\r\njigjoghcfcekhkonijg\r\n\r\n\r\n-----BEGIN ENCRYPTED MESSAGE-----\r\nYADDAYADDACRYPTOBLABLA123\r\n-----END ENCRYPTED MESSAGE-----\r\n\r\n\r\nSent securely from whiteout mail\r\nhttp://whiteout.io\r\n\r\n',
             flags: ['\\Seen']
@@ -65,16 +65,20 @@ describe('ImapClient integration tests', function () {
                 }
             }
         });
-        server.listen(12345, function () {
-            ic = new ImapClient(loginOptions);
-            ic.login(done);
-        });
+        server.listen(12345, done);
+    });
+
+    beforeEach(function (done) {
+        ic = new ImapClient(loginOptions);
+        ic.login(done);
     });
 
     afterEach(function (done) {
-        ic.logout(function () {
-            server.close(done);
-        });
+        ic.logout(done);
+    });
+
+    after(function (done) {
+        server.close(done);
     });
 
     it('should return number of unread messages', function (done) {
@@ -151,7 +155,7 @@ describe('ImapClient integration tests', function () {
         });
     });
 
-    // this seems to be unsupported by hoodiecrow. uncomment as soon as hoodiecrow supports this!
+    // unsupported by hoodiecrow. uncomment as soon as hoodiecrow supports this!
     // it('should get message preview', function(done) {
     //     ic.getMessagePreview({
     //         path: 'INBOX',
@@ -222,8 +226,21 @@ describe('ImapClient integration tests', function () {
         }, function (error, flags) {
             expect(error).to.be.null;
             expect(flags.unread).to.be.true;
-            expect(flags.answered).to.be.false;
+            expect(flags.answered).to.be.true;
             done();
         });
     });
+
+    // uncomment when https://github.com/andris9/hoodiecrow/pull/3 made it into a release
+    // it('should move message', function (done) {
+    //     ic.moveMessage({
+    //         path: 'INBOX',
+    //         uid: 1,
+    //         destination: '[Gmail]/Trash'
+    //     }, function (error) {
+    //         expect(error).to.not.exist;
+
+    //         done();
+    //     });
+    // });
 });

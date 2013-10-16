@@ -685,6 +685,11 @@ define(function (require) {
                 expect(error).to.be.null;
                 expect(flags.unread).to.be.false;
                 expect(flags.answered).to.be.true;
+
+                expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
+                expect(inboxMock.removeFlags.calledWith(123, [])).to.be.true;
+                expect(inboxMock.addFlags.calledWith(123, ['\\Seen', '\\Answered'])).to.be.true;
+
                 done();
             });
         });
@@ -707,8 +712,51 @@ define(function (require) {
             }, function (error, flags) {
                 expect(error).to.exist;
                 expect(flags).to.not.exist;
+
                 done();
             });
         });
+
+        it('should move a message', function (done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.moveMessage.yields(null);
+
+            imap.moveMessage({
+                path: 'INBOX',
+                uid: 123,
+                destination: 'asdasd'
+            }, function (error) {
+                expect(error).to.be.null;
+                expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
+                expect(inboxMock.moveMessage.calledWith(123, 'asdasd')).to.be.true;
+                done();
+            });
+        });
+
+        it('should not move a message due to error', function (done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.moveMessage.yields(new Error("AIN'T NOBODY GOT TIME FOR THAT?!"));
+
+            imap.moveMessage({
+                path: 'INBOX',
+                uid: 123,
+                destination: 'asdasd'
+            }, function (error) {
+                expect(error).to.exist;
+
+                expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
+                expect(inboxMock.moveMessage.calledWith(123, 'asdasd')).to.be.true;
+                done();
+            });
+        });
+
+        it('should not move a message due to not logged in', function () {
+            imap._loggedIn = false;
+
+            imap.moveMessage({}, function (error) {
+                expect(error).to.exist;
+            });
+        });
+
     });
 });
