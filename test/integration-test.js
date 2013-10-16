@@ -267,7 +267,7 @@ define(function (require) {
 
             function moveBack() {
                 ic.listMessages({
-                    path: 'INBOX',
+                    path: destination,
                     offset: 0,
                     length: 50
                 }, function (error, msgs) {
