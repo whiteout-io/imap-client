@@ -727,7 +727,7 @@ define(function (require) {
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Can move message, cause: Not logged in!'));
+            callback(new Error('Cannot move message, cause: Not logged in!'));
             return;
         }
 
@@ -742,6 +742,33 @@ define(function (require) {
             self._client.moveMessage(options.uid, options.destination, callback);
         });
     };
+
+    /**
+     * Purges a message from a folder
+     * @param {String} options.path The origin path where the message resides
+     * @param {Number} options.uid The uid of the message
+     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     */
+    ImapClient.prototype.deleteMessage = function (options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Cannot delete message, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.openMailbox(options.path, {
+            readOnly: false
+        }, function (error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._client.deleteMessage(options.uid, callback);
+        });
+    };
+
 
     return ImapClient;
 });

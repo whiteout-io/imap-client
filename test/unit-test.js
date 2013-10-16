@@ -758,5 +758,46 @@ define(function (require) {
             });
         });
 
+        it('should delete message', function (done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.deleteMessage.yields(null);
+
+            imap.deleteMessage({
+                path: 'INBOX',
+                uid: 123,
+            }, function (error) {
+                expect(error).to.be.null;
+                expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
+                expect(inboxMock.deleteMessage.calledWith(123)).to.be.true;
+                done();
+            });
+
+        });
+
+        it('should not delete message due to error', function (done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.deleteMessage.yields(new Error("AIN'T NOBODY GOT TIME FOR THAT?!"));
+
+            imap.deleteMessage({
+                path: 'INBOX',
+                uid: 123,
+            }, function (error) {
+                expect(error).to.exist;
+                expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
+                expect(inboxMock.deleteMessage.calledWith(123)).to.be.true;
+                done();
+            });
+
+        });
+
+        it('should not delete message due to not logged in', function () {
+            imap._loggedIn = false;
+
+            imap.deleteMessage({}, function (error) {
+                expect(error).to.exist;
+            });
+
+        });
+
     });
 });

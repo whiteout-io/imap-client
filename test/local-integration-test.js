@@ -29,6 +29,9 @@ describe('ImapClient integration tests', function () {
         }, {
             raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: "Whiteout Test" <whiteout.test@t-online.de>\r\nTo: safewithme.testuser@gmail.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
             flags: []
+        }, {
+            raw: 'Date: Tue, 15 Oct 2013 10:51:57 +0000\r\nMessage-ID: <123123@foobar>\r\nFrom: bla@blubb.io\r\nTo: blubb@bla.com\r\nSubject: blablubb\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nMIME-Version: 1.0\r\n\r\nblubb bla',
+            flags: ['\\Seen']
         }];
         server = hoodiecrow({
             storage: {
@@ -243,4 +246,34 @@ describe('ImapClient integration tests', function () {
     //         done();
     //     });
     // });
+
+    it('should purge message', function (done) {
+        ic.listMessages({
+            path: 'INBOX',
+            offset: 0,
+            length: 50
+        }, function (error, messages) {
+            var i, l;
+            expect(error).to.not.exist;
+
+            for (i = 0, l = messages.length; i < l; i++) {
+                if (messages[i].subject === 'blablubb') {
+                    purge(messages[i].uid);
+                    break;
+                }
+            }
+
+            function purge(uid) {
+                ic.deleteMessage({
+                    path: 'INBOX',
+                    uid: uid
+                }, function (error) {
+                    expect(error).to.be.null;
+                    done();
+                });
+            }
+
+            done();
+        });
+    });
 });
