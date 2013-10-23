@@ -158,21 +158,18 @@ describe('ImapClient integration tests', function () {
         });
     });
 
-    // unsupported by hoodiecrow. uncomment as soon as hoodiecrow supports this!
-    // it('should get message preview', function(done) {
-    //     ic.getMessagePreview({
-    //         path: 'INBOX',
-    //         uid: 2,
-    //         timeout: 500
-    //     }, function(error, message) {
-    //         expect(error).to.not.exist;
-    //         expect(message).to.exist;
-    //         expect(message.body).to.not.be.empty;
-    //         expect(message.unread).to.be.true;
-    //         expect(message.answered).to.be.false;
-    //         done();
-    //     });
-    // });
+    it('should get message preview', function(done) {
+        ic.getMessagePreview({
+            path: 'INBOX',
+            uid: 2,
+            timeout: 500
+        }, function(error, message) {
+            expect(error).to.not.exist;
+            expect(message).to.exist;
+            expect(message.body).to.equal("Hello world");
+            done();
+        });
+    });
 
     it('should not get preview of a non-existent message', function (done) {
         ic.getMessagePreview({
