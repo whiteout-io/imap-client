@@ -655,10 +655,14 @@ define(function (require) {
                     return;
                 }
 
-                callback(null, {
-                    unread: flags.indexOf('\\Seen') === -1,
-                    answered: flags.indexOf('\\Answered') > -1
-                });
+                if (flags === null) {
+                    callback(null, {});
+                } else {
+                    callback(null, {
+                        unread: flags.indexOf('\\Seen') === -1,
+                        answered: flags.indexOf('\\Answered') > -1
+                    });
+                }
             });
         });
     };
@@ -707,10 +711,14 @@ define(function (require) {
                 }
 
                 self._client.addFlags(options.uid, add, function (error, flags) {
-                    callback(null, {
-                        unread: flags.indexOf(READ_FLAG) === -1,
-                        answered: flags.indexOf(ANSWERED_FLAG) > -1
-                    });
+                    if (flags === true) {
+                        callback(null, {});
+                    } else {
+                        callback(null, {
+                            unread: flags.indexOf(READ_FLAG) === -1,
+                            answered: flags.indexOf(ANSWERED_FLAG) > -1
+                        });
+                    }
                 });
             });
         });

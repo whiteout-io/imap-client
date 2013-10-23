@@ -651,6 +651,20 @@ define(function (require) {
             });
         });
 
+        it('should get flags when inbox messes up', function (done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.fetchFlags.yields(null, null);
+
+            imap.getFlags({
+                path: 'INBOX',
+                uid: 123,
+            }, function (error, flags) {
+                expect(error).to.be.null;
+                expect(flags).to.deep.equal({});
+                done();
+            });
+        });
+
         it('should not get flags when not logged in', function () {
             imap._loggedIn = false;
             imap.getFlags({}, function (error) {
@@ -685,6 +699,28 @@ define(function (require) {
                 expect(error).to.be.null;
                 expect(flags.unread).to.be.false;
                 expect(flags.answered).to.be.true;
+
+                expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
+                expect(inboxMock.removeFlags.calledWith(123, [])).to.be.true;
+                expect(inboxMock.addFlags.calledWith(123, ['\\Seen', '\\Answered'])).to.be.true;
+
+                done();
+            });
+        });
+
+        it('should update flags when inbox messes up', function (done) {
+            inboxMock.openMailbox.yields();
+            inboxMock.removeFlags.yields(null, []);
+            inboxMock.addFlags.yields(null, true);
+
+            imap.updateFlags({
+                path: 'INBOX',
+                uid: 123,
+                unread: false,
+                answered: true
+            }, function (error, flags) {
+                expect(error).to.be.null;
+                expect(flags).to.deep.equal({});
 
                 expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
                 expect(inboxMock.removeFlags.calledWith(123, [])).to.be.true;
