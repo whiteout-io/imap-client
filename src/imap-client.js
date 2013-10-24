@@ -305,9 +305,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, {
-            readOnly: true
-        }, function (error) {
+        self._client.openMailbox(options.path, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -356,9 +354,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(path, {
-            readOnly: true
-        }, function (error) {
+        self._client.openMailbox(path, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -383,9 +379,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, {
-            readOnly: true
-        }, function (error) {
+        self._client.openMailbox(options.path, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -569,9 +563,7 @@ define(function (require) {
     ImapClient.prototype.getRawMessage = function (options, callback) {
         var self = this;
 
-        self._client.openMailbox(options.path, {
-            readOnly: true
-        }, function (error) {
+        self._client.openMailbox(options.path, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -641,9 +633,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, {
-            readOnly: true
-        }, function (error) {
+        self._client.openMailbox(options.path, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -685,9 +675,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, {
-            readOnly: false
-        }, function (error) {
+        self._client.openMailbox(options.path, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -739,9 +727,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, {
-            readOnly: false
-        }, function (error) {
+        self._client.openMailbox(options.path, function (error) {
             if (error) {
                 callback(error);
                 return;
@@ -765,9 +751,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, {
-            readOnly: false
-        }, function (error) {
+        self._client.openMailbox(options.path, function (error) {
             if (error) {
                 callback(error);
                 return;
