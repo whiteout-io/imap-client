@@ -21,6 +21,7 @@ define(function (require) {
      * @param {String} options.auth.pass Password for login
      * @param {Number} options.timeout (optional) Timeout to wait for server communication
      * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
+     * @param {Function} options.onIncomingMessage(message) (optional) handle new incoming messages from the server
      */
     ImapClient = function (options, ibx) {
         var self = this;
@@ -39,6 +40,9 @@ define(function (require) {
 
         if (typeof options.errorHandler !== 'undefined') {
             self._client.on('error', options.errorHandler);
+        }
+        if (typeof options.onIncomingMessage !== 'undefined') {
+            self._client.on('new', options.onIncomingMessage);
         }
     };
 

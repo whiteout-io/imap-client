@@ -23,6 +23,7 @@ define(function (require) {
                     pass: 'dummyPass'
                 },
                 errorHandler: function () {},
+                onIncomingMessage: function () {},
                 secure: true
             };
 
@@ -38,8 +39,9 @@ define(function (require) {
             imap._loggedIn = true;
 
             expect(createConnectionStub.called).to.be.true;
-            expect(inboxMock.on.calledOnce).to.be.true;
+            expect(inboxMock.on.calledTwice).to.be.true;
             expect(inboxMock.on.calledWith('error', loginOptions.errorHandler)).to.be.true;
+            expect(inboxMock.on.calledWith('new', loginOptions.onIncomingMessage)).to.be.true;
         });
 
         afterEach(function () {

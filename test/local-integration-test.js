@@ -231,18 +231,6 @@ describe('ImapClient integration tests', function () {
         });
     });
 
-    it('should move message', function (done) {
-        ic.moveMessage({
-            path: 'INBOX',
-            uid: 1,
-            destination: '[Gmail]/Trash'
-        }, function (error) {
-            expect(error).to.not.exist;
-
-            done();
-        });
-    });
-
     it('should purge message', function (done) {
         ic.listMessages({
             path: 'INBOX',
@@ -268,6 +256,18 @@ describe('ImapClient integration tests', function () {
                     done();
                 });
             }
+
+            done();
+        });
+    });
+
+    it('should move message', function (done) {
+        ic.moveMessage({
+            path: 'INBOX',
+            uid: 1,
+            destination: '[Gmail]/Trash'
+        }, function (error) {
+            expect(error).to.not.exist;
 
             done();
         });
