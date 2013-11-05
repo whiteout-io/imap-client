@@ -38,7 +38,19 @@ define(function (require) {
         });
         self._client.on('new', function(message) {
             if (typeof self.onIncomingMessage === 'function') {
-                self.onIncomingMessage(message);
+                self.onIncomingMessage({
+                    uid: message.UID,
+                    id: message.messageId,
+                    from: [message.from],
+                    to: message.to,
+                    cc: message.cc,
+                    bcc: message.bcc,
+                    subject: message.title,
+                    body: null,
+                    sentDate: message.date,
+                    unread: message.flags.indexOf('\\Seen') === -1,
+                    answered: message.flags.indexOf('\\Answered') > -1
+                });
             }
         });
 

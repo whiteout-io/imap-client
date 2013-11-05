@@ -2,7 +2,7 @@ if (typeof define !== 'function') {
     var define = require('amdefine')(module);
 }
 
-define(function (require) {
+define(function(require) {
     'use strict';
 
     var chai = require('chai'),
@@ -13,49 +13,69 @@ define(function (require) {
 
     chai.Assertion.includeStack = true;
 
-    describe('ImapClient', function () {
-        var imap, inboxMock,
-            loginOptions = {
-                port: 1234,
-                host: 'spiegel.de',
-                auth: {
-                    user: 'dummyUser',
-                    pass: 'dummyPass'
-                },
-                errorHandler: function () {},
-                onIncomingMessage: function () {},
-                secure: true
-            };
+    describe('ImapClient', function() {
+        var imap, inboxMock;
 
-        beforeEach(function () {
-            var createConnectionStub;
+        beforeEach(function(done) {
+            var createConnectionStub, loginOptions = {
+                    port: 1234,
+                    host: 'spiegel.de',
+                    auth: {
+                        user: 'dummyUser',
+                        pass: 'dummyPass'
+                    },
+                    errorHandler: function() {},
+                    secure: true
+                };
 
             inboxMock = sinon.createStubInstance(inbox.IMAPClient);
-            createConnectionStub = sinon.stub(inbox, 'createConnection', function () {
+            createConnectionStub = sinon.stub(inbox, 'createConnection', function() {
                 return inboxMock;
             });
 
             imap = new ImapClient(loginOptions, inbox);
             imap._loggedIn = true;
+            imap.onIncomingMessage = function(mail) {
+                expect(mail.uid).to.equal(1337);
+                expect(mail.id).to.equal('beepboop');
+                expect(mail.from).to.be.instanceof(Array);
+                expect(mail.to).to.be.instanceof(Array);
+                expect(mail.subject).to.equal('SHIAAAT');
+                expect(mail.unread).to.be.false;
+                expect(mail.answered).to.be.true;
+                done();
+            };
 
             expect(createConnectionStub.called).to.be.true;
             expect(inboxMock.on.calledTwice).to.be.true;
             expect(inboxMock.on.calledWith('error', loginOptions.errorHandler)).to.be.true;
-            expect(inboxMock.on.calledWith('new')).to.be.true;
+            expect(inboxMock.on.calledWith('new', sinon.match(function(func) {
+                expect(func).to.exist;
+                func({
+                    UID: 1337,
+                    messageId: 'beepboop',
+                    from: 'zuhause@aol.com',
+                    to: ['bankrupt@duh.com'],
+                    title: 'SHIAAAT',
+                    sentDate: '',
+                    flags: ['\\Seen', '\\Answered']
+                });
+                return true;
+            }))).to.be.true;
         });
 
-        afterEach(function () {
+        afterEach(function() {
             inbox.createConnection.restore();
         });
 
 
-        it('should login', function (done) {
+        it('should login', function(done) {
             // setup fixture
             inboxMock.once.yields();
             imap._loggedIn = false;
 
             // execute test case
-            imap.login(function (error) {
+            imap.login(function(error) {
                 expect(error).to.not.exist;
                 expect(imap._loggedIn).to.be.true;
                 expect(inboxMock.connect.calledOnce).to.be.true;
@@ -65,19 +85,19 @@ define(function (require) {
             });
         });
 
-        it('should not login when logged in', function () {
+        it('should not login when logged in', function() {
             imap._loggedIn = true;
-            imap.login(function (error) {
+            imap.login(function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should logout', function (done) {
+        it('should logout', function(done) {
             // setup fixture
             inboxMock.once.yields();
 
             // execute test case
-            imap.logout(function () {
+            imap.logout(function() {
                 expect(inboxMock.close.calledOnce).to.be.true;
                 expect(inboxMock.once.calledOnce).to.be.true;
 
@@ -85,19 +105,19 @@ define(function (require) {
             });
         });
 
-        it('should not logout when not logged in', function () {
+        it('should not logout when not logged in', function() {
             imap._loggedIn = false;
-            imap.logout(function (error) {
+            imap.logout(function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should list top level folders', function (done) {
+        it('should list top level folders', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields(null, [{}, {}, {}]);
 
             // execute test case
-            imap.listFolders(function (error, mailboxes) {
+            imap.listFolders(function(error, mailboxes) {
                 expect(error).to.be.null;
                 expect(mailboxes).to.not.be.empty;
                 expect(inboxMock.listMailboxes.calledOnce).to.be.true;
@@ -106,19 +126,19 @@ define(function (require) {
             });
         });
 
-        it('should not list top level folders when not logged in', function () {
+        it('should not list top level folders when not logged in', function() {
             imap._loggedIn = false;
-            imap.listFolders(function (error) {
+            imap.listFolders(function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should error while listing top level folders', function (done) {
+        it('should error while listing top level folders', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields([]);
 
             // execute test case
-            imap.listFolders(function (error, mailboxes) {
+            imap.listFolders(function(error, mailboxes) {
                 expect(error).to.exist;
                 expect(mailboxes).to.not.exist;
                 expect(inboxMock.listMailboxes.calledOnce).to.be.true;
@@ -127,12 +147,12 @@ define(function (require) {
             });
         });
 
-        it('should list subfolders', function (done) {
+        it('should list subfolders', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields(null, [{
                 path: 'INBOX',
                 hasChildren: true,
-                listChildren: function (cb) {
+                listChildren: function(cb) {
                     cb(null, [{
                         path: 'INBOX/FOO',
                         hasChildren: false
@@ -147,7 +167,7 @@ define(function (require) {
             }]);
 
             // execute test case
-            imap.listFolders('INBOX', function (error, mailboxes) {
+            imap.listFolders('INBOX', function(error, mailboxes) {
                 expect(error).to.be.null;
                 expect(mailboxes).to.not.be.empty;
                 expect(mailboxes[0].path).to.equal('INBOX/FOO');
@@ -158,14 +178,14 @@ define(function (require) {
             });
         });
 
-        it('should not list sub folders when not logged in', function () {
+        it('should not list sub folders when not logged in', function() {
             imap._loggedIn = false;
-            imap.listFolders('', function (error) {
+            imap.listFolders('', function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should list an empty subfolder', function (done) {
+        it('should list an empty subfolder', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields(null, [{
                 path: 'OUTBOX',
@@ -173,7 +193,7 @@ define(function (require) {
             }]);
 
             // execute test case
-            imap.listFolders('OUTBOX', function (error, mailboxes) {
+            imap.listFolders('OUTBOX', function(error, mailboxes) {
                 expect(error).to.not.exist;
                 expect(mailboxes).to.exist;
                 expect(mailboxes).to.be.empty;
@@ -185,16 +205,16 @@ define(function (require) {
 
 
 
-        it('should list all folders', function (done) {
+        it('should list all folders', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields(null, [{
                 path: 'INBOX',
                 hasChildren: true,
-                listChildren: function (cb) {
+                listChildren: function(cb) {
                     cb(null, [{
                         path: 'INBOX/FOO',
                         hasChildren: true,
-                        listChildren: function (cb) {
+                        listChildren: function(cb) {
                             cb(null, [{
                                 path: 'INBOX/FOO/POO',
                                 hasChildren: false
@@ -211,7 +231,7 @@ define(function (require) {
             }]);
 
             // execute test case
-            imap.listAllFolders(function (error, mailboxes) {
+            imap.listAllFolders(function(error, mailboxes) {
                 expect(error).to.not.exist;
                 expect(mailboxes).to.not.be.empty;
                 expect(mailboxes.length).to.equal(5);
@@ -221,14 +241,14 @@ define(function (require) {
             });
         });
 
-        it('should not list all folders when not logged in', function () {
+        it('should not list all folders when not logged in', function() {
             imap._loggedIn = false;
-            imap.listAllFolders(function (error) {
+            imap.listAllFolders(function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should list well known folders', function (done) {
+        it('should list well known folders', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields(null, [{
                 name: 'Posteingang',
@@ -246,7 +266,7 @@ define(function (require) {
                 name: '[Gmail]',
                 path: '[Gmail]',
                 hasChildren: true,
-                listChildren: function (cb) {
+                listChildren: function(cb) {
                     cb(null, [{
                         name: 'Entwürfe',
                         path: '[Gmail]/Entw&APw-rfe',
@@ -280,7 +300,7 @@ define(function (require) {
             }]);
 
             // execute test case
-            imap.listWellKnownFolders(function (error, folders) {
+            imap.listWellKnownFolders(function(error, folders) {
                 expect(error).to.not.exist;
                 expect(folders).to.exist;
                 expect(folders.inbox).to.exist;
@@ -307,19 +327,19 @@ define(function (require) {
             });
         });
 
-        it('should not list well known folders when not logged in', function () {
+        it('should not list well known folders when not logged in', function() {
             imap._loggedIn = false;
-            imap.listWellKnownFolders(function (error) {
+            imap.listWellKnownFolders(function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should error while listing all folders', function (done) {
+        it('should error while listing all folders', function(done) {
             // setup fixture
             inboxMock.listMailboxes.yields(new Error('fubar'));
 
             // execute test case
-            imap.listAllFolders(function (error, mailboxes) {
+            imap.listAllFolders(function(error, mailboxes) {
                 expect(error).to.exist;
                 expect(mailboxes).to.not.exist;
 
@@ -327,49 +347,49 @@ define(function (require) {
             });
         });
 
-        it('should return number of unread messages', function (done) {
+        it('should return number of unread messages', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.unreadMessages.yields(null, 1337);
 
-            imap.unreadMessages('INBOX', function (error, unreadMessages) {
+            imap.unreadMessages('INBOX', function(error, unreadMessages) {
                 expect(error).to.be.null;
                 expect(unreadMessages).to.equal(1337);
                 done();
             });
         });
 
-        it('should not return number of unread messages when not logged in', function () {
+        it('should not return number of unread messages when not logged in', function() {
             imap._loggedIn = false;
-            imap.unreadMessages('', function (error) {
+            imap.unreadMessages('', function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should error when querying unread messages', function (done) {
+        it('should error when querying unread messages', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
-            imap.unreadMessages('INBOX', function (error, unreadMessages) {
+            imap.unreadMessages('INBOX', function(error, unreadMessages) {
                 expect(error).to.exist;
                 expect(unreadMessages).to.not.exist;
                 done();
             });
         });
 
-        it('should not list messages due to error', function (done) {
+        it('should not list messages due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
             imap.listMessages({
                 path: 'foobar',
                 offset: 0,
                 length: 2
-            }, function (error, msg) {
+            }, function(error, msg) {
                 expect(error).to.exist;
                 expect(msg).to.not.exist;
                 done();
             });
         });
 
-        it('should list messages', function (done) {
+        it('should list messages', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.listMessages.yields(null, [{
                 UID: 1337,
@@ -384,7 +404,7 @@ define(function (require) {
                 path: 'foobar',
                 offset: 0,
                 length: 2
-            }, function (error, unreadMessages) {
+            }, function(error, unreadMessages) {
                 expect(error).to.be.null;
                 expect(unreadMessages.length).to.equal(1);
                 expect(unreadMessages[0].uid).to.equal(1337);
@@ -398,16 +418,16 @@ define(function (require) {
             });
         });
 
-        it('should not list messages when not logged in', function () {
+        it('should not list messages when not logged in', function() {
             imap._loggedIn = false;
-            imap.listMessages({}, function (error) {
+            imap.listMessages({}, function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should get a preview and decode quoted-printable', function (done) {
+        it('should get a preview and decode quoted-printable', function(done) {
             var ee = {}, count = 0;
-            ee.on = function (ev, cb) {
+            ee.on = function(ev, cb) {
                 if (ev === 'data') {
                     if (count === 0) {
                         cb("Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nFrom: 'Sender Name' <sender@example.com>\r\nTo: 'Receiver Name' <receiver@example.com>\r\nSubject: Hello world!\r\n");
@@ -426,7 +446,7 @@ define(function (require) {
             imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, msg) {
+            }, function(error, msg) {
                 expect(error).to.be.null;
                 expect(inboxMock.createStream.calledTwice).to.be.true;
                 expect(msg.uid).to.equal(123);
@@ -439,9 +459,9 @@ define(function (require) {
             });
         });
 
-        it('should get preview with nested body parts', function (done) {
+        it('should get preview with nested body parts', function(done) {
             var ee = {}, count = 0;
-            ee.on = function (ev, cb) {
+            ee.on = function(ev, cb) {
                 if (ev === 'data') {
                     if (count === 0) {
                         cb("Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nFrom: 'Sender Name' <sender@example.com>\r\nTo: 'Receiver Name' <receiver@example.com>\r\nSubject: Hello world!\r\n");
@@ -462,7 +482,7 @@ define(function (require) {
             imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, msg) {
+            }, function(error, msg) {
                 expect(error).to.be.null;
                 expect(inboxMock.createStream.calledTwice).to.be.true;
                 expect(msg.uid).to.equal(123);
@@ -475,29 +495,29 @@ define(function (require) {
             });
         });
 
-        it('should not get preview due to error', function (done) {
+        it('should not get preview due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
             imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, msg) {
+            }, function(error, msg) {
                 expect(error).to.exist;
                 expect(msg).to.not.exist;
                 done();
             });
         });
 
-        it('should not get a message preview when not logged in', function () {
+        it('should not get a message preview when not logged in', function() {
             imap._loggedIn = false;
-            imap.getMessagePreview({}, function (error) {
+            imap.getMessagePreview({}, function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should timeout when a non-existent body part should be retrieved', function (done) {
+        it('should timeout when a non-existent body part should be retrieved', function(done) {
             var ee = {}, count = 0;
-            ee.on = function (ev, cb) {
+            ee.on = function(ev, cb) {
                 if (ev === 'data') {
                     if (count === 0) {
                         cb("Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nFrom: 'Sender Name' <sender@example.com>\r\nTo: 'Receiver Name' <receiver@example.com>\r\nSubject: Hello world!\r\n");
@@ -517,7 +537,7 @@ define(function (require) {
                 path: 'INBOX',
                 uid: 123,
                 timeout: 10
-            }, function (error, msg) {
+            }, function(error, msg) {
                 expect(error).to.be.null;
                 expect(inboxMock.createStream.calledTwice).to.be.true;
                 expect(msg.uid).to.equal(123);
@@ -530,10 +550,10 @@ define(function (require) {
             });
         });
 
-        it('should catch stream error at preview', function (done) {
+        it('should catch stream error at preview', function(done) {
             var ee = {};
-            ee.pipe = function () {};
-            ee.on = function (event, cb) {
+            ee.pipe = function() {};
+            ee.on = function(event, cb) {
                 if (event === 'error') {
                     cb(new Error('New Shit Has Come To Light!'));
                 }
@@ -545,7 +565,7 @@ define(function (require) {
             imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, message) {
+            }, function(error, message) {
                 expect(error).to.exist;
                 expect(error.message).to.equal('New Shit Has Come To Light!');
                 expect(message).to.not.exist;
@@ -553,23 +573,23 @@ define(function (require) {
             });
         });
 
-        it('should avoid invoking pipe on nonexistent stream in preview', function (done) {
+        it('should avoid invoking pipe on nonexistent stream in preview', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(null);
 
             imap.getMessagePreview({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, message) {
+            }, function(error, message) {
                 expect(error).to.exist;
                 expect(message).to.not.exist;
                 done();
             });
         });
 
-        it('should get a complete message', function (done) {
+        it('should get a complete message', function(done) {
             var ee = {};
-            ee.on = function (ev, cb) {
+            ee.on = function(ev, cb) {
                 if (ev === 'end') {
                     cb("From: Felix Hammerl <felix.hammerl@gmail.com>\nContent-Type: multipart/mixed; boundary='Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A'\nSubject: test\nMessage-Id: <CAEB0027-379C-4E08-9367-8764B9A93D60@gmail.com>\nDate: Tue, 20 Aug 2013 13:47:05 +0200\nTo: 'safewithme.testuser@gmail.com' <safewithme.testuser@gmail.com>\nMime-Version: 1.0 (Mac OS X Mail 6.5)\n\n\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A\nContent-Transfer-Encoding: 7bit\nContent-Type: text/plain;\n    charset=us-ascii\n\nasdasdasd\n\n\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A\nContent-Disposition: attachment;\n    filename=README.md\nContent-Type: application/octet-stream;\n    x-unix-mode=0644;\n    name='README.md'\nContent-Transfer-Encoding: 7bit\n\nhtml5-mail\n==========\n\nHTML5 Mail App with Client-side Encryption\n\n## Getting started\nRequired packages: nodejs, npm\n\n    npm install\n    grunt dev\n    \nbrowse to http://localhost:8585\n--Apple-Mail=_5827A735-830A-490E-A024-8A991985B61A--");
                 }
@@ -581,7 +601,7 @@ define(function (require) {
             imap.getMessage({
                 path: 'INBOX',
                 uid: 1234,
-            }, function (error, msg) {
+            }, function(error, msg) {
                 expect(error).to.be.null;
                 expect(inboxMock.createStream.calledOnce).to.be.true;
                 expect(msg.uid).to.equal(1234);
@@ -595,17 +615,17 @@ define(function (require) {
             });
         });
 
-        it('should not get a complete message when not logged in', function () {
+        it('should not get a complete message when not logged in', function() {
             imap._loggedIn = false;
-            imap.getMessage({}, function (error) {
+            imap.getMessage({}, function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should catch stream error in full message mode', function (done) {
+        it('should catch stream error in full message mode', function(done) {
             var ee = {};
-            ee.pipe = function () {};
-            ee.on = function (event, cb) {
+            ee.pipe = function() {};
+            ee.on = function(event, cb) {
                 if (event === 'error') {
                     cb(new Error('New Shit Has Come To Light!'));
                 }
@@ -617,7 +637,7 @@ define(function (require) {
             imap.getMessage({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, message) {
+            }, function(error, message) {
                 expect(error).to.exist;
                 expect(error.message).to.equal('New Shit Has Come To Light!');
                 expect(message).to.not.exist;
@@ -625,27 +645,27 @@ define(function (require) {
             });
         });
 
-        it('should avoid invoking pipe on nonexistent stream in full message mode', function (done) {
+        it('should avoid invoking pipe on nonexistent stream in full message mode', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(null);
             imap.getMessage({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, message) {
+            }, function(error, message) {
                 expect(error).to.exist;
                 expect(message).to.not.exist;
                 done();
             });
         });
 
-        it('should get flags', function (done) {
+        it('should get flags', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.fetchFlags.yields(null, ['\\Seen', '\\Answered']);
 
             imap.getFlags({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, flags) {
+            }, function(error, flags) {
                 expect(error).to.be.null;
                 expect(flags.unread).to.be.false;
                 expect(flags.answered).to.be.true;
@@ -653,41 +673,41 @@ define(function (require) {
             });
         });
 
-        it('should get flags when inbox messes up', function (done) {
+        it('should get flags when inbox messes up', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.fetchFlags.yields(null, null);
 
             imap.getFlags({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, flags) {
+            }, function(error, flags) {
                 expect(error).to.be.null;
                 expect(flags).to.deep.equal({});
                 done();
             });
         });
 
-        it('should not get flags when not logged in', function () {
+        it('should not get flags when not logged in', function() {
             imap._loggedIn = false;
-            imap.getFlags({}, function (error) {
+            imap.getFlags({}, function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should not get flags due to error', function (done) {
+        it('should not get flags due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
             imap.getFlags({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error, flags) {
+            }, function(error, flags) {
                 expect(error).to.exist;
                 expect(flags).to.not.exist;
                 done();
             });
         });
 
-        it('should update flags', function (done) {
+        it('should update flags', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.removeFlags.yields(null, []);
             inboxMock.addFlags.yields(null, ['\\Seen', '\\Answered']);
@@ -697,7 +717,7 @@ define(function (require) {
                 uid: 123,
                 unread: false,
                 answered: true
-            }, function (error, flags) {
+            }, function(error, flags) {
                 expect(error).to.be.null;
                 expect(flags.unread).to.be.false;
                 expect(flags.answered).to.be.true;
@@ -710,7 +730,7 @@ define(function (require) {
             });
         });
 
-        it('should update flags when inbox messes up', function (done) {
+        it('should update flags when inbox messes up', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.removeFlags.yields(null, []);
             inboxMock.addFlags.yields(null, true);
@@ -720,7 +740,7 @@ define(function (require) {
                 uid: 123,
                 unread: false,
                 answered: true
-            }, function (error, flags) {
+            }, function(error, flags) {
                 expect(error).to.be.null;
                 expect(flags).to.deep.equal({});
 
@@ -732,14 +752,14 @@ define(function (require) {
             });
         });
 
-        it('should not update flags when not logged in', function () {
+        it('should not update flags when not logged in', function() {
             imap._loggedIn = false;
-            imap.updateFlags({}, function (error) {
+            imap.updateFlags({}, function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should not update flags due to error', function (done) {
+        it('should not update flags due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
             imap.updateFlags({
@@ -747,7 +767,7 @@ define(function (require) {
                 uid: 123,
                 unread: false,
                 answered: true
-            }, function (error, flags) {
+            }, function(error, flags) {
                 expect(error).to.exist;
                 expect(flags).to.not.exist;
 
@@ -755,7 +775,7 @@ define(function (require) {
             });
         });
 
-        it('should move a message', function (done) {
+        it('should move a message', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.moveMessage.yields(null);
 
@@ -763,7 +783,7 @@ define(function (require) {
                 path: 'INBOX',
                 uid: 123,
                 destination: 'asdasd'
-            }, function (error) {
+            }, function(error) {
                 expect(error).to.be.null;
                 expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
                 expect(inboxMock.moveMessage.calledWith(123, 'asdasd')).to.be.true;
@@ -771,7 +791,7 @@ define(function (require) {
             });
         });
 
-        it('should not move a message due to error', function (done) {
+        it('should not move a message due to error', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.moveMessage.yields(new Error("AIN'T NOBODY GOT TIME FOR THAT?!"));
 
@@ -779,7 +799,7 @@ define(function (require) {
                 path: 'INBOX',
                 uid: 123,
                 destination: 'asdasd'
-            }, function (error) {
+            }, function(error) {
                 expect(error).to.exist;
 
                 expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
@@ -788,22 +808,22 @@ define(function (require) {
             });
         });
 
-        it('should not move a message due to not logged in', function () {
+        it('should not move a message due to not logged in', function() {
             imap._loggedIn = false;
 
-            imap.moveMessage({}, function (error) {
+            imap.moveMessage({}, function(error) {
                 expect(error).to.exist;
             });
         });
 
-        it('should delete message', function (done) {
+        it('should delete message', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.deleteMessage.yields(null);
 
             imap.deleteMessage({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error) {
+            }, function(error) {
                 expect(error).to.be.null;
                 expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
                 expect(inboxMock.deleteMessage.calledWith(123)).to.be.true;
@@ -812,14 +832,14 @@ define(function (require) {
 
         });
 
-        it('should not delete message due to error', function (done) {
+        it('should not delete message due to error', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.deleteMessage.yields(new Error("AIN'T NOBODY GOT TIME FOR THAT?!"));
 
             imap.deleteMessage({
                 path: 'INBOX',
                 uid: 123,
-            }, function (error) {
+            }, function(error) {
                 expect(error).to.exist;
                 expect(inboxMock.openMailbox.calledWith('INBOX')).to.be.true;
                 expect(inboxMock.deleteMessage.calledWith(123)).to.be.true;
@@ -828,10 +848,10 @@ define(function (require) {
 
         });
 
-        it('should not delete message due to not logged in', function () {
+        it('should not delete message due to not logged in', function() {
             imap._loggedIn = false;
 
-            imap.deleteMessage({}, function (error) {
+            imap.deleteMessage({}, function(error) {
                 expect(error).to.exist;
             });
 
