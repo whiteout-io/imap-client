@@ -13,7 +13,7 @@ define(function (require) {
     require('setimmediate');
 
     /**
-     * Create an instance of ImapClient
+     * Create an instance of ImapClient. To observe new mails, assign your callback to this.onIncomingMessage.
      * @param {Number} options.port Port is the port to the server (defaults to 143 on non-secure and to 993 on secure connection).
      * @param {String} options.host Hostname of the server.
      * @param {Boolean} options.secure Indicates if the connection is using TLS or not
@@ -21,7 +21,6 @@ define(function (require) {
      * @param {String} options.auth.pass Password for login
      * @param {Number} options.timeout (optional) Timeout to wait for server communication
      * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
-     * @param {Function} options.onIncomingMessage(message) (optional) handle new incoming messages from the server
      */
     ImapClient = function (options, ibx) {
         var self = this;
@@ -37,12 +36,14 @@ define(function (require) {
             secureConnection: options.secure,
             auth: options.auth
         });
+        self._client.on('new', function(message) {
+            if (typeof self.onIncomingMessage === 'function') {
+                self.onIncomingMessage(message);
+            }
+        });
 
         if (typeof options.errorHandler !== 'undefined') {
             self._client.on('error', options.errorHandler);
-        }
-        if (typeof options.onIncomingMessage !== 'undefined') {
-            self._client.on('new', options.onIncomingMessage);
         }
     };
 

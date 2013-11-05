@@ -41,7 +41,7 @@ define(function (require) {
             expect(createConnectionStub.called).to.be.true;
             expect(inboxMock.on.calledTwice).to.be.true;
             expect(inboxMock.on.calledWith('error', loginOptions.errorHandler)).to.be.true;
-            expect(inboxMock.on.calledWith('new', loginOptions.onIncomingMessage)).to.be.true;
+            expect(inboxMock.on.calledWith('new')).to.be.true;
         });
 
         afterEach(function () {
