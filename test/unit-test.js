@@ -25,12 +25,16 @@ define(function(require) {
                         pass: 'dummyPass'
                     },
                     errorHandler: function() {},
-                    secure: true
+                    secure: true,
+                    timeout: 1234,
+                    ca: ['asdasd']
                 };
 
             inboxMock = sinon.createStubInstance(inbox.IMAPClient);
-            createConnectionStub = sinon.stub(inbox, 'createConnection', function() {
-                return inboxMock;
+            createConnectionStub = sinon.stub(inbox, 'createConnection', function(port, host, opts) {
+                if (port === 1234 && host === 'spiegel.de' && opts.ca[0] === 'asdasd' && opts.secureConnection === true && opts.auth.user === 'dummyUser' && opts.auth.pass === 'dummyPass' && opts.timeout === 1234) {
+                    return inboxMock;
+                }
             });
 
             imap = new ImapClient(loginOptions, inbox);

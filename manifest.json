@@ -1,5 +1,5 @@
 {
-  "name": "imap-client unit tests",
+  "name": "imap-client integration tests",
   "description": "Testing the imap-client in the browser",
   "version": "0.0.1",
   "manifest_version": 2,

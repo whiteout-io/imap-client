@@ -21,6 +21,7 @@ define(function (require) {
      * @param {String} options.auth.pass Password for login
      * @param {Number} options.timeout (optional) Timeout to wait for server communication
      * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
+     * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
     ImapClient = function (options, ibx) {
         var self = this;
@@ -34,7 +35,8 @@ define(function (require) {
         self._client = (ibx || inbox).createConnection(options.port, options.host, {
             timeout: options.timeout,
             secureConnection: options.secure,
-            auth: options.auth
+            auth: options.auth,
+            ca: options.ca
         });
         self._client.on('new', function(message) {
             if (typeof self.onIncomingMessage === 'function') {
