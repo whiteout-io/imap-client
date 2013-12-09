@@ -24,7 +24,6 @@ define(function(require) {
                         user: 'dummyUser',
                         pass: 'dummyPass'
                     },
-                    errorHandler: function() {},
                     secure: true,
                     timeout: 1234,
                     ca: ['asdasd']
@@ -52,7 +51,7 @@ define(function(require) {
 
             expect(createConnectionStub.called).to.be.true;
             expect(inboxMock.on.calledTwice).to.be.true;
-            expect(inboxMock.on.calledWith('error', loginOptions.errorHandler)).to.be.true;
+            expect(inboxMock.on.calledWith('error')).to.be.true;
             expect(inboxMock.on.calledWith('new', sinon.match(function(func) {
                 expect(func).to.exist;
                 func({

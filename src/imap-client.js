@@ -56,9 +56,9 @@ define(function (require) {
             }
         });
 
-        if (typeof options.errorHandler !== 'undefined') {
-            self._client.on('error', options.errorHandler);
-        }
+        self._client.on('error', function(error) {
+            self.onError(error);
+        });
     };
 
     /**
