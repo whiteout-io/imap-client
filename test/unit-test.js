@@ -428,6 +428,68 @@ define(function(require) {
             });
         });
 
+        it('should list messages by uid', function(done) {
+            inboxMock.openMailbox.withArgs('foobar').yields();
+            inboxMock.uidListMessages.withArgs(1, 2).yields(null, [{
+                UID: 1,
+                messageId: 'beepboop',
+                from: 'zuhause@aol.com',
+                to: ['bankrupt@duh.com'],
+                title: 'SHIAAAT',
+                sentDate: '',
+                flags: ['\\Seen', '\\Answered']
+            }, {
+                UID: 2,
+                messageId: 'beepboop',
+                from: 'zuhause@aol.com',
+                to: ['bankrupt@duh.com'],
+                title: 'SHIAAAT',
+                sentDate: '',
+                flags: ['\\Seen', '\\Answered']
+            }]);
+            imap.listMessagesByUid({
+                path: 'foobar',
+                firstUid: 1,
+                lastUid: 2
+            }, function(error, unreadMessages) {
+                expect(error).to.be.null;
+                expect(unreadMessages.length).to.equal(2);
+                expect(unreadMessages[0].uid).to.equal(2);
+                expect(unreadMessages[0].id).to.equal('beepboop');
+                expect(unreadMessages[0].from).to.be.instanceof(Array);
+                expect(unreadMessages[0].to).to.be.instanceof(Array);
+                expect(unreadMessages[0].subject).to.equal('SHIAAAT');
+                expect(unreadMessages[0].unread).to.be.false;
+                expect(unreadMessages[0].answered).to.be.true;
+                done();
+            });
+        });
+
+        it('should not list messages by uid due to error', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.listMessagesByUid({
+                path: 'foobar',
+                firstUid: 1,
+                lastUid: 2
+            }, function(error, msg) {
+                expect(error).to.exist;
+                expect(msg).to.not.exist;
+                done();
+            });
+        });
+
+        it('should not list messages by uid when not logged in', function() {
+            imap._loggedIn = false;
+            imap.listMessagesByUid({
+                path: 'foobar',
+                firstUid: 1,
+                lastUid: 2
+            }, function(error) {
+                expect(error).to.exist;
+            });
+        });
+
         it('should get a preview and decode quoted-printable', function(done) {
             var ee = {}, count = 0;
             ee.on = function(ev, cb) {

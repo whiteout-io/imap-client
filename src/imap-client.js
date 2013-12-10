@@ -2,7 +2,7 @@ if (typeof define !== 'function') {
     var define = require('amdefine')(module);
 }
 
-define(function (require) {
+define(function(require) {
     'use strict';
 
     var inbox = require('inbox'),
@@ -23,7 +23,7 @@ define(function (require) {
      * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
-    ImapClient = function (options, ibx) {
+    ImapClient = function(options, ibx) {
         var self = this;
 
         /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
@@ -66,7 +66,7 @@ define(function (require) {
      *
      * @param {Function} callback Callback when the login was successful
      */
-    ImapClient.prototype.login = function (callback) {
+    ImapClient.prototype.login = function(callback) {
         var self = this;
 
         if (self._loggedIn) {
@@ -75,7 +75,7 @@ define(function (require) {
         }
 
         self._client.connect();
-        self._client.once('connect', function () {
+        self._client.once('connect', function() {
             self._loggedIn = true;
             callback();
         });
@@ -84,7 +84,7 @@ define(function (require) {
     /**
      * Log out of the current IMAP session
      */
-    ImapClient.prototype.logout = function (callback) {
+    ImapClient.prototype.logout = function(callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -100,7 +100,7 @@ define(function (require) {
      * Provides the well known folders: Drafts, Sent, Inbox, Trash, Flagged, etc. No-op if not logged in.
      * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
      */
-    ImapClient.prototype.listWellKnownFolders = function (callback) {
+    ImapClient.prototype.listWellKnownFolders = function(callback) {
         var self = this,
             types = {
                 INBOX: 'Inbox',
@@ -171,7 +171,7 @@ define(function (require) {
      * Will traverse all available IMAP folders via DFS and return their paths as Array
      * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
      */
-    ImapClient.prototype.listAllFolders = function (callback) {
+    ImapClient.prototype.listAllFolders = function(callback) {
         var self = this,
             folders = [],
             mbxQueue = [],
@@ -230,7 +230,7 @@ define(function (require) {
      * @param {String} path [optional] If present, its subfolders will be listed
      * @param callback [Function] callback(error, mailboxes) triggered when the folders are available
      */
-    ImapClient.prototype.listFolders = function (path, callback) {
+    ImapClient.prototype.listFolders = function(path, callback) {
         var self = this,
             args = arguments;
 
@@ -253,7 +253,7 @@ define(function (require) {
     /*
      * This is the simple path, where we just list the top level folders and we're good
      */
-    var listTopLevelFolders = function (callback) {
+    var listTopLevelFolders = function(callback) {
         var self = this;
 
         self._client.listMailboxes(callback);
@@ -264,7 +264,7 @@ define(function (require) {
      * search along the path until we've reached the target. The folders are always declared via L0/L1/L2/..., so we just
      * track how deep we're in the IMAP folder hierarchy and look for the next nested folders there.
      */
-    var listSubFolders = function (path, callback) {
+    var listSubFolders = function(path, callback) {
         var self = this,
             pathComponents = path.split('/'),
             maxDepth = pathComponents.length;
@@ -310,13 +310,13 @@ define(function (require) {
     };
 
     /**
-     * List messages in an IMAP folder
+     * List messages in an IMAP folder based on their uid
      * @param {String} options.path The folder's path
-     * @param {String} options.offset The offset where to start reading. Positive offsets count from the beginning, negative offset count from the tail.
-     * @param {String} options.length Indicates how many messages you want to read
-     * @param {Function} callback(error, messages) triggered when the messages are available.
+     * @param {Number} options.firstUid The uid of the first message
+     * @param {Number} options.lastUid (optional) The uid of the last message. if omitted, lists all availble messages
+     * @param {Function} callback(error, exists) will be called at completion, contains boolean value if the message exists (true), or information if an error occurred.
      */
-    ImapClient.prototype.listMessages = function (options, callback) {
+    ImapClient.prototype.listMessagesByUid = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -324,13 +324,64 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, function (error) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.listMessages(options.offset, options.length, function (error, messages) {
+            self._client.uidListMessages(options.firstUid, options.lastUid, function(error, messages) {
+                var i, email, emails;
+
+                if (!callback) {
+                    return;
+                }
+
+                emails = [];
+                i = messages.length;
+                while (i--) {
+                    email = messages[i];
+                    emails.push({
+                        uid: email.UID,
+                        id: email.messageId,
+                        from: [email.from],
+                        to: email.to,
+                        cc: email.cc,
+                        bcc: email.bcc,
+                        subject: email.title,
+                        body: null,
+                        sentDate: email.date,
+                        unread: email.flags.indexOf('\\Seen') === -1,
+                        answered: email.flags.indexOf('\\Answered') > -1
+                    });
+                }
+                callback(error, emails);
+            });
+        });
+    };
+
+    /**
+     * List messages in an IMAP folder
+     * @param {String} options.path The folder's path
+     * @param {String} options.offset The offset where to start reading. Positive offsets count from the beginning, negative offset count from the tail.
+     * @param {String} options.length Indicates how many messages you want to read
+     * @param {Function} callback(error, messages) triggered when the messages are available.
+     */
+    ImapClient.prototype.listMessages = function(options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not list messages, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.openMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._client.listMessages(options.offset, options.length, function(error, messages) {
                 var i, email, emails;
 
                 if (!callback) {
@@ -365,7 +416,7 @@ define(function (require) {
      * @param {String} path The folder's path
      * @param  {Function} callback(error, unreadCount) invoked with the number of unread messages, or an error object if an error occurred
      */
-    ImapClient.prototype.unreadMessages = function (path, callback) {
+    ImapClient.prototype.unreadMessages = function(path, callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -373,7 +424,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(path, function (error) {
+        self._client.openMailbox(path, function(error) {
             if (error) {
                 callback(error);
                 return;
@@ -390,7 +441,7 @@ define(function (require) {
      * @param {Number} options.timeout Timeout if an error occurs during the message retrieval, only relevant if options.textOnly is true
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
-    ImapClient.prototype.getMessagePreview = function (options, callback) {
+    ImapClient.prototype.getMessagePreview = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -398,7 +449,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, function (error) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
@@ -494,7 +545,7 @@ define(function (require) {
                 }
 
                 function armTimeout() {
-                    timeoutId = setTimeout(function () {
+                    timeoutId = setTimeout(function() {
                         timeoutFired = true;
                         informDelegate();
                     }, options.timeout ? options.timeout : 5000);
@@ -535,7 +586,7 @@ define(function (require) {
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
-    ImapClient.prototype.getMessage = function (options, callback) {
+    ImapClient.prototype.getMessage = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -579,10 +630,10 @@ define(function (require) {
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
      */
-    ImapClient.prototype.getRawMessage = function (options, callback) {
+    ImapClient.prototype.getRawMessage = function(options, callback) {
         var self = this;
 
-        self._client.openMailbox(options.path, function (error) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
@@ -619,17 +670,17 @@ define(function (require) {
 
     function parse(options, cb) {
         if (options.nonConcurrent || typeof window === 'undefined' || !window.Worker) {
-            parser.parse(options.raw, function (parsed) {
+            parser.parse(options.raw, function(parsed) {
                 cb(null, parsed);
             });
             return;
         }
 
         var worker = new Worker('../lib/parser-worker.js');
-        worker.onmessage = function (e) {
+        worker.onmessage = function(e) {
             cb(null, e.data);
         };
-        worker.onerror = function (e) {
+        worker.onerror = function(e) {
             var error = new Error('Error handling web worker: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
             console.error(error);
             cb(error);
@@ -644,7 +695,7 @@ define(function (require) {
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error, flags) will be called the flags have been received from the server
      */
-    ImapClient.prototype.getFlags = function (options, callback) {
+    ImapClient.prototype.getFlags = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -652,13 +703,13 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, function (error) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.fetchFlags(options.uid, function (error, flags) {
+            self._client.fetchFlags(options.uid, function(error, flags) {
                 if (error) {
                     callback(error);
                     return;
@@ -684,7 +735,7 @@ define(function (require) {
      * @param {Boolean} options.answered (optional) Marks the message as answered
      * @param {Function} callback(error, flags) will be called the flags have been received from the server
      */
-    ImapClient.prototype.updateFlags = function (options, callback) {
+    ImapClient.prototype.updateFlags = function(options, callback) {
         var self = this,
             READ_FLAG = '\\Seen',
             ANSWERED_FLAG = '\\Answered';
@@ -694,7 +745,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, function (error) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
@@ -711,13 +762,13 @@ define(function (require) {
                 options.answered ? add.push(ANSWERED_FLAG) : remove.push(ANSWERED_FLAG);
             }
 
-            self._client.removeFlags(options.uid, remove, function (error) {
+            self._client.removeFlags(options.uid, remove, function(error) {
                 if (error) {
                     callback(error);
                     return;
                 }
 
-                self._client.addFlags(options.uid, add, function (error, flags) {
+                self._client.addFlags(options.uid, add, function(error, flags) {
                     if (flags === true) {
                         callback(null, {});
                     } else {
@@ -738,7 +789,7 @@ define(function (require) {
      * @param {String} options.destination The destination folder
      * @param {Function} callback(error) Callback with an error object in case something went wrong.
      */
-    ImapClient.prototype.moveMessage = function (options, callback) {
+    ImapClient.prototype.moveMessage = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -746,7 +797,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, function (error) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
@@ -762,7 +813,7 @@ define(function (require) {
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error) Callback with an error object in case something went wrong.
      */
-    ImapClient.prototype.deleteMessage = function (options, callback) {
+    ImapClient.prototype.deleteMessage = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
@@ -770,7 +821,7 @@ define(function (require) {
             return;
         }
 
-        self._client.openMailbox(options.path, function (error) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;

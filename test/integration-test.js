@@ -127,6 +127,17 @@ define(function (require) {
             });
         });
 
+        it('should list messages by uid', function (done) {
+            ic.listMessagesByUid({
+                path: 'INBOX',
+                firstUid: 772
+            }, function (error, messages) {
+                expect(error).to.not.exist;
+                expect(messages).to.not.be.empty;
+                done();
+            });
+        });
+
         it('should get preview of multipart/mixed message', function (done) {
             ic.getMessagePreview({
                 path: 'INBOX',
