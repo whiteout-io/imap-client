@@ -158,6 +158,17 @@ describe('ImapClient integration tests', function() {
         });
     });
 
+    it('should search messages', function(done) {
+        ic.search({
+            path: 'INBOX',
+            subject: 'blablubb'
+        }, function(error, uids) {
+            expect(error).to.not.exist;
+            expect(uids).to.not.be.empty;
+            done();
+        });
+    });
+
     it('should list messages by uid', function(done) {
         ic.listMessagesByUid({
             path: 'INBOX',

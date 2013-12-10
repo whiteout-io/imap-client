@@ -428,6 +428,30 @@ define(function(require) {
             });
         });
 
+        it('should search', function(done) {
+            inboxMock.openMailbox.withArgs('foobar').yields();
+            inboxMock.search.yields(null, [1, 3, 5]);
+            imap.search({
+                path: 'foobar',
+                subject: 'whiteout '
+            }, function(error, uids) {
+                expect(error).to.be.null;
+                expect(uids.length).to.equal(3);
+                done();
+            });
+        });
+
+        it('should not search when not logged in', function() {
+            imap._loggedIn = false;
+            imap.search({
+                path: 'foobar',
+                subject: 'whiteout '
+            }, function(error) {
+                expect(error).to.exist;
+            });
+        });
+
+
         it('should list messages by uid', function(done) {
             inboxMock.openMailbox.withArgs('foobar').yields();
             inboxMock.uidListMessages.withArgs(1, 2).yields(null, [{

@@ -310,6 +310,30 @@ define(function(require) {
     };
 
     /**
+     * Returns the uids of messages containing the search terms in the options
+     * @param {String} options.path The folder's path
+     * @param {String} options.subject Mails containing string in the subject
+     * @param {Function} callback(error, uids) invoked with the uids of messages matching the search terms, or an error object if an error occurred
+     */
+    ImapClient.prototype.search = function(options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not list messages, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.openMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._client.search(options, callback);
+        });
+    };
+
+    /**
      * List messages in an IMAP folder based on their uid
      * @param {String} options.path The folder's path
      * @param {Number} options.firstUid The uid of the first message
