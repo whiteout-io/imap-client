@@ -35,14 +35,6 @@ define(function(require) {
             ic.logout(done);
         });
 
-        it('should return number of unread messages', function(done) {
-            ic.unreadMessages('INBOX', function(error, unreadMessages) {
-                expect(error).to.be.null;
-                expect(unreadMessages).to.be.at.least(1);
-                done();
-            });
-        });
-
         it('should list well known folders', function(done) {
             ic.listWellKnownFolders(function(error, folders) {
                 expect(error).to.not.exist;
@@ -130,10 +122,12 @@ define(function(require) {
         it('should search messages', function(done) {
             ic.search({
                 path: 'INBOX',
-                subject: 'attachment'
+                unread: true,
+                answered: false
             }, function(error, uids) {
                 expect(error).to.not.exist;
                 expect(uids).to.not.be.empty;
+                expect(uids).to.contain(780);
                 done();
             });
         });

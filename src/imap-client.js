@@ -312,7 +312,9 @@ define(function(require) {
     /**
      * Returns the uids of messages containing the search terms in the options
      * @param {String} options.path The folder's path
-     * @param {String} options.subject Mails containing string in the subject
+     * @param {String} options.subject (optional) Mails containing string in the subject
+     * @param {Boolean} options.answered (optional) Mails with or without the \Answered flag set.
+     * @param {Boolean} options.unread (optional) Mails with or without the \Seen flag set.
      * @param {Function} callback(error, uids) invoked with the uids of messages matching the search terms, or an error object if an error occurred
      */
     ImapClient.prototype.search = function(options, callback) {
@@ -432,29 +434,6 @@ define(function(require) {
                 }
                 callback(error, emails);
             });
-        });
-    };
-
-    /**
-     * Returns the number of unread messages in a folder
-     * @param {String} path The folder's path
-     * @param  {Function} callback(error, unreadCount) invoked with the number of unread messages, or an error object if an error occurred
-     */
-    ImapClient.prototype.unreadMessages = function(path, callback) {
-        var self = this;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not retrieve unread count, cause: Not logged in!'));
-            return;
-        }
-
-        self._client.openMailbox(path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            self._client.unreadMessages(callback);
         });
     };
 

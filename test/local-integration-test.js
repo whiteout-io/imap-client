@@ -84,14 +84,6 @@ describe('ImapClient integration tests', function() {
         server.close(done);
     });
 
-    it('should return number of unread messages', function(done) {
-        ic.unreadMessages('INBOX', function(error, unreadMessages) {
-            expect(error).to.be.null;
-            expect(unreadMessages).to.equal(1);
-            done();
-        });
-    });
-
     it('should list all folders', function(done) {
         ic.listAllFolders(function(error, mailboxes) {
             expect(error).to.not.exist;
@@ -161,7 +153,9 @@ describe('ImapClient integration tests', function() {
     it('should search messages', function(done) {
         ic.search({
             path: 'INBOX',
-            subject: 'blablubb'
+            subject: 'blablubb',
+            unread: false,
+            answered: false
         }, function(error, uids) {
             expect(error).to.not.exist;
             expect(uids).to.not.be.empty;

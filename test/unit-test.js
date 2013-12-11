@@ -350,34 +350,6 @@ define(function(require) {
             });
         });
 
-        it('should return number of unread messages', function(done) {
-            inboxMock.openMailbox.yields();
-            inboxMock.unreadMessages.yields(null, 1337);
-
-            imap.unreadMessages('INBOX', function(error, unreadMessages) {
-                expect(error).to.be.null;
-                expect(unreadMessages).to.equal(1337);
-                done();
-            });
-        });
-
-        it('should not return number of unread messages when not logged in', function() {
-            imap._loggedIn = false;
-            imap.unreadMessages('', function(error) {
-                expect(error).to.exist;
-            });
-        });
-
-        it('should error when querying unread messages', function(done) {
-            inboxMock.openMailbox.yields(new Error('fubar'));
-
-            imap.unreadMessages('INBOX', function(error, unreadMessages) {
-                expect(error).to.exist;
-                expect(unreadMessages).to.not.exist;
-                done();
-            });
-        });
-
         it('should not list messages due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
