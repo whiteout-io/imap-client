@@ -40,6 +40,7 @@ define(function(require) {
         });
         self._client.on('new', function(message) {
             if (typeof self.onIncomingMessage === 'function') {
+                message.flags = message.flags || [];
                 self.onIncomingMessage({
                     uid: message.UID,
                     id: message.messageId,
@@ -367,6 +368,7 @@ define(function(require) {
                 i = messages.length;
                 while (i--) {
                     email = messages[i];
+                    email.flags = email.flags || [];
                     emails.push({
                         uid: email.UID,
                         id: email.messageId,
@@ -418,6 +420,7 @@ define(function(require) {
                 i = messages.length;
                 while (i--) {
                     email = messages[i];
+                    email.flags = email.flags || [];
                     emails.push({
                         uid: email.UID,
                         id: email.messageId,
