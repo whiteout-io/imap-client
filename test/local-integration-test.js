@@ -16,7 +16,7 @@ loginOptions = {
         pass: 'testpass'
     },
     secure: false,
-    timeout: 20
+    timeout: 1000
 };
 
 describe('ImapClient integration tests', function() {
@@ -27,7 +27,7 @@ describe('ImapClient integration tests', function() {
             raw: 'Delivered-To: receiver@example.com\r\nMIME-Version: 1.0\r\nX-Mailer: Nodemailer (0.5.3-dev; +http://www.nodemailer.com/)\r\nDate: Mon, 07 Oct 2013 02:04:29 -0700 (PDT)\r\nMessage-Id: <1381136667884.3c5d64c9@Nodemailer>\r\nFrom: sender@example.com\r\nTo: receiver@example.com\r\nSubject: [whiteout] Encrypted message\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHi receiver,\r\n\r\nthis is a private conversation. To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome. The app is really easy to use and =\r\nautomatically encrypts sent emails, so that only the two of us can read =\r\nthem: https://chrome.google.com/webstore/detail/whiteout-mail/jjgghafhamhol=\r\njigjoghcfcekhkonijg\r\n\r\n\r\n-----BEGIN ENCRYPTED MESSAGE-----\r\nYADDAYADDACRYPTOBLABLA123\r\n-----END ENCRYPTED MESSAGE-----\r\n\r\n\r\nSent securely from whiteout mail\r\nhttp://whiteout.io\r\n\r\n',
             flags: ['\\Seen']
         }, {
-            raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: "Whiteout Test" <whiteout.test@t-online.de>\r\nTo: safewithme.testuser@gmail.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
+            raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
             flags: []
         }, {
             raw: 'Date: Tue, 15 Oct 2013 10:51:57 +0000\r\nMessage-ID: <123123@foobar>\r\nFrom: bla@blubb.io\r\nTo: blubb@bla.com\r\nSubject: blablubb\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nMIME-Version: 1.0\r\n\r\nblubb bla',
@@ -138,18 +138,6 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should list messages', function(done) {
-        ic.listMessages({
-            path: 'INBOX',
-            offset: 0,
-            length: 50
-        }, function(error, messages) {
-            expect(error).to.not.exist;
-            expect(messages).to.not.be.empty;
-            done();
-        });
-    });
-
     it('should search messages', function(done) {
         ic.search({
             path: 'INBOX',
@@ -172,6 +160,7 @@ describe('ImapClient integration tests', function() {
             expect(error).to.not.exist;
             expect(messages).to.not.be.empty;
             expect(messages.length).to.equal(3);
+            expect(messages[0].bodystructure).to.exist;
             done();
         });
     });
@@ -188,11 +177,10 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should get message preview', function(done) {
-        ic.getMessagePreview({
+    it('should get message in plain text', function(done) {
+        ic.getMessage({
             path: 'INBOX',
-            uid: 2,
-            timeout: 500
+            uid: 2
         }, function(error, message) {
             expect(error).to.not.exist;
             expect(message).to.exist;
@@ -201,8 +189,8 @@ describe('ImapClient integration tests', function() {
         });
     });
 
-    it('should not get preview of a non-existent message', function(done) {
-        ic.getMessagePreview({
+    it('should not get a non-existent message', function(done) {
+        ic.getMessage({
             path: 'INBOX',
             uid: 999
         }, function(error, message) {
@@ -211,29 +199,6 @@ describe('ImapClient integration tests', function() {
 
             done();
         });
-    });
-
-    it('should get full message with attachments', function(done) {
-        function onEnd(error, message) {
-            expect(error).to.be.null;
-
-            expect(message).to.exist;
-            expect(message.id).to.exist;
-            expect(message.uid).to.equal(2);
-            expect(message.to).to.be.instanceof(Array);
-            expect(message.from).to.be.instanceof(Array);
-            expect(message.subject).to.not.be.empty;
-            expect(message.body).to.not.be.empty;
-            expect(message.attachments).to.be.instanceof(Array);
-            expect(message.attachments).to.not.be.empty;
-
-            done();
-        }
-
-        ic.getMessage({
-            path: 'INBOX',
-            uid: 2,
-        }, onEnd);
     });
 
     it('should get flags', function(done) {
@@ -247,6 +212,7 @@ describe('ImapClient integration tests', function() {
             done();
         });
     });
+
     it('should update flags', function(done) {
         ic.updateFlags({
             path: 'INBOX',
@@ -262,10 +228,9 @@ describe('ImapClient integration tests', function() {
     });
 
     it('should purge message', function(done) {
-        ic.listMessages({
+        ic.listMessagesByUid({
             path: 'INBOX',
-            offset: 0,
-            length: 50
+            uid: 1,
         }, function(error, messages) {
             var i, l;
             expect(error).to.not.exist;
