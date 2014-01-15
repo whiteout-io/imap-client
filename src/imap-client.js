@@ -362,6 +362,7 @@ define(function(require) {
                 while (i--) {
                     email = messages[i];
                     email.flags = email.flags || [];
+                    email.messageId = email.messageId.replace(/[<>]/g, '');
                     emails.push({
                         uid: email.UID,
                         id: email.messageId,

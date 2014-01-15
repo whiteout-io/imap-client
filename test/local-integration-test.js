@@ -160,6 +160,8 @@ describe('ImapClient integration tests', function() {
             expect(error).to.not.exist;
             expect(messages).to.not.be.empty;
             expect(messages.length).to.equal(3);
+            expect(messages[0].id).to.not.be.empty;
+            expect(/[<>]/g.test(messages[0].id)).to.be.false;
             expect(messages[0].bodystructure).to.exist;
             done();
         });
