@@ -6,7 +6,7 @@ define(function(require) {
     'use strict';
 
     var inbox = require('inbox'),
-        parser = require('./parser'),
+        // parser = require('./parser'),
         mimelib = require('mimelib'),
         ImapClient;
 
@@ -137,29 +137,22 @@ define(function(require) {
                     type: folders[i].type,
                     path: folders[i].path
                 };
-                switch (folders[i].type) {
-                case types.INBOX:
+
+                if (folders[i].type === types.INBOX) {
                     wellKnownFolders.inbox = folder;
-                    break;
-                case types.DRAFTS:
+                } else if (folders[i].type === types.DRAFTS) {
                     wellKnownFolders.drafts = folder;
-                    break;
-                case types.SENT:
+                } else if (folders[i].type === types.SENT) {
                     wellKnownFolders.sent = folder;
-                    break;
-                case types.TRASH:
+                } else if (folders[i].type === types.TRASH) {
                     wellKnownFolders.trash = folder;
-                    break;
-                case types.JUNK:
+                } else if (folders[i].type === types.JUNK) {
                     wellKnownFolders.junk = folder;
-                    break;
-                case types.FLAGGED:
+                } else if (folders[i].type === types.FLAGGED) {
                     wellKnownFolders.flagged.push(folder);
-                    break;
-                case types.NORMAL:
+                } else if (folders[i].type === types.NORMAL) {
                     wellKnownFolders.normal.push(folder);
-                    break;
-                default:
+                } else {
                     wellKnownFolders.other.push(folder);
                 }
             }
@@ -369,6 +362,7 @@ define(function(require) {
                 while (i--) {
                     email = messages[i];
                     email.flags = email.flags || [];
+                    email.messageId = email.messageId.replace(/[<>]/g, '');
                     emails.push({
                         uid: email.UID,
                         id: email.messageId,
@@ -380,7 +374,8 @@ define(function(require) {
                         body: null,
                         sentDate: email.date,
                         unread: email.flags.indexOf('\\Seen') === -1,
-                        answered: email.flags.indexOf('\\Answered') > -1
+                        answered: email.flags.indexOf('\\Answered') > -1,
+                        bodystructure: email.bodystructure
                     });
                 }
                 callback(error, emails);
@@ -389,205 +384,7 @@ define(function(require) {
     };
 
     /**
-     * List messages in an IMAP folder
-     * @param {String} options.path The folder's path
-     * @param {String} options.offset The offset where to start reading. Positive offsets count from the beginning, negative offset count from the tail.
-     * @param {String} options.length Indicates how many messages you want to read
-     * @param {Function} callback(error, messages) triggered when the messages are available.
-     */
-    ImapClient.prototype.listMessages = function(options, callback) {
-        var self = this;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not list messages, cause: Not logged in!'));
-            return;
-        }
-
-        self._client.openMailbox(options.path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            self._client.listMessages(options.offset, options.length, function(error, messages) {
-                var i, email, emails;
-
-                if (!callback) {
-                    return;
-                }
-
-                emails = [];
-                i = messages.length;
-                while (i--) {
-                    email = messages[i];
-                    email.flags = email.flags || [];
-                    emails.push({
-                        uid: email.UID,
-                        id: email.messageId,
-                        from: [email.from],
-                        to: email.to,
-                        cc: email.cc,
-                        bcc: email.bcc,
-                        subject: email.title,
-                        body: null,
-                        sentDate: email.date,
-                        unread: email.flags.indexOf('\\Seen') === -1,
-                        answered: email.flags.indexOf('\\Answered') > -1
-                    });
-                }
-                callback(error, emails);
-            });
-        });
-    };
-
-    /**
-     * Fetches the preview of a message from the server
-     * @param {String} options.path The folder's path
-     * @param {Number} options.uid The uid of the message
-     * @param {Number} options.timeout Timeout if an error occurs during the message retrieval, only relevant if options.textOnly is true
-     * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
-     */
-    ImapClient.prototype.getMessagePreview = function(options, callback) {
-        var self = this;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not get message preview for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
-            return;
-        }
-
-        self._client.openMailbox(options.path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            var stream, raw = '';
-
-            stream = self._client.createStream({
-                uid: options.uid,
-                part: 'HEADER'
-            });
-
-            if (!stream) {
-                callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
-                return;
-            }
-            stream.on('error', callback);
-            stream.on('data', onData);
-            stream.on('end', onEnd);
-
-            function onData(chunk) {
-                if (typeof chunk === 'undefined') {
-                    return;
-                }
-
-                raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
-            }
-
-            function onEnd(chunk) {
-                onData(chunk);
-                parse({
-                    raw: raw,
-                    nonConcurrent: true
-                }, onHeader);
-            }
-
-            function onHeader(error, header) { // we received the header, now it's time to process the rest...
-                var rawBody = '',
-                    timeoutId,
-                    timeoutFired = false;
-
-                if (error) {
-                    callback(error);
-                    return;
-                }
-
-                streamBodyPart('1');
-                armTimeout();
-
-                function streamBodyPart(part) {
-                    stream = self._client.createStream({
-                        uid: options.uid,
-                        part: part
-                    });
-
-                    stream.on('data', onBodyData);
-                    stream.on('end', onBodyEnd);
-                    stream.on('error', callback);
-                }
-
-                function onBodyData(chunk) {
-                    disarmTimeout(); // we have received anything, so the timeout can be discarded, even if it was only an 'end' event
-
-                    if (typeof chunk === 'undefined') {
-                        return;
-                    }
-
-                    rawBody += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
-                }
-
-                function onBodyEnd(chunk) {
-                    if (timeoutFired) {
-                        return;
-                    }
-                    onBodyData(chunk);
-
-                    if (header.headers['content-type'].indexOf('multipart/mixed') > -1) {
-                        if (rawBody.slice(0, 2) === '--') {
-                            // the body part 1 most likely contains a nested part. start again with body part 1.1
-                            rawBody = '';
-                            streamBodyPart('1.1');
-                            armTimeout();
-
-                            return;
-                        }
-                    }
-
-                    if (header.headers['content-transfer-encoding'] && header.headers['content-transfer-encoding'].indexOf('quoted-printable') > -1) {
-                        rawBody = mimelib.decodeQuotedPrintable(rawBody);
-                    }
-
-                    informDelegate();
-                }
-
-                function armTimeout() {
-                    timeoutId = setTimeout(function() {
-                        timeoutFired = true;
-                        informDelegate();
-                    }, options.timeout ? options.timeout : 5000);
-                }
-
-                function disarmTimeout() {
-                    clearTimeout(timeoutId);
-                }
-
-                function informDelegate() {
-                    var emailObj = {
-                        uid: options.uid,
-                        id: header.messageId,
-                        from: header.from,
-                        to: header.to,
-                        cc: header.cc,
-                        bcc: header.bcc,
-                        subject: header.subject,
-                        body: rawBody,
-                        html: false,
-                        sentDate: header.date,
-                        attachments: []
-                    };
-
-                    if (timeoutFired) {
-                        delete emailObj.body;
-                    }
-
-                    callback(null, emailObj);
-                }
-            }
-        });
-    };
-
-    /**
-     * Fetches a full message from the server and parses it
+     * Fetches the message from the server
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
      * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
@@ -596,104 +393,90 @@ define(function(require) {
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not get message for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            callback(new Error('Can not get message preview for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
             return;
         }
 
-        self.getRawMessage(options, onRaw);
-
-        function onRaw(error, raw) {
+        self.listMessagesByUid({
+            path: options.path,
+            firstUid: options.uid,
+            lastUid: options.uid
+        }, function(error, msgs) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            parse({
-                raw: raw
-            }, onMessage);
-        }
-
-        function onMessage(error, email) {
-            callback(null, {
-                uid: options.uid,
-                id: email.messageId,
-                from: email.from,
-                to: email.to,
-                cc: email.cc,
-                bcc: email.bcc,
-                subject: email.subject,
-                body: email.html || email.text,
-                html: !! email.html,
-                sentDate: email.date,
-                attachments: email.attachments
-            });
-        }
-    };
-
-    /**
-     * Fetches a full message from the server and parses it
-     * @param {String} options.path The folder's path
-     * @param {Number} options.uid The uid of the message
-     * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
-     */
-    ImapClient.prototype.getRawMessage = function(options, callback) {
-        var self = this;
-
-        self._client.openMailbox(options.path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-            var stream, raw = '';
-
-            stream = self._client.createStream({
-                uid: options.uid,
-                part: false
-            });
-
-            if (!stream) {
-                callback(new Error('Cannot get message: No message with uid ' + options.uid + ' found!'));
+            if (msgs.length === 0) {
+                callback(new Error('Message with uid ' + options.uid + ' does not exist'));
                 return;
             }
 
-            stream.on('error', callback);
-            stream.on('data', onData);
-            stream.on('end', onEnd);
+            var msg = msgs[0],
+                plaintextParts = [],
+                stream;
+
+            // give the message a body
+            msg.body = '';
+
+            // look up plain text body parts
+            walkBodystructure(msg.bodystructure);
+
+            // there are no plain text parts, we're done
+            if (plaintextParts.length === 0) {
+                callback(null, msg);
+                return;
+            }
+
+            // start by streaming the first body part
+            streamBodyPart(plaintextParts.shift());
+
+            function streamBodyPart(part) {
+                // let's stream them one by one
+                stream = self._client.createStream({
+                    uid: options.uid,
+                    part: part
+                });
+                stream.on('error', callback);
+                stream.on('data', onData);
+                stream.on('end', onEnd);
+            }
 
             function onData(chunk) {
-                if (typeof chunk === 'undefined') {
-                    return;
+                if (chunk) {
+                    msg.body += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                 }
-                raw += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
             }
 
             function onEnd(chunk) {
                 onData(chunk);
-                callback(null, raw);
+
+                if (plaintextParts.length > 0) {
+                    // there are plain-text body parts left to stream
+                    streamBodyPart(plaintextParts.shift());
+                } else {
+                    // there are no plain-text body parts left, we're done.
+                    msg.body = mimelib.decodeQuotedPrintable(msg.body);
+                    callback(null, msg);
+                }
+            }
+
+            // looks for text/plain parts in the bodystructure in a DFS
+            // we are not interested in any other types than text/plain
+            function walkBodystructure(structure) {
+                if (structure.type.indexOf('text/plain') === 0 && typeof structure.disposition === 'undefined') {
+                    // we got ourselves a non-attachment text/plain part, let's remember it.
+                    plaintextParts.push(structure.part);
+                } else if (structure.type.indexOf('multipart/') === 0) {
+                    // this is a multipart/* part, we have to go deeper
+                    for (var i = 1; typeof structure[i] !== 'undefined'; i++) {
+                        walkBodystructure(structure[i]);
+                    }
+                }
             }
         });
+
     };
-
-    function parse(options, cb) {
-        if (options.nonConcurrent || typeof window === 'undefined' || !window.Worker) {
-            parser.parse(options.raw, function(parsed) {
-                cb(null, parsed);
-            });
-            return;
-        }
-
-        var worker = new Worker('../lib/parser-worker.js');
-        worker.onmessage = function(e) {
-            cb(null, e.data);
-        };
-        worker.onerror = function(e) {
-            var error = new Error('Error handling web worker: Line ' + e.lineno + ' in ' + e.filename + ': ' + e.message);
-            console.error(error);
-            cb(error);
-        };
-
-        worker.postMessage(options.raw);
-    }
 
     /**
      * Fetches IMAP flags for a message with a given UID from the server

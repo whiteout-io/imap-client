@@ -99,26 +99,6 @@ define(function(require) {
             });
         });
 
-        it('should list messages', function(done) {
-            ic.listMessages({
-                path: 'INBOX',
-                offset: 0,
-                length: 50
-            }, function(error, messages) {
-                var message;
-
-                expect(error).to.not.exist;
-                expect(messages).to.not.be.empty;
-                for (var i = messages.length - 1; i >= 0; i--) {
-                    message = messages[i];
-                    if (message.uid === 780) {
-                        expect(message.unread).to.be.true;
-                    }
-                }
-                done();
-            });
-        });
-
         it('should search messages', function(done) {
             ic.search({
                 path: 'INBOX',
@@ -144,10 +124,9 @@ define(function(require) {
         });
 
         it('should get preview of multipart/mixed message', function(done) {
-            ic.getMessagePreview({
+            ic.getMessage({
                 path: 'INBOX',
-                uid: 772,
-                textOnly: true
+                uid: 772
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
@@ -157,10 +136,9 @@ define(function(require) {
         });
 
         it('should get preview of multipart/alternative message', function(done) {
-            ic.getMessagePreview({
+            ic.getMessage({
                 path: 'INBOX',
-                uid: 773,
-                textOnly: true
+                uid: 773
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
@@ -170,10 +148,9 @@ define(function(require) {
         });
 
         it('should decode quoted-printable in message preview', function(done) {
-            ic.getMessagePreview({
+            ic.getMessage({
                 path: 'INBOX',
-                uid: 797,
-                textOnly: true
+                uid: 797
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
@@ -183,7 +160,7 @@ define(function(require) {
         });
 
         it('should not get preview of a non-existent message', function(done) {
-            ic.getMessagePreview({
+            ic.getMessage({
                 path: 'INBOX',
                 uid: 999
             }, function(error, message) {
@@ -195,11 +172,9 @@ define(function(require) {
         });
 
         it('should get preview with multipart/mixed and non-nested body part 1', function(done) {
-            ic.getMessagePreview({
+            ic.getMessage({
                 path: 'INBOX',
-                uid: 781,
-                timeout: 500,
-                textOnly: true
+                uid: 781
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
@@ -207,29 +182,6 @@ define(function(require) {
 
                 done();
             });
-        });
-
-        it('should get full message with attachments', function(done) {
-            function onEnd(error, message) {
-                expect(error).to.be.null;
-
-                expect(message).to.exist;
-                expect(message.id).to.exist;
-                expect(message.uid).to.equal(772);
-                expect(message.to).to.be.instanceof(Array);
-                expect(message.from).to.be.instanceof(Array);
-                expect(message.subject).to.not.be.empty;
-                expect(message.body).to.not.be.empty;
-                expect(message.html).to.be.true;
-                expect(message.attachments).to.be.instanceof(Array);
-                expect(message.attachments).to.not.be.empty;
-                done();
-            }
-
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 772,
-            }, onEnd);
         });
 
         it('should get flags', function(done) {
@@ -265,14 +217,13 @@ define(function(require) {
                 expect(folders.trash).to.exist;
 
                 destination = folders.trash.path;
-                ic.listMessages({
+                ic.listMessagesByUid({
                     path: origin,
-                    offset: 0,
-                    length: 50
+                    firstUid: 1
                 }, function(error, msgs) {
                     ic.moveMessage({
                         path: 'INBOX',
-                        uid: msgs[0].uid,
+                        uid: msgs[msgs.length-1].uid,
                         destination: destination
                     }, function(error) {
                         expect(error).to.not.exist;
@@ -283,14 +234,13 @@ define(function(require) {
             });
 
             function moveBack() {
-                ic.listMessages({
+                ic.listMessagesByUid({
                     path: destination,
-                    offset: 0,
-                    length: 50
+                    firstUid: 1
                 }, function(error, msgs) {
                     ic.moveMessage({
                         path: destination,
-                        uid: msgs[0].uid,
+                        uid: msgs[msgs.length-1].uid,
                         destination: 'INBOX'
                     }, function(error) {
                         expect(error).to.not.exist;
