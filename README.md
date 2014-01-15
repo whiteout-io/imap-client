@@ -9,4 +9,4 @@ Run the following commands to get started:
 
     npm install && grunt
 
-Then open chrome -> extentions, check developer mode, and add the root folder as packaged app and see the integration tests fly!
+Then open chrome, go to extentions, check developer mode, and add the root folder as packaged app and see the integration tests fly!
