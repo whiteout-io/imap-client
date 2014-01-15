@@ -1,4 +1,4 @@
-imap-client [![Build Status](https://magnum.travis-ci.com/whiteout-io/imap-client.png?token=g11Y5xe1ynqF5dzGqgB8&branch=master)](https://magnum.travis-ci.com/whiteout-io/imap-client)
+imap-client [![Build Status](https://travis-ci.org/whiteout-io/imap-client.png?branch=master)](https://travis-ci.org/whiteout-io/imap-client)
 ===========
 
 IMAP client as an AMD module written with node API for the browser.
