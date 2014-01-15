@@ -10,6 +10,7 @@
 		"amdefine": ">=0.0.8",
 		"setimmediate": ">=1.0.1",
 		"mimelib": "https://github.com/whiteout-io/mimelib/tarball/amd",
+		"mime": "https://github.com/whiteout-io/node-mime/tarball/amd",
 		"mailparser": "https://github.com/whiteout-io/mailparser/tarball/amd",
 		"inbox": "https://github.com/whiteout-io/inbox/tarball/amd"
 	},

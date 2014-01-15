@@ -269,4 +269,27 @@ describe('ImapClient integration tests', function() {
             done();
         });
     });
+
+    it('should get attachments', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 2,
+            lastUid: 2
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+
+            ic.getAttachment({
+                path: 'INBOX',
+                uid: messages[0].uid,
+                attachment: messages[0].attachments[0]
+            }, function(error, attachment) {
+                expect(error).to.not.exist;
+                expect(attachment).to.exist;
+                expect(attachment.content).to.exist;
+                expect(attachment.progress).to.equal(1);
+
+                done();
+            });
+        });
+    });
 });

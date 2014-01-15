@@ -6,7 +6,8 @@ define(function(require) {
     'use strict';
 
     var inbox = require('inbox'),
-        // parser = require('./parser'),
+        mime = require("mime"),
+        MailParser = require('mailparser').MailParser,
         mimelib = require('mimelib'),
         ImapClient;
 
@@ -351,7 +352,7 @@ define(function(require) {
             }
 
             self._client.uidListMessages(options.firstUid, options.lastUid, function(error, messages) {
-                var i, email, emails;
+                var i, emails, email, attachments;
 
                 if (!callback) {
                     return;
@@ -363,6 +364,8 @@ define(function(require) {
                     email = messages[i];
                     email.flags = email.flags || [];
                     email.messageId = email.messageId.replace(/[<>]/g, '');
+                    attachments = [];
+                    findAttachments(email.bodystructure, attachments);
                     emails.push({
                         uid: email.UID,
                         id: email.messageId,
@@ -375,10 +378,37 @@ define(function(require) {
                         sentDate: email.date,
                         unread: email.flags.indexOf('\\Seen') === -1,
                         answered: email.flags.indexOf('\\Answered') > -1,
-                        bodystructure: email.bodystructure
+                        bodystructure: email.bodystructure,
+                        attachments: attachments
                     });
                 }
                 callback(error, emails);
+
+                // looks for attachments in the bodystructure in a DFS
+                function findAttachments(structure, attachments) {
+                    if (structure.disposition) {
+                        // we got ourselves an attachment, let's remember it. ignore inline attachments!
+                        structure.disposition.forEach(function(attmt) {
+                            if (attmt.type !== 'attachment') {
+                                return;
+                            }
+
+                            var mimeType = (structure.type === "application/octet-stream") ? mime.lookup(attmt.filename.split(".").pop().toLowerCase()) : structure.type;
+                            attachments.push({
+                                filename: attmt.filename,
+                                filesize: structure.size,
+                                mimeType: mimeType,
+                                part: structure.part,
+                                content: null
+                            });
+                        });
+                    } else if (structure.type.indexOf('multipart/') === 0) {
+                        // this is a multipart/* part, we have to go deeper
+                        for (var i = 1; typeof structure[i] !== 'undefined'; i++) {
+                            findAttachments(structure[i], attachments);
+                        }
+                    }
+                }
             });
         });
     };
@@ -387,7 +417,7 @@ define(function(require) {
      * Fetches the message from the server
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
-     * @param {Function} callback(error, message) will be called the message and attachments are fully parsed
+     * @param {Function} callback(error, message) will be called the message is parsed
      */
     ImapClient.prototype.getMessage = function(options, callback) {
         var self = this;
@@ -475,7 +505,111 @@ define(function(require) {
                 }
             }
         });
+    };
 
+    /**
+     * Streams an attachment from the server
+     * @param {String} options.path The folder's path
+     * @param {Number} options.uid The uid of the message
+     * @param {Object} options.attachment Attachment to fetch, as return in the array by ImapClient.getMessage(). A field 'content' and 'progress' is added during parsing
+     * @param {Function} callback(error, attachment) will be called the message is parsed
+     */
+    ImapClient.prototype.getAttachment = function(options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not get flags, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.openMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            /*
+             * to be able to use mailparser, we have to piece together one node of the message, e.g.
+             * if the attachment is in body part 2, we cannot simply fetch body part 2, since the headers are missing.
+             * however, we fetch the MIME-headers and piece them together with the payload of the body part,
+             * so that mailparser can nicely parse them.
+             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the 
+             * payload, in order to not end() the mailparser stream prematurely.
+             */
+            var stream, mailparser,
+                bytesRead = 0,
+                progress, // helper to update attachment.progress 
+                streamingPayload = false; // helper flag if the MIME-headers are done
+
+            mailparser = new MailParser();
+            mailparser.on("end", function(parsed) {
+                options.attachment.content = bufferToTypedArray(parsed.attachments[0].content);
+                callback(null, options.attachment);
+            });
+
+            // set the progress flag for the attachment
+            options.attachment.progress = 0;
+
+            // stream the attachment's MIME-header first
+            streamAttachmentPart(options.attachment.part + '.MIME');
+
+            // set up the streams
+            function streamAttachmentPart(part) {
+                stream = self._client.createStream({
+                    uid: options.uid,
+                    part: part
+                });
+                stream.on('error', callback);
+                stream.on('data', onData);
+                stream.on('end', onEnd);
+            }
+
+            // just forward all the 'data' events to the mailparser and update attachment.progress
+            function onData(chunk) {
+                if (!chunk) {
+                    return;
+                }
+
+                // write to mailparser                
+                mailparser.write(chunk);
+
+                // update attachment.progress
+                if (streamingPayload) {
+                    bytesRead += chunk.length;
+                    progress = bytesRead / options.attachment.filesize;
+                    progress = progress <= 1 ? progress : 1;
+                    options.attachment.progress = progress;
+                }
+            }
+
+            // do *not* forward the first 'end' event to the mailparser, we don't
+            // want to close the parser stream after the headers are done.
+            // this is why we can't simply pipe the streams to the parser.
+            function onEnd(chunk) {
+                onData(chunk);
+
+                if (!streamingPayload) {
+                    // we have the mime header, now stream the attachment's raw payload
+                    streamingPayload = true;
+                    streamAttachmentPart(options.attachment.part);
+                } else {
+                    // parse the whole attachment
+                    mailparser.end();
+                }
+            }
+        });
+
+        // helper function to convert from a node buffer to a typed array
+        function bufferToTypedArray(buffer) {
+            var ab = new ArrayBuffer(buffer.length),
+                view = new Uint8Array(ab),
+                i, len;
+
+            for (i = 0, len = buffer.length; i < len; i++) {
+                view[i] = buffer.readUInt8(i);
+            }
+            return view;
+        }
     };
 
     /**

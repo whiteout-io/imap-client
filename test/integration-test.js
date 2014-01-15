@@ -117,32 +117,21 @@ define(function(require) {
                 path: 'INBOX',
                 firstUid: 772
             }, function(error, messages) {
+                console.log(messages);
                 expect(error).to.not.exist;
                 expect(messages).to.not.be.empty;
                 done();
             });
         });
 
-        it('should get preview of multipart/mixed message', function(done) {
+        it('should get preview of multipart message', function(done) {
             ic.getMessage({
                 path: 'INBOX',
-                uid: 772
+                uid: 781
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.body).to.equal('do not delete me, i have got something here for you\r\n');
-                done();
-            });
-        });
-
-        it('should get preview of multipart/alternative message', function(done) {
-            ic.getMessage({
-                path: 'INBOX',
-                uid: 773
-            }, function(error, message) {
-                expect(error).to.not.exist;
-                expect(message).to.exist;
-                expect(message.body).to.equal('asdfasdfasdf');
+                expect(message.body).to.equal('Hello world');
                 done();
             });
         });
@@ -223,7 +212,7 @@ define(function(require) {
                 }, function(error, msgs) {
                     ic.moveMessage({
                         path: 'INBOX',
-                        uid: msgs[msgs.length-1].uid,
+                        uid: msgs[msgs.length - 1].uid,
                         destination: destination
                     }, function(error) {
                         expect(error).to.not.exist;
@@ -240,7 +229,7 @@ define(function(require) {
                 }, function(error, msgs) {
                     ic.moveMessage({
                         path: destination,
-                        uid: msgs[msgs.length-1].uid,
+                        uid: msgs[msgs.length - 1].uid,
                         destination: 'INBOX'
                     }, function(error) {
                         expect(error).to.not.exist;
@@ -249,6 +238,29 @@ define(function(require) {
                     });
                 });
             }
+        });
+
+        it('should get attachment', function(done) {
+            ic.listMessagesByUid({
+                path: 'INBOX',
+                firstUid: 781,
+                lastUid: 781
+            }, function(error, messages) {
+                expect(error).to.not.exist;
+
+                ic.getAttachment({
+                    path: 'INBOX',
+                    uid: messages[0].uid,
+                    attachment: messages[0].attachments[0]
+                }, function(error, attachment) {
+                    expect(error).to.not.exist;
+                    expect(attachment).to.exist;
+                    expect(attachment.content).to.exist;
+                    expect(attachment.progress).to.equal(1);
+
+                    done();
+                });
+            });
         });
     });
 });

@@ -46,6 +46,7 @@ module.exports = function(grunt) {
                     'inbox/node_modules/node-shims/node_modules/node-forge/js/*.js',
                     'inbox/node_modules/utf7/src/utf7.js',
                     'inbox/node_modules/xoauth2/src/xoauth2.js',
+                    'mime/src/mime.js',
                     'mimelib/src/mimelib.js',
                     'mimelib/node_modules/addressparser/src/addressparser.js',
                     'mimelib/node_modules/encoding/src/encoding.js',

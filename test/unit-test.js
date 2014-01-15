@@ -383,7 +383,34 @@ define(function(require) {
                 to: ['bankrupt@duh.com'],
                 title: 'SHIAAAT',
                 sentDate: '',
-                flags: ['\\Seen', '\\Answered']
+                flags: ['\\Seen', '\\Answered'],
+                bodystructure: {
+                    '1': {
+                        part: '1',
+                        type: 'text/plain',
+                        parameters: {
+                            charset: 'us-ascii'
+                        },
+                        encoding: '7bit',
+                        size: 13,
+                        lines: 2
+                    },
+                    '2': {
+                        part: '2',
+                        type: 'application/octet-stream',
+                        parameters: {
+                            name: 'foobar.md',
+                            'x-unix-mode': '0644'
+                        },
+                        encoding: '7bit',
+                        size: 211,
+                        disposition: [{
+                            type: 'attachment',
+                            filename: 'foobar.md'
+                        }]
+                    },
+                    type: 'multipart/mixed'
+                }
             }, {
                 UID: 2,
                 messageId: 'beepboop',
@@ -391,22 +418,39 @@ define(function(require) {
                 to: ['bankrupt@duh.com'],
                 title: 'SHIAAAT',
                 sentDate: '',
-                flags: ['\\Seen', '\\Answered']
+                flags: ['\\Seen', '\\Answered'],
+                bodystructure: {
+                    part: '1',
+                    type: 'text/plain',
+                    parameters: {
+                        charset: 'us-ascii'
+                    },
+                    encoding: '7bit',
+                    size: 13,
+                    lines: 2
+                }
             }]);
             imap.listMessagesByUid({
                 path: 'foobar',
                 firstUid: 1,
                 lastUid: 2
-            }, function(error, unreadMessages) {
+            }, function(error, msgs) {
                 expect(error).to.be.null;
-                expect(unreadMessages.length).to.equal(2);
-                expect(unreadMessages[0].uid).to.equal(2);
-                expect(unreadMessages[0].id).to.equal('beepboop');
-                expect(unreadMessages[0].from).to.be.instanceof(Array);
-                expect(unreadMessages[0].to).to.be.instanceof(Array);
-                expect(unreadMessages[0].subject).to.equal('SHIAAAT');
-                expect(unreadMessages[0].unread).to.be.false;
-                expect(unreadMessages[0].answered).to.be.true;
+                expect(msgs.length).to.equal(2);
+                expect(msgs[0].uid).to.equal(2);
+                expect(msgs[0].id).to.equal('beepboop');
+                expect(msgs[0].from).to.be.instanceof(Array);
+                expect(msgs[0].to).to.be.instanceof(Array);
+                expect(msgs[0].subject).to.equal('SHIAAAT');
+                expect(msgs[0].unread).to.be.false;
+                expect(msgs[0].answered).to.be.true;
+                expect(msgs[0].attachments).to.be.empty;
+                expect(msgs[1].attachments).to.not.be.empty;
+                expect(msgs[1].attachments[0].filename).to.equal('foobar.md');
+                expect(msgs[1].attachments[0].filesize).to.equal(211);
+                expect(msgs[1].attachments[0].mimeType).to.equal('text/x-markdown');
+                expect(msgs[1].attachments[0].part).to.equal('2');
+                expect(msgs[1].attachments[0].content).to.be.null;
                 done();
             });
         });
@@ -837,6 +881,107 @@ define(function(require) {
                 expect(error).to.exist;
             });
 
+        });
+
+        it('should stream attachments', function(done) {
+            var ee = {}, streamBody = false;
+            ee.on = function(ev, cb) {
+                if (ev === 'data') {
+                    if (!streamBody) {
+                        cb('Content-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\n');
+                        streamBody = true;
+                    } else {
+                        cb('Zm9vZm9vZm9vZm9vZm9v\r\n');
+                    }
+                } else if (ev === 'end') {
+                    cb();
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '2'
+            }).returns(ee);
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '2.MIME'
+            }).returns(ee);
+
+            imap.getAttachment({
+                path: 'INBOX',
+                uid: 123,
+                attachment: {
+                    filename: 'foo.txt',
+                    filesize: 20,
+                    mimeType: 'text/plain',
+                    part: '2'
+                }
+            }, function(error, attmt) {
+                expect(error).to.be.null;
+                expect(attmt).to.exist;
+                expect(attmt.content).to.exist;
+                expect(attmt.progress).to.equal(1);
+
+                done();
+            });
+        });
+
+        it('should not stream attachments when not logged in', function() {
+            imap._loggedIn = false;
+            imap.getAttachment({}, function(error) {
+                expect(error).to.exist;
+            });
+        });
+
+        it('should not stream attachments due to error while opening the mail box', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.getAttachment({
+                path: 'INBOX',
+                uid: 123,
+                attachment: {
+                    filename: 'foo.txt',
+                    filesize: 20,
+                    mimeType: 'text/plain',
+                    part: '2'
+                }
+            }, function(error, attmt) {
+                expect(error).to.exist;
+                expect(attmt).to.not.exist;
+                done();
+            });
+        });
+
+        it('should not stream attachments due to stream error', function(done) {
+            var ee = {};
+            ee.on = function(event, cb) {
+                if (event === 'error') {
+                    cb(new Error('New Shit Has Come To Light!'));
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '2.MIME'
+            }).returns(ee);
+
+
+            imap.getAttachment({
+                path: 'INBOX',
+                uid: 123,
+                attachment: {
+                    filename: 'foo.txt',
+                    filesize: 20,
+                    mimeType: 'text/plain',
+                    part: '2'
+                }
+            }, function(error, attmt) {
+                expect(error).to.exist;
+                expect(attmt).to.not.exist;
+                done();
+            });
         });
 
     });
