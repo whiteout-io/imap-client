@@ -518,7 +518,7 @@ define(function(require) {
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not get flags, cause: Not logged in!'));
+            callback(new Error('Can not get attachment, cause: Not logged in!'));
             return;
         }
 
