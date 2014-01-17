@@ -379,7 +379,8 @@ define(function(require) {
                         unread: email.flags.indexOf('\\Seen') === -1,
                         answered: email.flags.indexOf('\\Answered') > -1,
                         bodystructure: email.bodystructure,
-                        attachments: attachments
+                        attachments: attachments,
+                        isEncrypted: email.bodystructure.type === 'multipart/encrypted'
                     });
                 }
                 callback(error, emails);
@@ -444,13 +445,21 @@ define(function(require) {
 
             var msg = msgs[0],
                 plaintextParts = [],
-                stream;
+                stream,
+                currentBodypart,
+                currentPlaintext;
 
             // give the message a body
             msg.body = '';
 
-            // look up plain text body parts
-            walkBodystructure(msg.bodystructure);
+            // if the message is encrypted, stream the cypher text, otherwise just get the plain text parts
+            if (msg.isEncrypted) {
+                // body part 2 is the pgp part, see http://tools.ietf.org/search/rfc3156, p. 2f
+                plaintextParts.push(msg.bodystructure['2']);
+            } else {
+                // look up plain text body parts
+                walkBodystructure(msg.bodystructure);
+            }
 
             // there are no plain text parts, we're done
             if (plaintextParts.length === 0) {
@@ -458,14 +467,17 @@ define(function(require) {
                 return;
             }
 
-            // start by streaming the first body part
+            // start by streaming the body parts
             streamBodyPart(plaintextParts.shift());
 
-            function streamBodyPart(part) {
+            function streamBodyPart(bodypart) {
+                currentBodypart = bodypart;
+                currentPlaintext = '';
+
                 // let's stream them one by one
                 stream = self._client.createStream({
                     uid: options.uid,
-                    part: part
+                    part: currentBodypart.part
                 });
                 stream.on('error', callback);
                 stream.on('data', onData);
@@ -474,19 +486,24 @@ define(function(require) {
 
             function onData(chunk) {
                 if (chunk) {
-                    msg.body += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                    currentPlaintext += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
                 }
             }
 
             function onEnd(chunk) {
                 onData(chunk);
 
+                // strip quoted-printable, if necessary
+                if (currentBodypart.encoding === 'quoted-printable') {
+                    currentPlaintext = mimelib.decodeQuotedPrintable(currentPlaintext);
+                }
+                msg.body += currentPlaintext;
+
                 if (plaintextParts.length > 0) {
                     // there are plain-text body parts left to stream
                     streamBodyPart(plaintextParts.shift());
                 } else {
                     // there are no plain-text body parts left, we're done.
-                    msg.body = mimelib.decodeQuotedPrintable(msg.body);
                     callback(null, msg);
                 }
             }
@@ -496,7 +513,7 @@ define(function(require) {
             function walkBodystructure(structure) {
                 if (structure.type.indexOf('text/plain') === 0 && typeof structure.disposition === 'undefined') {
                     // we got ourselves a non-attachment text/plain part, let's remember it.
-                    plaintextParts.push(structure.part);
+                    plaintextParts.push(structure);
                 } else if (structure.type.indexOf('multipart/') === 0) {
                     // this is a multipart/* part, we have to go deeper
                     for (var i = 1; typeof structure[i] !== 'undefined'; i++) {
@@ -505,6 +522,32 @@ define(function(require) {
                 }
             }
         });
+    };
+
+    /**
+     * Parses a message
+     * @param {Number} options.message The meta data of the message, as retrieved by ImapClient.listMessagesByUid()
+     * @param {String} options.block The string representation of the decrypted PGP message block
+     * @param {Function} callback(error, message) will be called when the message decrypted PGP message block was parsed
+     */
+    ImapClient.prototype.parseDecryptedMessageBlock = function(options, callback) {
+        var mailparser = new MailParser(),
+            message = options.message;
+
+        mailparser.on("end", function(parsed) {
+            message.body = parsed.text ? parsed.text : '';
+            parsed.attachments.forEach(function(attmt) {
+                message.attachments.push({
+                    filename: attmt.generatedFileName,
+                    filesize: attmt.length,
+                    mimeType: attmt.contentType,
+                    part: 'n/a',
+                    content: bufferToTypedArray(attmt.content)
+                });
+            });
+            callback(null, message);
+        });
+        mailparser.end(options.block);
     };
 
     /**
@@ -533,7 +576,7 @@ define(function(require) {
              * if the attachment is in body part 2, we cannot simply fetch body part 2, since the headers are missing.
              * however, we fetch the MIME-headers and piece them together with the payload of the body part,
              * so that mailparser can nicely parse them.
-             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the 
+             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the
              * payload, in order to not end() the mailparser stream prematurely.
              */
             var stream, mailparser,
@@ -598,18 +641,6 @@ define(function(require) {
                 }
             }
         });
-
-        // helper function to convert from a node buffer to a typed array
-        function bufferToTypedArray(buffer) {
-            var ab = new ArrayBuffer(buffer.length),
-                view = new Uint8Array(ab),
-                i, len;
-
-            for (i = 0, len = buffer.length; i < len; i++) {
-                view[i] = buffer.readUInt8(i);
-            }
-            return view;
-        }
     };
 
     /**
@@ -754,6 +785,17 @@ define(function(require) {
         });
     };
 
+    // helper function to convert from a node buffer to a typed array
+    function bufferToTypedArray(buffer) {
+        var ab = new ArrayBuffer(buffer.length),
+            view = new Uint8Array(ab),
+            i, len;
+
+        for (i = 0, len = buffer.length; i < len; i++) {
+            view[i] = buffer.readUInt8(i);
+        }
+        return view;
+    }
 
     return ImapClient;
 });
