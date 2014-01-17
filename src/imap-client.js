@@ -606,18 +606,23 @@ define(function(require) {
             return;
         }
 
+        if (typeof options.message.bodystructure[2] === 'undefined') {
+            callback(new Error('Can not encrypted message block, message does not conform to RFC 3156!'));
+            return;
+        }
+
         self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            var pgpPart, stream, block = '';
+            var stream, block = '';
 
-            pgpPart = findPGPPart(options.message.bodystructure),
+            // body part 2 is the pgp part, see http://tools.ietf.org/search/rfc3156, p. 2f
             stream = self._client.createStream({
                 uid: options.message.uid,
-                part: pgpPart
+                part: '2'
             });
             stream.on('error', callback);
             stream.on('data', onData);
@@ -632,17 +637,6 @@ define(function(require) {
             function onEnd(chunk) {
                 onData(chunk);
                 callback(null, block);
-            }
-
-            // looks for the part with the PGP block in the bodystructure
-            function findPGPPart(bodystructure) {
-                var i, bodyPart;
-
-                for (i = 1, bodyPart = bodystructure['1']; typeof bodystructure[i] !== 'undefined'; i++, bodyPart = bodystructure[i]) {
-                    if (bodyPart.disposition && bodyPart.disposition[0].type === 'inline') {
-                        return bodyPart.part;
-                    }
-                }
             }
         });
     };

@@ -1023,6 +1023,27 @@ define(function(require) {
             });
         });
 
+        it('should not get encrypted message block for RFC 3156 messages', function(done) {
+            imap.getEncryptedMessageBlock({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    bodystructure: {
+                        part: '1',
+                        type: 'text/plain',
+                        parameters: {},
+                        encoding: '7bit',
+                        size: 12
+                    }
+                }
+            }, function(error, pgpBlock) {
+                expect(error).to.exist;
+                expect(pgpBlock).to.not.exist;
+
+                done();
+            });
+        });
+
         it('should not get encrypted message block due to stream error', function(done) {
             var ee = {};
             ee.pipe = function() {};
@@ -1075,7 +1096,32 @@ define(function(require) {
             inboxMock.openMailbox.yields(new Error('fubar'));
             imap.getEncryptedMessageBlock({
                 path: 'INBOX',
-                message: {}
+                message: {
+                    uid: 123,
+                    bodystructure: {
+                        '1': {
+                            part: '1',
+                            type: 'application/pgp-encrypted',
+                            parameters: {},
+                            encoding: '7bit',
+                            size: 12
+                        },
+                        '2': {
+                            part: '2',
+                            type: 'application/octet-stream',
+                            parameters: {
+                                name: 'encrypted.asc'
+                            },
+                            encoding: '7bit',
+                            size: 4357,
+                            disposition: [{
+                                type: 'inline',
+                                filename: 'encrypted.asc'
+                            }]
+                        },
+                        type: 'multipart/encrypted'
+                    }
+                }
             }, function(error, pgpBlock) {
                 expect(error).to.exist;
                 expect(pgpBlock).to.not.exist;
