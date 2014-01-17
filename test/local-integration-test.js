@@ -32,9 +32,6 @@ describe('ImapClient integration tests', function() {
         }, {
             raw: 'Date: Tue, 15 Oct 2013 10:51:57 +0000\r\nMessage-ID: <123123@foobar>\r\nFrom: bla@blubb.io\r\nTo: blubb@bla.com\r\nSubject: blablubb\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nMIME-Version: 1.0\r\n\r\nblubb bla',
             flags: ['\\Seen']
-        }, {
-            raw: 'Content-Type: multipart/encrypted; boundary="Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69"; protocol="application/pgp-encrypted";\r\nSubject: [whiteout] attachment only\r\nFrom: Felix Hammerl <felix.hammerl@gmail.com>\r\nDate: Thu, 16 Jan 2014 14:55:56 +0100\r\nContent-Transfer-Encoding: 7bit\r\nMessage-Id: <3ECDF9DC-895E-4475-B2A9-52AF1F117652@gmail.com>\r\nContent-Description: OpenPGP encrypted message\r\nTo: safewithme.testuser@gmail.com\r\n\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: application/pgp-encrypted\r\nContent-Description: PGP/MIME Versions Identification\r\n\r\nVersion: 1\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: inline;\r\n    filename=encrypted.asc\r\nContent-Type: application/octet-stream;\r\n    name=encrypted.asc\r\nContent-Description: OpenPGP encrypted message\r\n\r\ninsert pgp here.\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69--',
-            flags: []
         }];
         server = hoodiecrow({
             storage: {
@@ -177,57 +174,31 @@ describe('ImapClient integration tests', function() {
         }, function(error, messages) {
             expect(error).to.not.exist;
             expect(messages).to.not.be.empty;
-            expect(messages.length).to.equal(4);
+            expect(messages.length).to.equal(3);
             done();
         });
     });
 
     it('should get message in plain text', function(done) {
-        ic.getPlaintext({
+        ic.getMessage({
             path: 'INBOX',
-            message: {
-                uid: 2,
-                bodystructure: {
-                    '1': {
-                        part: '1',
-                        type: 'text/plain',
-                        parameters: {},
-                        encoding: 'quoted-printable',
-                        size: 12
-                    },
-                    '2': {
-                        part: '2',
-                        type: 'text/plain',
-                        parameters: {
-                            name: 'foo.txt'
-                        },
-                        encoding: 'base64',
-                        size: 20,
-                        disposition: [{
-                            type: 'attachment',
-                            filename: 'foo.txt'
-                        }]
-                    },
-                    '3': {
-                        part: '3',
-                        type: 'text/plain',
-                        parameters: {
-                            name: 'bar.txt'
-                        },
-                        encoding: 'base64',
-                        size: 20,
-                        disposition: [{
-                            type: 'attachment',
-                            filename: 'bar.txt'
-                        }]
-                    },
-                    type: 'multipart/mixed'
-                }
-            }
+            uid: 2
         }, function(error, message) {
             expect(error).to.not.exist;
             expect(message).to.exist;
             expect(message.body).to.equal("Hello world");
+            done();
+        });
+    });
+
+    it('should not get a non-existent message', function(done) {
+        ic.getMessage({
+            path: 'INBOX',
+            uid: 999
+        }, function(error, message) {
+            expect(error).to.exist;
+            expect(message).to.not.exist;
+
             done();
         });
     });
@@ -319,43 +290,6 @@ describe('ImapClient integration tests', function() {
 
                 done();
             });
-        });
-    });
-
-    it('should get encrypted message block', function(done) {
-        ic.getEncryptedMessageBlock({
-            path: 'INBOX',
-            message: {
-                uid: 4,
-                bodystructure: {
-                    '1': {
-                        part: '1',
-                        type: 'application/pgp-encrypted',
-                        parameters: {},
-                        encoding: '7bit',
-                        size: 12
-                    },
-                    '2': {
-                        part: '2',
-                        type: 'application/octet-stream',
-                        parameters: {
-                            name: 'encrypted.asc'
-                        },
-                        encoding: '7bit',
-                        size: 4357,
-                        disposition: [{
-                            type: 'inline',
-                            filename: 'encrypted.asc'
-                        }]
-                    },
-                    type: 'multipart/encrypted'
-                }
-            }
-        }, function(error, pgpBlock) {
-            expect(error).to.be.null;
-            expect(pgpBlock).to.equal('insert pgp here.\r\n');
-
-            done();
         });
     });
 });
