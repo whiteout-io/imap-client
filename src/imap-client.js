@@ -379,7 +379,8 @@ define(function(require) {
                         unread: email.flags.indexOf('\\Seen') === -1,
                         answered: email.flags.indexOf('\\Answered') > -1,
                         bodystructure: email.bodystructure,
-                        attachments: attachments
+                        attachments: attachments,
+                        isPGPEncrypted: email.bodystructure.type === 'multipart/encrypted'
                     });
                 }
                 callback(error, emails);
@@ -414,35 +415,26 @@ define(function(require) {
     };
 
     /**
-     * Fetches the message from the server
+     * Fetches the plain text part of a message from the server
      * @param {String} options.path The folder's path
-     * @param {Number} options.uid The uid of the message
+     * @param {Number} options.message The meta data of the message, as retrieved by ImapClient.listMessagesByUid()
      * @param {Function} callback(error, message) will be called the message is parsed
      */
-    ImapClient.prototype.getMessage = function(options, callback) {
+    ImapClient.prototype.getPlaintext = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not get message preview for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            callback(new Error('Can not get message preview for uid ' + options.message.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
             return;
         }
 
-        self.listMessagesByUid({
-            path: options.path,
-            firstUid: options.uid,
-            lastUid: options.uid
-        }, function(error, msgs) {
+        self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            if (msgs.length === 0) {
-                callback(new Error('Message with uid ' + options.uid + ' does not exist'));
-                return;
-            }
-
-            var msg = msgs[0],
+            var msg = options.message,
                 plaintextParts = [],
                 stream;
 
@@ -464,7 +456,7 @@ define(function(require) {
             function streamBodyPart(part) {
                 // let's stream them one by one
                 stream = self._client.createStream({
-                    uid: options.uid,
+                    uid: options.message.uid,
                     part: part
                 });
                 stream.on('error', callback);
@@ -533,7 +525,7 @@ define(function(require) {
              * if the attachment is in body part 2, we cannot simply fetch body part 2, since the headers are missing.
              * however, we fetch the MIME-headers and piece them together with the payload of the body part,
              * so that mailparser can nicely parse them.
-             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the 
+             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the
              * payload, in order to not end() the mailparser stream prematurely.
              */
             var stream, mailparser,
@@ -598,18 +590,87 @@ define(function(require) {
                 }
             }
         });
+    };
 
-        // helper function to convert from a node buffer to a typed array
-        function bufferToTypedArray(buffer) {
-            var ab = new ArrayBuffer(buffer.length),
-                view = new Uint8Array(ab),
-                i, len;
+    /**
+     * Fetches the ASCII-armored PGP-encrypted block from the server
+     * @param {String} options.path The folder's path
+     * @param {Number} options.message The meta data of the message, as retrieved by ImapClient.listMessagesByUid()
+     * @param {Function} callback(error, pgpBlock) will be called the PGP-encrypted block was received
+     */
+    ImapClient.prototype.getEncryptedMessageBlock = function(options, callback) {
+        var self = this;
 
-            for (i = 0, len = buffer.length; i < len; i++) {
-                view[i] = buffer.readUInt8(i);
-            }
-            return view;
+        if (!self._loggedIn) {
+            callback(new Error('Can not get attachment, cause: Not logged in!'));
+            return;
         }
+
+        self._client.openMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            var pgpPart, stream, block = '';
+
+            pgpPart = findPGPPart(options.message.bodystructure),
+            stream = self._client.createStream({
+                uid: options.message.uid,
+                part: pgpPart
+            });
+            stream.on('error', callback);
+            stream.on('data', onData);
+            stream.on('end', onEnd);
+
+            function onData(chunk) {
+                if (chunk) {
+                    block += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                }
+            }
+
+            function onEnd(chunk) {
+                onData(chunk);
+                callback(null, block);
+            }
+
+            // looks for the part with the PGP block in the bodystructure
+            function findPGPPart(bodystructure) {
+                var i, bodyPart;
+
+                for (i = 1, bodyPart = bodystructure['1']; typeof bodystructure[i] !== 'undefined'; i++, bodyPart = bodystructure[i]) {
+                    if (bodyPart.disposition && bodyPart.disposition[0].type === 'inline') {
+                        return bodyPart.part;
+                    }
+                }
+            }
+        });
+    };
+
+    /**
+     * Parses a message
+     * @param {Number} options.message The meta data of the message, as retrieved by ImapClient.listMessagesByUid()
+     * @param {String} options.block The string representation of the decrypted PGP message block
+     * @param {Function} callback(error, message) will be called when the message decrypted PGP message block was parsed
+     */
+    ImapClient.prototype.parseDecryptedMessageBlock = function(options, callback) {
+        var mailparser = new MailParser(),
+            message = options.message;
+
+        mailparser.on("end", function(parsed) {
+            message.body = parsed.text ? parsed.text : '';
+            parsed.attachments.forEach(function(attmt) {
+                message.attachments.push({
+                    filename: attmt.generatedFileName,
+                    filesize: attmt.length,
+                    mimeType: attmt.contentType,
+                    part: 'n/a',
+                    content: bufferToTypedArray(attmt.content)
+                });
+            });
+            callback(null, message);
+        });
+        mailparser.end(options.block);
     };
 
     /**
@@ -754,6 +815,17 @@ define(function(require) {
         });
     };
 
+    // helper function to convert from a node buffer to a typed array
+    function bufferToTypedArray(buffer) {
+        var ab = new ArrayBuffer(buffer.length),
+            view = new Uint8Array(ab),
+            i, len;
+
+        for (i = 0, len = buffer.length; i < len; i++) {
+            view[i] = buffer.readUInt8(i);
+        }
+        return view;
+    }
 
     return ImapClient;
 });

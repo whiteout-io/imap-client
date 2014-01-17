@@ -480,210 +480,6 @@ define(function(require) {
             });
         });
 
-        it('should get a plain text message', function(done) {
-            var ee = {};
-            ee.on = function(ev, cb) {
-                if (ev === 'data') {
-                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.');
-                } else if (ev === 'end') {
-                    cb();
-                }
-            };
-
-            inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(123, 123).yields(null, [{
-                UID: 123,
-                messageId: 'beepboop',
-                from: 'zuhause@aol.com',
-                to: ['bankrupt@duh.com'],
-                title: 'Hello world!',
-                sentDate: '',
-                flags: ['\\Seen', '\\Answered'],
-                bodystructure: {
-                    part: '1',
-                    type: 'text/plain',
-                    parameters: {
-                        charset: 'utf-8'
-                    },
-                    encoding: 'quoted-printable',
-                    size: 11, // that's not the actual value ...
-                    lines: 1 // that's not the actual value ...
-                }
-            }]);
-            inboxMock.createStream.withArgs({
-                uid: 123,
-                part: '1'
-            }).returns(ee);
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-            }, function(error, msg) {
-                expect(error).to.be.null;
-                expect(msg.uid).to.equal(123);
-                expect(msg.from).to.be.instanceof(Array);
-                expect(msg.to).to.be.instanceof(Array);
-                expect(msg.subject).to.equal('Hello world!');
-                expect(inboxMock.createStream.called).to.be.true;
-                expect(msg.body).to.equal('To read my encrypted message below, simply install Whiteout Mail for Chrome.');
-
-                done();
-            });
-        });
-
-        it('should get a plain text from a nested body part', function(done) {
-            var ee = {};
-            ee.on = function(ev, cb) {
-                if (ev === 'data') {
-                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.');
-                } else if (ev === 'end') {
-                    cb();
-                }
-            };
-
-            inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(123, 123).yields(null, [{
-                UID: 123,
-                messageId: 'beepboop',
-                from: 'zuhause@aol.com',
-                to: ['bankrupt@duh.com'],
-                title: 'Hello world!',
-                sentDate: '',
-                flags: ['\\Seen', '\\Answered'],
-                bodystructure: {
-                    '1': {
-                        '1': {
-                            part: '1.1',
-                            type: 'text/plain',
-                            parameters: {},
-                            encoding: 'quoted-printable',
-                            size: 1549,
-                            lines: 40
-                        },
-                        '2': {
-                            part: '1.2',
-                            type: 'text/html',
-                            parameters: {},
-                            encoding: 'quoted-printable',
-                            size: 1934,
-                            lines: 43
-                        },
-                        type: 'multipart/alternative'
-                    },
-                    '2': {
-                        part: '2',
-                        type: 'application/x-gpt',
-                        parameters: {
-                            name: 'elements.gp5'
-                        },
-                        encoding: 'base64',
-                        size: 75648,
-                        disposition: [{
-                            type: 'attachment',
-                            filename: 'Doom.gp5'
-                        }]
-                    },
-                    type: 'multipart/mixed'
-                }
-            }]);
-            inboxMock.createStream.withArgs({
-                uid: 123,
-                part: '1.1'
-            }).returns(ee);
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-            }, function(error, msg) {
-                expect(error).to.be.null;
-                expect(msg.uid).to.equal(123);
-                expect(msg.from).to.be.instanceof(Array);
-                expect(msg.to).to.be.instanceof(Array);
-                expect(msg.subject).to.equal('Hello world!');
-                expect(msg.body).to.equal('To read my encrypted message below, simply install Whiteout Mail for Chrome.');
-                expect(inboxMock.createStream.called).to.be.true;
-
-                done();
-            });
-        });
-
-        it('should not get preview of a non-existent message', function(done) {
-            inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(999, 999).yields(null, []);
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 999
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(message).to.not.exist;
-
-                done();
-            });
-        });
-
-        it('should not get a message due to error while opening the mail box', function(done) {
-            inboxMock.openMailbox.yields(new Error('fubar'));
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-            }, function(error, msg) {
-                expect(error).to.exist;
-                expect(msg).to.not.exist;
-                done();
-            });
-        });
-
-        it('should not get a message when not logged in', function() {
-            imap._loggedIn = false;
-            imap.getMessage({}, function(error) {
-                expect(error).to.exist;
-            });
-        });
-
-        it('should catch stream error', function(done) {
-            var ee = {};
-            ee.pipe = function() {};
-            ee.on = function(event, cb) {
-                if (event === 'error') {
-                    cb(new Error('New Shit Has Come To Light!'));
-                }
-            };
-
-            inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(123, 123).yields(null, [{
-                UID: 123,
-                messageId: 'beepboop',
-                from: 'zuhause@aol.com',
-                to: ['bankrupt@duh.com'],
-                title: 'Hello world!',
-                sentDate: '',
-                flags: ['\\Seen', '\\Answered'],
-                bodystructure: {
-                    part: '1',
-                    type: 'text/plain',
-                    parameters: {
-                        charset: 'utf-8'
-                    },
-                    encoding: 'quoted-printable',
-                    size: 11, // that's not the actual value ...
-                    lines: 1 // that's not the actual value ...
-                }
-            }]);
-            inboxMock.createStream.returns(ee);
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(error.message).to.equal('New Shit Has Come To Light!');
-                expect(message).to.not.exist;
-                done();
-            });
-        });
-
         it('should get flags', function(done) {
             inboxMock.openMailbox.yields();
             inboxMock.fetchFlags.yields(null, ['\\Seen', '\\Answered']);
@@ -883,6 +679,197 @@ define(function(require) {
 
         });
 
+        it('should get plain text', function(done) {
+            var ee = {};
+            ee.on = function(ev, cb) {
+                if (ev === 'data') {
+                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.');
+                } else if (ev === 'end') {
+                    cb();
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '1'
+            }).returns(ee);
+
+            imap.getPlaintext({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    bodystructure: {
+                        part: '1',
+                        type: 'text/plain',
+                        parameters: {
+                            charset: 'utf-8'
+                        },
+                        encoding: 'quoted-printable',
+                        size: 11, // that's not the actual value ...
+                        lines: 1 // that's not the actual value ...
+                    }
+                }
+            }, function(error, msg) {
+                expect(error).to.be.null;
+                expect(msg.uid).to.equal(123);
+                expect(inboxMock.createStream.called).to.be.true;
+                expect(msg.body).to.equal('To read my encrypted message below, simply install Whiteout Mail for Chrome.');
+
+                done();
+            });
+        });
+
+        it('should get plain text from a nested body part', function(done) {
+            var ee = {};
+            ee.on = function(ev, cb) {
+                if (ev === 'data') {
+                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.');
+                } else if (ev === 'end') {
+                    cb();
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '1.1'
+            }).returns(ee);
+
+            imap.getPlaintext({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    bodystructure: {
+                        '1': {
+                            '1': {
+                                part: '1.1',
+                                type: 'text/plain',
+                                parameters: {},
+                                encoding: 'quoted-printable',
+                                size: 1549,
+                                lines: 40
+                            },
+                            '2': {
+                                part: '1.2',
+                                type: 'text/html',
+                                parameters: {},
+                                encoding: 'quoted-printable',
+                                size: 1934,
+                                lines: 43
+                            },
+                            type: 'multipart/alternative'
+                        },
+                        '2': {
+                            part: '2',
+                            type: 'application/x-gpt',
+                            parameters: {
+                                name: 'elements.gp5'
+                            },
+                            encoding: 'base64',
+                            size: 75648,
+                            disposition: [{
+                                type: 'attachment',
+                                filename: 'Doom.gp5'
+                            }]
+                        },
+                        type: 'multipart/mixed'
+                    }
+                }
+            }, function(error, msg) {
+                expect(error).to.be.null;
+                expect(msg.uid).to.equal(123);
+                expect(msg.body).to.equal('To read my encrypted message below, simply install Whiteout Mail for Chrome.');
+                expect(inboxMock.createStream.called).to.be.true;
+
+                done();
+            });
+        });
+
+        it('should not get plain text due to error while opening the mail box', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.getPlaintext({
+                path: 'INBOX',
+                message: {}
+            }, function(error, msg) {
+                expect(error).to.exist;
+                expect(msg).to.not.exist;
+                done();
+            });
+        });
+
+        it('should not get plain text when not logged in', function() {
+            imap._loggedIn = false;
+            imap.getPlaintext({
+                path: 'INBOX',
+                message: {
+                    uid: 123
+                }
+            }, function(error) {
+                expect(error).to.exist;
+            });
+        });
+
+        it('should catch stream error', function(done) {
+            var ee = {};
+            ee.pipe = function() {};
+            ee.on = function(event, cb) {
+                if (event === 'error') {
+                    cb(new Error('New Shit Has Come To Light!'));
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.returns(ee);
+
+            imap.getPlaintext({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    bodystructure: {
+                        '1': {
+                            '1': {
+                                part: '1.1',
+                                type: 'text/plain',
+                                parameters: {},
+                                encoding: 'quoted-printable',
+                                size: 1549,
+                                lines: 40
+                            },
+                            '2': {
+                                part: '1.2',
+                                type: 'text/html',
+                                parameters: {},
+                                encoding: 'quoted-printable',
+                                size: 1934,
+                                lines: 43
+                            },
+                            type: 'multipart/alternative'
+                        },
+                        '2': {
+                            part: '2',
+                            type: 'application/x-gpt',
+                            parameters: {
+                                name: 'elements.gp5'
+                            },
+                            encoding: 'base64',
+                            size: 75648,
+                            disposition: [{
+                                type: 'attachment',
+                                filename: 'Doom.gp5'
+                            }]
+                        },
+                        type: 'multipart/mixed'
+                    }
+                }
+            }, function(error, message) {
+                expect(error).to.exist;
+                expect(message).to.not.exist;
+                done();
+            });
+        });
+
         it('should stream attachments', function(done) {
             var ee = {}, streamBody = false;
             ee.on = function(ev, cb) {
@@ -983,6 +970,146 @@ define(function(require) {
                 done();
             });
         });
+
+        it('should get encrypted message block', function(done) {
+            var ee = {};
+            ee.on = function(ev, cb) {
+                if (ev === 'data') {
+                    cb('insert pgp here.');
+                } else if (ev === 'end') {
+                    cb();
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '2'
+            }).returns(ee);
+
+            imap.getEncryptedMessageBlock({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    bodystructure: {
+                        '1': {
+                            part: '1',
+                            type: 'application/pgp-encrypted',
+                            parameters: {},
+                            encoding: '7bit',
+                            size: 12
+                        },
+                        '2': {
+                            part: '2',
+                            type: 'application/octet-stream',
+                            parameters: {
+                                name: 'encrypted.asc'
+                            },
+                            encoding: '7bit',
+                            size: 4357,
+                            disposition: [{
+                                type: 'inline',
+                                filename: 'encrypted.asc'
+                            }]
+                        },
+                        type: 'multipart/encrypted'
+                    }
+                }
+            }, function(error, pgpBlock) {
+                expect(error).to.be.null;
+                expect(pgpBlock).to.equal('insert pgp here.');
+
+                done();
+            });
+        });
+
+        it('should not get encrypted message block due to stream error', function(done) {
+            var ee = {};
+            ee.pipe = function() {};
+            ee.on = function(event, cb) {
+                if (event === 'error') {
+                    cb(new Error('New Shit Has Come To Light!'));
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.returns(ee);
+
+            imap.getEncryptedMessageBlock({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    bodystructure: {
+                        '1': {
+                            part: '1',
+                            type: 'application/pgp-encrypted',
+                            parameters: {},
+                            encoding: '7bit',
+                            size: 12
+                        },
+                        '2': {
+                            part: '2',
+                            type: 'application/octet-stream',
+                            parameters: {
+                                name: 'encrypted.asc'
+                            },
+                            encoding: '7bit',
+                            size: 4357,
+                            disposition: [{
+                                type: 'inline',
+                                filename: 'encrypted.asc'
+                            }]
+                        },
+                        type: 'multipart/encrypted'
+                    }
+                }
+            }, function(error, pgpBlock) {
+                expect(error).to.exist;
+                expect(pgpBlock).to.not.exist;
+
+                done();
+            });
+        });
+
+        it('should not get encrypted message block due to error while opening mailbox', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+            imap.getEncryptedMessageBlock({
+                path: 'INBOX',
+                message: {}
+            }, function(error, pgpBlock) {
+                expect(error).to.exist;
+                expect(pgpBlock).to.not.exist;
+
+                done();
+            });
+        });
+
+        it('should not get encrypted message block when not logged in', function(done) {
+            imap._loggedIn = false;
+            imap.getEncryptedMessageBlock({}, function(error, pgpBlock) {
+                expect(error).to.exist;
+                expect(pgpBlock).to.not.exist;
+
+                done();
+            });
+        });
+
+        it('should parse decrypted message block', function(done) {
+            imap.parseDecryptedMessageBlock({
+                message: {
+                    attachments: []
+                },
+                block: 'Content-Type: multipart/signed;\r\n boundary="Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710";\r\n    protocol="application/pgp-signature";\r\n   micalg=pgp-sha512\r\n\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710\r\nContent-Type: multipart/mixed;\r\n   boundary="Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D"\r\n\r\nBODY!\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D\r\nContent-Disposition: attachment;\r\n  filename="user test 20131210 dad.md"\r\nContent-Type: application/octet-stream;\r\n x-unix-mode=0644;\r\n   name="user test 20131210 dad.md"\r\nContent-Transfer-Encoding: 7bit\r\n\r\n- sichere und unsichere absender sind sichtbar und unterscheidbar\r\n- was ist ein pgp key?\r\n- hamburger button ist selbsterklaerend, "das kennt man"\r\n- arbeitsweise der app und value assumption sind verstaendlich\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: text/plain;\r\n  charset=us-ascii\r\n\r\n\r\n\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D--\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: attachment;\r\n   filename=signature.asc\r\nContent-Type: application/pgp-signature;\r\n  name=signature.asc\r\nContent-Description: Message signed with OpenPGP using GPGMail\r\n\r\n-----BEGIN PGP SIGNATURE-----\r\nComment: GPGTools - https://gpgtools.org\r\n\r\niQEcBAEBCgAGBQJS1+TtAAoJEDzmUwH7XO/cQoUH/AtZlFzQYLECIxrxj14PFDLP\r\nS36ZYBe2BUBDyGmacqGEGmHYyYbAWWz5ju1YQZq6tfS8YCZpV+YFrXhgx16MSXi6\r\neNC02rb0KztkaI7DlwA+AhfbZ8VwhXkHGKW8zG6fXSgmEoOZbbdHpb8aSshJWWBB\r\nDYUU2SNZQRO2OCuHLr7fGmCzpQGDehcRIhdFTTZIskuYOlGvlj+wDC7qGQ4QWmzi\r\nnaPOA4egdAkbskN3DqYm4Zi/pzR7oVSwQIyaYuh/Vw69m1P48Eg6HndJS6cZWk7m\r\nnA3YnoIna6JTanxRi0/jb2QFDpZ1eQvq8v9qZqTomRivZdqlyxO5/fQIYLhjJvg=\r\n=UF7l\r\n-----END PGP SIGNATURE-----\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710--\r\n'
+            }, function(error, message) {
+                expect(error).to.be.null;
+                expect(message.body).to.exist;
+                expect(message.attachments).to.not.be.empty;
+
+                done();
+            });
+        });
+
+
 
     });
 });
