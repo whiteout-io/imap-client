@@ -536,15 +536,16 @@ define(function(require) {
 
         mailparser.on("end", function(parsed) {
             message.body = parsed.text ? parsed.text : '';
-            parsed.attachments.forEach(function(attmt) {
-                message.attachments.push({
-                    filename: attmt.generatedFileName,
-                    filesize: attmt.length,
-                    mimeType: attmt.contentType,
-                    part: 'n/a',
-                    content: bufferToTypedArray(attmt.content)
+            if (parsed.attachments) {
+                parsed.attachments.forEach(function(attmt) {
+                    message.attachments.push({
+                        filename: attmt.generatedFileName,
+                        filesize: attmt.length,
+                        mimeType: attmt.contentType,
+                        content: bufferToTypedArray(attmt.content)
+                    });
                 });
-            });
+            }
             callback(null, message);
         });
         mailparser.end(options.block);
