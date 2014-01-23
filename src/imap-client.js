@@ -334,7 +334,7 @@ define(function(require) {
      * @param {String} options.path The folder's path
      * @param {Number} options.firstUid The uid of the first message
      * @param {Number} options.lastUid (optional) The uid of the last message. if omitted, lists all availble messages
-     * @param {Function} callback(error, exists) will be called at completion, contains boolean value if the message exists (true), or information if an error occurred.
+     * @param {Function} callback(error, messages) will be called at completion, contains an array of messages with their respective envelope data, or information if an error occurred.
      */
     ImapClient.prototype.listMessagesByUid = function(options, callback) {
         var self = this;
@@ -352,10 +352,6 @@ define(function(require) {
 
             self._client.uidListMessages(options.firstUid, options.lastUid, function(error, messages) {
                 var i, email, emails;
-
-                if (!callback) {
-                    return;
-                }
 
                 emails = [];
                 i = messages.length;
