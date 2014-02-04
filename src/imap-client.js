@@ -351,39 +351,64 @@ define(function(require) {
                 return;
             }
 
-            self._client.uidListMessages(options.firstUid, options.lastUid, function(error, messages) {
-                var i, emails, email, attachments;
+            self._client.uidListMessages(options.firstUid, options.lastUid, function(error, mails) {
+                var i, customMailObjects, customMailObj, mail, attachments, encryptedBodypart;
 
                 if (!callback) {
                     return;
                 }
 
-                emails = [];
-                i = messages.length;
+                customMailObjects = [];
+                i = mails.length;
                 while (i--) {
-                    email = messages[i];
-                    email.flags = email.flags || [];
-                    email.messageId = email.messageId.replace(/[<>]/g, '');
+                    mail = mails[i];
+                    mail.flags = mail.flags || [];
+                    mail.messageId = mail.messageId.replace(/[<>]/g, '');
                     attachments = [];
-                    findAttachments(email.bodystructure, attachments);
-                    emails.push({
-                        uid: email.UID,
-                        id: email.messageId,
-                        from: [email.from],
-                        to: email.to,
-                        cc: email.cc,
-                        bcc: email.bcc,
-                        subject: email.title,
+                    findAttachments(mail.bodystructure, attachments);
+                    customMailObj = {
+                        uid: mail.UID,
+                        id: mail.messageId,
+                        from: [mail.from],
+                        to: mail.to,
+                        cc: mail.cc,
+                        bcc: mail.bcc,
+                        subject: mail.title,
                         body: null,
-                        sentDate: email.date,
-                        unread: email.flags.indexOf('\\Seen') === -1,
-                        answered: email.flags.indexOf('\\Answered') > -1,
-                        bodystructure: email.bodystructure,
-                        attachments: attachments,
-                        isEncrypted: email.bodystructure.type === 'multipart/encrypted'
-                    });
+                        sentDate: mail.date,
+                        unread: mail.flags.indexOf('\\Seen') === -1,
+                        answered: mail.flags.indexOf('\\Answered') > -1,
+                        bodystructure: mail.bodystructure,
+                        attachments: attachments
+                    };
+
+                    encryptedBodypart = findEncryptedPart(mail.bodystructure);
+                    if (typeof encryptedBodypart !== 'undefined') {
+                        customMailObj.isEncrypted = true;
+                        customMailObj.encryptedBodypart = encryptedBodypart;
+                    }
+                    customMailObjects.push(customMailObj);
                 }
-                callback(error, emails);
+                callback(error, customMailObjects);
+
+                // looks for a 'multipart/encrypted' mime node in the bodystructure in a DFS
+                function findEncryptedPart(structure) {
+                    var part;
+
+                    // the standard demands that the pgp payload be in the second child node of multipart/encrypted
+                    if (structure.type && structure.type === 'multipart/encrypted' && structure['2']) {
+                        return structure['2'];
+                    } else if (structure.type.indexOf('multipart/') === 0) {
+                        // this is a multipart/* part, we have to go deeper
+                        for (var i = 1; typeof structure[i] !== 'undefined'; i++) {
+                            part = findEncryptedPart(structure[i], attachments);
+                            if (part) {
+                                // we have found the encrypted body part, no need to look any further!
+                                return part;
+                            }
+                        }
+                    }
+                }
 
                 // looks for attachments in the bodystructure in a DFS
                 function findAttachments(structure, attachments) {
@@ -455,7 +480,7 @@ define(function(require) {
             // if the message is encrypted, stream the cypher text, otherwise just get the plain text parts
             if (msg.isEncrypted) {
                 // body part 2 is the pgp part, see http://tools.ietf.org/search/rfc3156, p. 2f
-                plaintextParts.push(msg.bodystructure['2']);
+                plaintextParts.push(msg.encryptedBodypart);
             } else {
                 // look up plain text body parts
                 walkBodystructure(msg.bodystructure);

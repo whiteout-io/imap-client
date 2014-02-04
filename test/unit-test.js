@@ -375,8 +375,7 @@ define(function(require) {
 
 
         it('should list messages by uid', function(done) {
-            inboxMock.openMailbox.withArgs('foobar').yields();
-            inboxMock.uidListMessages.withArgs(1, 2).yields(null, [{
+            var listing = [{
                 UID: 1,
                 messageId: 'beepboop',
                 from: 'zuhause@aol.com',
@@ -429,28 +428,72 @@ define(function(require) {
                     size: 13,
                     lines: 2
                 }
-            }]);
+            }, {
+                UID: 3,
+                messageId: 'ajabwelvzbslvnasd',
+                from: 'god@aol.com',
+                to: ['devil@aol.com'],
+                title: 'we broke, man.',
+                sentDate: '',
+                flags: ['\\Seen', '\\Answered'],
+                bodystructure: {
+                    1: {
+                        part: '1',
+                        type: 'text/plain',
+                        parameters: {
+                            charset: 'us-ascii'
+                        },
+                        encoding: '7bit',
+                        size: 13,
+                        lines: 2
+                    },
+                    2: {
+                        part: '1',
+                        type: 'multipart/encrypted',
+                        1: {
+                            part: '2.1',
+                            type: 'application/pgp-encrypted',
+                            encoding: '7bit'
+                        },
+                        2: {
+                            part: '2.2',
+                            type: 'application/octet-stream',
+                            encoding: '7bit'
+                        }
+                    },
+                    type: 'multipart/mixed'
+                }
+            }];
+            inboxMock.openMailbox.withArgs('foobar').yields();
+            inboxMock.uidListMessages.withArgs(1, 2).yields(null, listing);
             imap.listMessagesByUid({
                 path: 'foobar',
                 firstUid: 1,
                 lastUid: 2
             }, function(error, msgs) {
                 expect(error).to.be.null;
-                expect(msgs.length).to.equal(2);
-                expect(msgs[0].uid).to.equal(2);
-                expect(msgs[0].id).to.equal('beepboop');
-                expect(msgs[0].from).to.be.instanceof(Array);
-                expect(msgs[0].to).to.be.instanceof(Array);
-                expect(msgs[0].subject).to.equal('SHIAAAT');
-                expect(msgs[0].unread).to.be.false;
-                expect(msgs[0].answered).to.be.true;
-                expect(msgs[0].attachments).to.be.empty;
-                expect(msgs[1].attachments).to.not.be.empty;
-                expect(msgs[1].attachments[0].filename).to.equal('foobar.md');
-                expect(msgs[1].attachments[0].filesize).to.equal(211);
-                expect(msgs[1].attachments[0].mimeType).to.equal('text/x-markdown');
-                expect(msgs[1].attachments[0].part).to.equal('2');
-                expect(msgs[1].attachments[0].content).to.be.null;
+                expect(msgs.length).to.equal(3);
+
+                expect(msgs[0].uid).to.equal(3);
+                expect(msgs[0].isEncrypted).to.be.true;
+                expect(msgs[0].encryptedBodypart).to.equal(listing[2].bodystructure[2][2]);
+
+                expect(msgs[1].uid).to.equal(2);
+                expect(msgs[1].id).to.equal('beepboop');
+                expect(msgs[1].from).to.be.instanceof(Array);
+                expect(msgs[1].to).to.be.instanceof(Array);
+                expect(msgs[1].subject).to.equal('SHIAAAT');
+                expect(msgs[1].unread).to.be.false;
+                expect(msgs[1].answered).to.be.true;
+                expect(msgs[1].attachments).to.be.empty;
+
+                expect(msgs[2].attachments).to.not.be.empty;
+                expect(msgs[2].attachments[0].filename).to.equal('foobar.md');
+                expect(msgs[2].attachments[0].filesize).to.equal(211);
+                expect(msgs[2].attachments[0].mimeType).to.equal('text/x-markdown');
+                expect(msgs[2].attachments[0].part).to.equal('2');
+                expect(msgs[2].attachments[0].content).to.be.null;
+
                 done();
             });
         });
