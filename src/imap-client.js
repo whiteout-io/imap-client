@@ -528,6 +528,10 @@ define(function(require) {
                     // there are plain-text body parts left to stream
                     streamBodyPart(plaintextParts.shift());
                 } else {
+                    // clean up the dto
+                    delete msg.isEncrypted;
+                    delete msg.encryptedBodypart;
+
                     // there are no plain-text body parts left, we're done.
                     callback(null, msg);
                 }
