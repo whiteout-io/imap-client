@@ -32,6 +32,9 @@ describe('ImapClient integration tests', function() {
         }, {
             raw: 'Date: Tue, 15 Oct 2013 10:51:57 +0000\r\nMessage-ID: <123123@foobar>\r\nFrom: bla@blubb.io\r\nTo: blubb@bla.com\r\nSubject: blablubb\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nMIME-Version: 1.0\r\n\r\nblubb bla',
             flags: ['\\Seen']
+        }, {
+            raw: 'Content-Type: multipart/encrypted; boundary="Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69"; protocol="application/pgp-encrypted";\r\nSubject: [whiteout] attachment only\r\nFrom: Felix Hammerl <felix.hammerl@gmail.com>\r\nDate: Thu, 16 Jan 2014 14:55:56 +0100\r\nContent-Transfer-Encoding: 7bit\r\nMessage-Id: <3ECDF9DC-895E-4475-B2A9-52AF1F117652@gmail.com>\r\nContent-Description: OpenPGP encrypted message\r\nTo: safewithme.testuser@gmail.com\r\n\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: application/pgp-encrypted\r\nContent-Description: PGP/MIME Versions Identification\r\n\r\nVersion: 1\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: inline;\r\n    filename=encrypted.asc\r\nContent-Type: application/octet-stream;\r\n    name=encrypted.asc\r\nContent-Description: OpenPGP encrypted message\r\n\r\ninsert pgp here.\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69--',
+            flags: []
         }];
         server = hoodiecrow({
             storage: {
@@ -174,7 +177,7 @@ describe('ImapClient integration tests', function() {
         }, function(error, messages) {
             expect(error).to.not.exist;
             expect(messages).to.not.be.empty;
-            expect(messages.length).to.equal(3);
+            expect(messages.length).to.equal(4);
             done();
         });
     });
@@ -187,6 +190,18 @@ describe('ImapClient integration tests', function() {
             expect(error).to.not.exist;
             expect(message).to.exist;
             expect(message.body).to.equal("Hello world");
+            done();
+        });
+    });
+
+    it('should get cyphertext of an encrypted message', function(done) {
+        ic.getMessage({
+            path: 'INBOX',
+            uid: 4
+        }, function(error, message) {
+            expect(error).to.not.exist;
+            expect(message).to.exist;
+            expect(message.body).to.equal("insert pgp here.\r\n");
             done();
         });
     });
@@ -267,6 +282,29 @@ describe('ImapClient integration tests', function() {
             expect(error).to.not.exist;
 
             done();
+        });
+    });
+
+    it('should get attachments', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 2,
+            lastUid: 2
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+
+            ic.getAttachment({
+                path: 'INBOX',
+                uid: messages[0].uid,
+                attachment: messages[0].attachments[0]
+            }, function(error, attachment) {
+                expect(error).to.not.exist;
+                expect(attachment).to.exist;
+                expect(attachment.content).to.exist;
+                expect(attachment.progress).to.equal(1);
+
+                done();
+            });
         });
     });
 });

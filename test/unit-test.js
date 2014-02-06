@@ -375,15 +375,41 @@ define(function(require) {
 
 
         it('should list messages by uid', function(done) {
-            inboxMock.openMailbox.withArgs('foobar').yields();
-            inboxMock.uidListMessages.withArgs(1, 2).yields(null, [{
+            var listing = [{
                 UID: 1,
                 messageId: 'beepboop',
                 from: 'zuhause@aol.com',
                 to: ['bankrupt@duh.com'],
                 title: 'SHIAAAT',
                 sentDate: '',
-                flags: ['\\Seen', '\\Answered']
+                flags: ['\\Seen', '\\Answered'],
+                bodystructure: {
+                    '1': {
+                        part: '1',
+                        type: 'text/plain',
+                        parameters: {
+                            charset: 'us-ascii'
+                        },
+                        encoding: '7bit',
+                        size: 13,
+                        lines: 2
+                    },
+                    '2': {
+                        part: '2',
+                        type: 'application/octet-stream',
+                        parameters: {
+                            name: 'foobar.md',
+                            'x-unix-mode': '0644'
+                        },
+                        encoding: '7bit',
+                        size: 211,
+                        disposition: [{
+                            type: 'attachment',
+                            filename: 'foobar.md'
+                        }]
+                    },
+                    type: 'multipart/mixed'
+                }
             }, {
                 UID: 2,
                 messageId: 'beepboop',
@@ -391,22 +417,83 @@ define(function(require) {
                 to: ['bankrupt@duh.com'],
                 title: 'SHIAAAT',
                 sentDate: '',
-                flags: ['\\Seen', '\\Answered']
-            }]);
+                flags: ['\\Seen', '\\Answered'],
+                bodystructure: {
+                    part: '1',
+                    type: 'text/plain',
+                    parameters: {
+                        charset: 'us-ascii'
+                    },
+                    encoding: '7bit',
+                    size: 13,
+                    lines: 2
+                }
+            }, {
+                UID: 3,
+                messageId: 'ajabwelvzbslvnasd',
+                from: 'god@aol.com',
+                to: ['devil@aol.com'],
+                title: 'we broke, man.',
+                sentDate: '',
+                flags: ['\\Seen', '\\Answered'],
+                bodystructure: {
+                    1: {
+                        part: '1',
+                        type: 'text/plain',
+                        parameters: {
+                            charset: 'us-ascii'
+                        },
+                        encoding: '7bit',
+                        size: 13,
+                        lines: 2
+                    },
+                    2: {
+                        part: '1',
+                        type: 'multipart/encrypted',
+                        1: {
+                            part: '2.1',
+                            type: 'application/pgp-encrypted',
+                            encoding: '7bit'
+                        },
+                        2: {
+                            part: '2.2',
+                            type: 'application/octet-stream',
+                            encoding: '7bit'
+                        }
+                    },
+                    type: 'multipart/mixed'
+                }
+            }];
+            inboxMock.openMailbox.withArgs('foobar').yields();
+            inboxMock.uidListMessages.withArgs(1, 2).yields(null, listing);
             imap.listMessagesByUid({
                 path: 'foobar',
                 firstUid: 1,
                 lastUid: 2
-            }, function(error, unreadMessages) {
+            }, function(error, msgs) {
                 expect(error).to.be.null;
-                expect(unreadMessages.length).to.equal(2);
-                expect(unreadMessages[0].uid).to.equal(2);
-                expect(unreadMessages[0].id).to.equal('beepboop');
-                expect(unreadMessages[0].from).to.be.instanceof(Array);
-                expect(unreadMessages[0].to).to.be.instanceof(Array);
-                expect(unreadMessages[0].subject).to.equal('SHIAAAT');
-                expect(unreadMessages[0].unread).to.be.false;
-                expect(unreadMessages[0].answered).to.be.true;
+                expect(msgs.length).to.equal(3);
+
+                expect(msgs[0].uid).to.equal(3);
+                expect(msgs[0].isEncrypted).to.be.true;
+                expect(msgs[0].encryptedBodypart).to.equal(listing[2].bodystructure[2][2]);
+
+                expect(msgs[1].uid).to.equal(2);
+                expect(msgs[1].id).to.equal('beepboop');
+                expect(msgs[1].from).to.be.instanceof(Array);
+                expect(msgs[1].to).to.be.instanceof(Array);
+                expect(msgs[1].subject).to.equal('SHIAAAT');
+                expect(msgs[1].unread).to.be.false;
+                expect(msgs[1].answered).to.be.true;
+                expect(msgs[1].attachments).to.be.empty;
+
+                expect(msgs[2].attachments).to.not.be.empty;
+                expect(msgs[2].attachments[0].filename).to.equal('foobar.md');
+                expect(msgs[2].attachments[0].filesize).to.equal(211);
+                expect(msgs[2].attachments[0].mimeType).to.equal('text/x-markdown');
+                expect(msgs[2].attachments[0].part).to.equal('2');
+                expect(msgs[2].attachments[0].content).to.be.null;
+
                 done();
             });
         });
@@ -839,5 +926,120 @@ define(function(require) {
 
         });
 
+        it('should stream attachments', function(done) {
+            var ee = {}, streamBody = false;
+            ee.on = function(ev, cb) {
+                if (ev === 'data') {
+                    if (!streamBody) {
+                        cb('Content-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\n');
+                        streamBody = true;
+                    } else {
+                        cb('Zm9vZm9vZm9vZm9vZm9v\r\n');
+                    }
+                } else if (ev === 'end') {
+                    cb();
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '2'
+            }).returns(ee);
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '2.MIME'
+            }).returns(ee);
+
+            imap.getAttachment({
+                path: 'INBOX',
+                uid: 123,
+                attachment: {
+                    filename: 'foo.txt',
+                    filesize: 20,
+                    mimeType: 'text/plain',
+                    part: '2'
+                }
+            }, function(error, attmt) {
+                expect(error).to.be.null;
+                expect(attmt).to.exist;
+                expect(attmt.content).to.exist;
+                expect(attmt.progress).to.equal(1);
+
+                done();
+            });
+        });
+
+        it('should not stream attachments when not logged in', function() {
+            imap._loggedIn = false;
+            imap.getAttachment({}, function(error) {
+                expect(error).to.exist;
+            });
+        });
+
+        it('should not stream attachments due to error while opening the mail box', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.getAttachment({
+                path: 'INBOX',
+                uid: 123,
+                attachment: {
+                    filename: 'foo.txt',
+                    filesize: 20,
+                    mimeType: 'text/plain',
+                    part: '2'
+                }
+            }, function(error, attmt) {
+                expect(error).to.exist;
+                expect(attmt).to.not.exist;
+                done();
+            });
+        });
+
+        it('should not stream attachments due to stream error', function(done) {
+            var ee = {};
+            ee.on = function(event, cb) {
+                if (event === 'error') {
+                    cb(new Error('New Shit Has Come To Light!'));
+                }
+            };
+
+            inboxMock.openMailbox.yields();
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '2.MIME'
+            }).returns(ee);
+
+
+            imap.getAttachment({
+                path: 'INBOX',
+                uid: 123,
+                attachment: {
+                    filename: 'foo.txt',
+                    filesize: 20,
+                    mimeType: 'text/plain',
+                    part: '2'
+                }
+            }, function(error, attmt) {
+                expect(error).to.exist;
+                expect(attmt).to.not.exist;
+                done();
+            });
+        });
+
+        it('should parse decrypted message block', function(done) {
+            imap.parseDecryptedMessageBlock({
+                message: {
+                    attachments: []
+                },
+                block: 'Content-Type: multipart/signed;\r\n boundary="Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710";\r\n    protocol="application/pgp-signature";\r\n   micalg=pgp-sha512\r\n\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710\r\nContent-Type: multipart/mixed;\r\n   boundary="Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D"\r\n\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D\r\nContent-Disposition: attachment;\r\n  filename="user test 20131210 dad.md"\r\nContent-Type: application/octet-stream;\r\n x-unix-mode=0644;\r\n   name="user test 20131210 dad.md"\r\nContent-Transfer-Encoding: 7bit\r\n\r\n- sichere und unsichere absender sind sichtbar und unterscheidbar\r\n- was ist ein pgp key?\r\n- hamburger button ist selbsterklaerend, "das kennt man"\r\n- arbeitsweise der app und value assumption sind verstaendlich\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: text/plain;\r\n  charset=us-ascii\r\n\r\n\r\n\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D--\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: attachment;\r\n   filename=signature.asc\r\nContent-Type: application/pgp-signature;\r\n  name=signature.asc\r\nContent-Description: Message signed with OpenPGP using GPGMail\r\n\r\n-----BEGIN PGP SIGNATURE-----\r\nComment: GPGTools - https://gpgtools.org\r\n\r\niQEcBAEBCgAGBQJS1+TtAAoJEDzmUwH7XO/cQoUH/AtZlFzQYLECIxrxj14PFDLP\r\nS36ZYBe2BUBDyGmacqGEGmHYyYbAWWz5ju1YQZq6tfS8YCZpV+YFrXhgx16MSXi6\r\neNC02rb0KztkaI7DlwA+AhfbZ8VwhXkHGKW8zG6fXSgmEoOZbbdHpb8aSshJWWBB\r\nDYUU2SNZQRO2OCuHLr7fGmCzpQGDehcRIhdFTTZIskuYOlGvlj+wDC7qGQ4QWmzi\r\nnaPOA4egdAkbskN3DqYm4Zi/pzR7oVSwQIyaYuh/Vw69m1P48Eg6HndJS6cZWk7m\r\nnA3YnoIna6JTanxRi0/jb2QFDpZ1eQvq8v9qZqTomRivZdqlyxO5/fQIYLhjJvg=\r\n=UF7l\r\n-----END PGP SIGNATURE-----\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710--\r\n'
+            }, function(error, message) {
+                expect(error).to.be.null;
+                expect(message.body).to.exist;
+                expect(message.attachments).to.not.be.empty;
+
+                done();
+            });
+        });
     });
 });
