@@ -8,7 +8,6 @@ define(function(require) {
     var inbox = require('inbox'),
         mime = require("mime"),
         MailParser = require('mailparser').MailParser,
-        mimelib = require('mimelib'),
         ImapClient;
 
     require('setimmediate');
@@ -345,209 +344,226 @@ define(function(require) {
             return;
         }
 
+
+        // 
+        // matchers for the mime tree
+        // 
+        // note: i did not put them in the forEach loop because re-declaring them in each iteration seems redundant.
+        // 
+
+        // look for nodes that contain well-formed pgp/mime and add them to the list of body parts. (bind to mailObj!)
+        var handlePgpMime = function(node) {
+            if (!(node.type && node.type === 'multipart/encrypted' && node['2'])) {
+                return false;
+            }
+
+            // as the standard dictates, the second child node of a multipart/encrypted node contains the pgp payload
+            this.textParts.push(node['2']);
+            return true;
+        };
+
+        // look for text/plain nodes that are not attachments and add them to the list of body parts. (bind to mailObj!)
+        var handlePlainText = function(node) {
+            if (!(node.type.indexOf('text/plain') === 0 && !node.disposition)) {
+                return false;
+            }
+
+            this.textParts.push(node);
+            return true;
+        };
+
+        // look for attachment nodes and add all of them to the array of attachments. (bind to mailObj!)
+        var handleAttachment = function(node) {
+            var self = this;
+
+            if (!node.disposition) {
+                return false;
+            }
+
+            node.disposition.forEach(function(attmt) {
+                // if we have a generic content type, try to infer the mime type based on the file ending
+                var mimeType = node.type;
+                if (mimeType === "application/octet-stream") {
+                    mimeType = mime.lookup(attmt.filename.split(".").pop().toLowerCase());
+                }
+
+                self.attachments.push({
+                    filename: attmt.filename,
+                    filesize: node.size,
+                    mimeType: mimeType,
+                    part: node.part,
+                    content: null
+                });
+            });
+            return true;
+        };
+
+        // open the mailbox
         self._client.openMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.uidListMessages(options.firstUid, options.lastUid, function(error, mails) {
-                var i, customMailObjects, customMailObj, mail, attachments, encryptedBodypart;
-
-                if (!callback) {
-                    return;
-                }
-
-                customMailObjects = [];
-                i = mails.length;
-                while (i--) {
-                    mail = mails[i];
-                    mail.flags = mail.flags || [];
-                    mail.messageId = mail.messageId.replace(/[<>]/g, '');
-                    attachments = [];
-                    findAttachments(mail.bodystructure, attachments);
-                    customMailObj = {
-                        uid: mail.UID,
-                        id: mail.messageId,
-                        from: [mail.from],
-                        to: mail.to,
-                        cc: mail.cc,
-                        bcc: mail.bcc,
-                        subject: mail.title,
-                        body: null,
-                        sentDate: mail.date,
-                        unread: mail.flags.indexOf('\\Seen') === -1,
-                        answered: mail.flags.indexOf('\\Answered') > -1,
-                        bodystructure: mail.bodystructure,
-                        attachments: attachments
-                    };
-
-                    encryptedBodypart = findEncryptedPart(mail.bodystructure);
-                    if (typeof encryptedBodypart !== 'undefined') {
-                        customMailObj.isEncrypted = true;
-                        customMailObj.encryptedBodypart = encryptedBodypart;
-                    }
-                    customMailObjects.push(customMailObj);
-                }
-                callback(error, customMailObjects);
-
-                // looks for a 'multipart/encrypted' mime node in the bodystructure in a DFS
-                function findEncryptedPart(structure) {
-                    var part;
-
-                    // the standard demands that the pgp payload be in the second child node of multipart/encrypted
-                    if (structure.type && structure.type === 'multipart/encrypted' && structure['2']) {
-                        return structure['2'];
-                    } else if (structure.type.indexOf('multipart/') === 0) {
-                        // this is a multipart/* part, we have to go deeper
-                        for (var i = 1; typeof structure[i] !== 'undefined'; i++) {
-                            part = findEncryptedPart(structure[i], attachments);
-                            if (part) {
-                                // we have found the encrypted body part, no need to look any further!
-                                return part;
-                            }
-                        }
-                    }
-                }
-
-                // looks for attachments in the bodystructure in a DFS
-                function findAttachments(structure, attachments) {
-                    if (structure.disposition) {
-                        // we got ourselves an attachment, let's remember it. ignore inline attachments!
-                        structure.disposition.forEach(function(attmt) {
-                            if (attmt.type !== 'attachment') {
-                                return;
-                            }
-
-                            var mimeType = (structure.type === "application/octet-stream") ? mime.lookup(attmt.filename.split(".").pop().toLowerCase()) : structure.type;
-                            attachments.push({
-                                filename: attmt.filename,
-                                filesize: structure.size,
-                                mimeType: mimeType,
-                                part: structure.part,
-                                content: null
-                            });
-                        });
-                    } else if (structure.type.indexOf('multipart/') === 0) {
-                        // this is a multipart/* part, we have to go deeper
-                        for (var i = 1; typeof structure[i] !== 'undefined'; i++) {
-                            findAttachments(structure[i], attachments);
-                        }
-                    }
-                }
-            });
+            self._client.uidListMessages(options.firstUid, options.lastUid, processHeaders);
         });
-    };
 
-    /**
-     * Fetches the message from the server
-     * @param {String} options.path The folder's path
-     * @param {Number} options.uid The uid of the message
-     * @param {Function} callback(error, message) will be called the message is parsed
-     */
-    ImapClient.prototype.getMessage = function(options, callback) {
-        var self = this;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not get message preview for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
-            return;
-        }
-
-        self.listMessagesByUid({
-            path: options.path,
-            firstUid: options.uid,
-            lastUid: options.uid
-        }, function(error, msgs) {
+        // process what inbox returns into a usable form for our client
+        function processHeaders(error, mails) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            if (msgs.length === 0) {
-                callback(new Error('Message with uid ' + options.uid + ' does not exist'));
+            var processedMails = [];
+            mails.forEach(function(mail) {
+                mail.flags = mail.flags || [];
+                mail.messageId = mail.messageId.replace(/[<>]/g, '');
+
+                // construct a cleansed mail object
+                var processedMail = {
+                    uid: mail.UID,
+                    id: mail.messageId,
+                    from: [mail.from],
+                    to: mail.to,
+                    cc: mail.cc,
+                    bcc: mail.bcc,
+                    subject: mail.title,
+                    body: null,
+                    sentDate: mail.date,
+                    unread: mail.flags.indexOf('\\Seen') === -1,
+                    answered: mail.flags.indexOf('\\Answered') > -1,
+                    bodystructure: mail.bodystructure,
+                    attachments: [],
+                    textParts: []
+                };
+
+                processedMails.push(processedMail);
+
+                // walk the mime tree to find pgp/mime nodes
+                walkMimeTree(processedMail.bodystructure, handlePgpMime.bind(processedMail));
+                if (processedMail.textParts.length > 0) {
+                    // the mail contains pgp/mime, so forget about the plain text stuff and attachments
+                    return;
+                }
+
+                // the mail does not contain pgp/mime, so find all the plain text body parts and attachments
+                walkMimeTree(processedMail.bodystructure, handlePlainText.bind(processedMail));
+                walkMimeTree(processedMail.bodystructure, handleAttachment.bind(processedMail));
+            });
+
+            callback(null, processedMails);
+        }
+    };
+
+    /**
+     * Stream the message from the server
+     * @param {String} options.path The folder's path
+     * @param {Number} options.message The message
+     * @param {Function} callback(error, message) will be called the message is parsed
+     */
+    ImapClient.prototype.streamPlaintext = function(options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not get message preview for uid ' + options.message.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            return;
+        }
+
+        if (options.message.textParts.length === 0) {
+            // there are no plain text parts
+            options.message.body = 'This message contains no text content.';
+            callback(null, options.message);
+            return;
+        }
+
+        self._client.openMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
                 return;
             }
 
-            var msg = msgs[0],
-                plaintextParts = [],
-                stream,
-                currentBodypart,
-                currentPlaintext;
+            // set an empty body to which text will be appended
+            options.message.body = '';
 
-            // give the message a body
-            msg.body = '';
+            /*
+             * to be able to use mailparser, we have to piece together one node of the message, e.g.
+             * if the attachment is in body part 2, we cannot simply fetch body part 2, since the headers are missing.
+             * however, we fetch the MIME-headers and piece them together with the payload of the body part,
+             * so that mailparser can nicely parse them.
+             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the
+             * payload, in order to not end() the mailparser stream prematurely.
+             */
+            var stream, mailparser,
+                streamHeader = true, // helper flag if we're streaming MIME-headers or text content
+                currentTextpart; // helper flag if the MIME-headers are done
 
-            // if the message is encrypted, stream the cypher text, otherwise just get the plain text parts
-            if (msg.isEncrypted) {
-                // body part 2 is the pgp part, see http://tools.ietf.org/search/rfc3156, p. 2f
-                plaintextParts.push(msg.encryptedBodypart);
-            } else {
-                // look up plain text body parts
-                walkBodystructure(msg.bodystructure);
-            }
+            // start streaming text parts
+            streamNextPart();
 
-            // there are no plain text parts, we're done
-            if (plaintextParts.length === 0) {
-                callback(null, msg);
-                return;
-            }
+            // set up the stream
+            function streamNextPart() {
+                // are there are more text parts left to stream?
+                // if not, we're done here.
+                if (options.message.textParts.length === 0 && !currentTextpart) {
+                    callback(null, options.message);
+                    return;
+                }
 
-            // start by streaming the body parts
-            streamBodyPart(plaintextParts.shift());
+                // we need to get the next body part
+                if (streamHeader) {
+                    currentTextpart = options.message.textParts.shift();
+                    mailparser = new MailParser();
+                    mailparser.on('end', function(parsed) {
+                        // the mailparser parses the pgp/mime attachments, so we need to do a little extra work here
+                        var text = parsed.text || parsed.attachments[0].content.toString('binary');
 
-            function streamBodyPart(bodypart) {
-                currentBodypart = bodypart;
-                currentPlaintext = '';
+                        // remove the unnecessary \n and \r\n at the end of the string...
+                        text = text.replace(/[\r]?\n$/g, '');
 
-                // let's stream them one by one
+                        // the mailparser parsed the content of the text node, so let's add it to the mail body
+                        options.message.body += text;
+
+                        // the current part parsed, so let's stream the next text part
+                        streamHeader = true;
+                        currentTextpart = undefined;
+                        streamNextPart();
+                    });
+
+                }
+
                 stream = self._client.createStream({
-                    uid: options.uid,
-                    part: currentBodypart.part
+                    uid: options.message.uid,
+                    part: currentTextpart.part + (streamHeader ? '.MIME' : '') // according to RFC3501 the MIME headers for part '1' are '1.MIME'
                 });
                 stream.on('error', callback);
                 stream.on('data', onData);
                 stream.on('end', onEnd);
             }
 
+            // just forward all the 'data' events to the mailparser and update attachment.progress
             function onData(chunk) {
-                if (chunk) {
-                    currentPlaintext += (typeof chunk === 'string') ? chunk : chunk.toString('binary');
+                if (!chunk) {
+                    return;
                 }
+
+                // write to mailparser                
+                mailparser.write(chunk);
             }
 
+            // do *not* forward the first 'end' event to the mailparser, we don't
+            // want to close the parser stream after the headers are done.
+            // this is why we can't simply pipe the streams to the parser.
             function onEnd(chunk) {
                 onData(chunk);
 
-                // strip quoted-printable, if necessary
-                if (currentBodypart.encoding === 'quoted-printable') {
-                    currentPlaintext = mimelib.decodeQuotedPrintable(currentPlaintext);
-                }
-                msg.body += currentPlaintext;
-
-                if (plaintextParts.length > 0) {
-                    // there are plain-text body parts left to stream
-                    streamBodyPart(plaintextParts.shift());
+                if (streamHeader) {
+                    // we have the mime header, now stream the attachment's raw payload
+                    streamHeader = false;
+                    streamNextPart();
                 } else {
-                    // clean up the dto
-                    delete msg.isEncrypted;
-                    delete msg.encryptedBodypart;
-
-                    // there are no plain-text body parts left, we're done.
-                    callback(null, msg);
-                }
-            }
-
-            // looks for text/plain parts in the bodystructure in a DFS
-            // we are not interested in any other types than text/plain
-            function walkBodystructure(structure) {
-                if (structure.type.indexOf('text/plain') === 0 && typeof structure.disposition === 'undefined') {
-                    // we got ourselves a non-attachment text/plain part, let's remember it.
-                    plaintextParts.push(structure);
-                } else if (structure.type.indexOf('multipart/') === 0) {
-                    // this is a multipart/* part, we have to go deeper
-                    for (var i = 1; typeof structure[i] !== 'undefined'; i++) {
-                        walkBodystructure(structure[i]);
-                    }
+                    // parse the whole attachment
+                    mailparser.end();
                 }
             }
         });
@@ -815,7 +831,15 @@ define(function(require) {
         });
     };
 
-    // helper function to convert from a node buffer to a typed array
+    //
+    // Helper Methods
+    //
+
+    /**
+     * Turns a node-style buffer into a typed array
+     * @param  {Buffer} buffer A node-style buffer
+     * @return {Uint8Array}    Uint8Array view on the ArrayBuffer
+     */
     function bufferToTypedArray(buffer) {
         var ab = new ArrayBuffer(buffer.length),
             view = new Uint8Array(ab),
@@ -826,6 +850,27 @@ define(function(require) {
         }
         return view;
     }
+
+    /**
+     * Helper function that walks the mime tree in a dfs and calls back every time it has found a node the matches the search
+     * @param  {Object}   mimeNode  The initial mime-node whose subtree should be traversed
+     * @param  {function} handler   Callback invoked with the current mime node. Returns true if the mime node was interesting, returns false to go deeper.
+     */
+    function walkMimeTree(mimeNode, handler) {
+        if (handler(mimeNode)) {
+            // the node was interesting, so no need to look further down the mime tree
+            return;
+        }
+
+        if (mimeNode.type.indexOf('multipart/') === 0) {
+            // this is a multipart/* part, we have to go deeper
+            for (var i = 1; typeof mimeNode[i] !== 'undefined'; i++) {
+                walkMimeTree(mimeNode[i], handler);
+            }
+        }
+    }
+
+
 
     return ImapClient;
 });
