@@ -475,6 +475,7 @@ define(function(require) {
                 expect(msgs.length).to.equal(3);
 
                 expect(msgs[2].uid).to.equal(3);
+                expect(msgs[2].encrypted).to.be.true;
                 expect(msgs[2].textParts[0]).to.equal(listing[2].bodystructure[2][2]);
 
                 expect(msgs[1].uid).to.equal(2);
@@ -486,6 +487,7 @@ define(function(require) {
                 expect(msgs[1].answered).to.be.true;
                 expect(msgs[1].attachments).to.be.empty;
                 expect(msgs[1].textParts[0]).to.equal(listing[1].bodystructure);
+                expect(msgs[1].encrypted).to.be.false;
 
                 expect(msgs[0].attachments).to.not.be.empty;
                 expect(msgs[0].attachments[0].filename).to.equal('foobar.md');
@@ -494,6 +496,7 @@ define(function(require) {
                 expect(msgs[0].attachments[0].part).to.equal('2');
                 expect(msgs[0].attachments[0].content).to.be.null;
                 expect(msgs[0].textParts[0]).to.equal(listing[0].bodystructure[1]);
+                expect(msgs[0].encrypted).to.be.false;
 
                 done();
             });

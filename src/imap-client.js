@@ -443,10 +443,12 @@ define(function(require) {
                 // walk the mime tree to find pgp/mime nodes
                 walkMimeTree(processedMail.bodystructure, handlePgpMime.bind(processedMail));
                 if (processedMail.textParts.length > 0) {
+                    processedMail.encrypted = true;
                     // the mail contains pgp/mime, so forget about the plain text stuff and attachments
                     return;
                 }
 
+                processedMail.encrypted = false;
                 // the mail does not contain pgp/mime, so find all the plain text body parts and attachments
                 walkMimeTree(processedMail.bodystructure, handlePlainText.bind(processedMail));
                 walkMimeTree(processedMail.bodystructure, handleAttachment.bind(processedMail));
