@@ -474,9 +474,9 @@ define(function(require) {
                 expect(error).to.be.null;
                 expect(msgs.length).to.equal(3);
 
-                expect(msgs[0].uid).to.equal(3);
-                expect(msgs[0].isEncrypted).to.be.true;
-                expect(msgs[0].encryptedBodypart).to.equal(listing[2].bodystructure[2][2]);
+                expect(msgs[2].uid).to.equal(3);
+                expect(msgs[2].encrypted).to.be.true;
+                expect(msgs[2].textParts[0]).to.equal(listing[2].bodystructure[2][2]);
 
                 expect(msgs[1].uid).to.equal(2);
                 expect(msgs[1].id).to.equal('beepboop');
@@ -486,13 +486,17 @@ define(function(require) {
                 expect(msgs[1].unread).to.be.false;
                 expect(msgs[1].answered).to.be.true;
                 expect(msgs[1].attachments).to.be.empty;
+                expect(msgs[1].textParts[0]).to.equal(listing[1].bodystructure);
+                expect(msgs[1].encrypted).to.be.false;
 
-                expect(msgs[2].attachments).to.not.be.empty;
-                expect(msgs[2].attachments[0].filename).to.equal('foobar.md');
-                expect(msgs[2].attachments[0].filesize).to.equal(211);
-                expect(msgs[2].attachments[0].mimeType).to.equal('text/x-markdown');
-                expect(msgs[2].attachments[0].part).to.equal('2');
-                expect(msgs[2].attachments[0].content).to.be.null;
+                expect(msgs[0].attachments).to.not.be.empty;
+                expect(msgs[0].attachments[0].filename).to.equal('foobar.md');
+                expect(msgs[0].attachments[0].filesize).to.equal(211);
+                expect(msgs[0].attachments[0].mimeType).to.equal('text/x-markdown');
+                expect(msgs[0].attachments[0].part).to.equal('2');
+                expect(msgs[0].attachments[0].content).to.be.null;
+                expect(msgs[0].textParts[0]).to.equal(listing[0].bodystructure[1]);
+                expect(msgs[0].encrypted).to.be.false;
 
                 done();
             });
@@ -524,49 +528,46 @@ define(function(require) {
         });
 
         it('should get a plain text message', function(done) {
-            var ee = {};
-            ee.on = function(ev, cb) {
+            var mimeStream = {}, payloadStream = {};
+
+            mimeStream.on = function(ev, cb) {
                 if (ev === 'data') {
-                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.');
+                    cb('Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n');
+                } else if (ev === 'end') {
+                    cb();
+                }
+            };
+
+            payloadStream.on = function(ev, cb) {
+                if (ev === 'data') {
+                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.\r\n');
                 } else if (ev === 'end') {
                     cb();
                 }
             };
 
             inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(123, 123).yields(null, [{
-                UID: 123,
-                messageId: 'beepboop',
-                from: 'zuhause@aol.com',
-                to: ['bankrupt@duh.com'],
-                title: 'Hello world!',
-                sentDate: '',
-                flags: ['\\Seen', '\\Answered'],
-                bodystructure: {
-                    part: '1',
-                    type: 'text/plain',
-                    parameters: {
-                        charset: 'utf-8'
-                    },
-                    encoding: 'quoted-printable',
-                    size: 11, // that's not the actual value ...
-                    lines: 1 // that's not the actual value ...
-                }
-            }]);
+            inboxMock.createStream.withArgs({
+                uid: 123,
+                part: '1.MIME'
+            }).returns(mimeStream);
             inboxMock.createStream.withArgs({
                 uid: 123,
                 part: '1'
-            }).returns(ee);
+            }).returns(payloadStream);
 
-            imap.getMessage({
+            imap.getBody({
                 path: 'INBOX',
-                uid: 123,
+                message: {
+                    uid: 123,
+                    body: null,
+                    textParts: [{
+                        part: '1',
+                    }]
+                }
             }, function(error, msg) {
                 expect(error).to.be.null;
                 expect(msg.uid).to.equal(123);
-                expect(msg.from).to.be.instanceof(Array);
-                expect(msg.to).to.be.instanceof(Array);
-                expect(msg.subject).to.equal('Hello world!');
                 expect(inboxMock.createStream.called).to.be.true;
                 expect(msg.body).to.equal('To read my encrypted message below, simply install Whiteout Mail for Chrome.');
 
@@ -574,118 +575,7 @@ define(function(require) {
             });
         });
 
-        it('should get a plain text from a nested body part', function(done) {
-            var ee = {};
-            ee.on = function(ev, cb) {
-                if (ev === 'data') {
-                    cb('To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome.');
-                } else if (ev === 'end') {
-                    cb();
-                }
-            };
-
-            inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(123, 123).yields(null, [{
-                UID: 123,
-                messageId: 'beepboop',
-                from: 'zuhause@aol.com',
-                to: ['bankrupt@duh.com'],
-                title: 'Hello world!',
-                sentDate: '',
-                flags: ['\\Seen', '\\Answered'],
-                bodystructure: {
-                    '1': {
-                        '1': {
-                            part: '1.1',
-                            type: 'text/plain',
-                            parameters: {},
-                            encoding: 'quoted-printable',
-                            size: 1549,
-                            lines: 40
-                        },
-                        '2': {
-                            part: '1.2',
-                            type: 'text/html',
-                            parameters: {},
-                            encoding: 'quoted-printable',
-                            size: 1934,
-                            lines: 43
-                        },
-                        type: 'multipart/alternative'
-                    },
-                    '2': {
-                        part: '2',
-                        type: 'application/x-gpt',
-                        parameters: {
-                            name: 'elements.gp5'
-                        },
-                        encoding: 'base64',
-                        size: 75648,
-                        disposition: [{
-                            type: 'attachment',
-                            filename: 'Doom.gp5'
-                        }]
-                    },
-                    type: 'multipart/mixed'
-                }
-            }]);
-            inboxMock.createStream.withArgs({
-                uid: 123,
-                part: '1.1'
-            }).returns(ee);
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-            }, function(error, msg) {
-                expect(error).to.be.null;
-                expect(msg.uid).to.equal(123);
-                expect(msg.from).to.be.instanceof(Array);
-                expect(msg.to).to.be.instanceof(Array);
-                expect(msg.subject).to.equal('Hello world!');
-                expect(msg.body).to.equal('To read my encrypted message below, simply install Whiteout Mail for Chrome.');
-                expect(inboxMock.createStream.called).to.be.true;
-
-                done();
-            });
-        });
-
-        it('should not get preview of a non-existent message', function(done) {
-            inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(999, 999).yields(null, []);
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 999
-            }, function(error, message) {
-                expect(error).to.exist;
-                expect(message).to.not.exist;
-
-                done();
-            });
-        });
-
-        it('should not get a message due to error while opening the mail box', function(done) {
-            inboxMock.openMailbox.yields(new Error('fubar'));
-
-            imap.getMessage({
-                path: 'INBOX',
-                uid: 123,
-            }, function(error, msg) {
-                expect(error).to.exist;
-                expect(msg).to.not.exist;
-                done();
-            });
-        });
-
-        it('should not get a message when not logged in', function() {
-            imap._loggedIn = false;
-            imap.getMessage({}, function(error) {
-                expect(error).to.exist;
-            });
-        });
-
-        it('should catch stream error', function(done) {
+        it('should not get a message due to stream error', function(done) {
             var ee = {};
             ee.pipe = function() {};
             ee.on = function(event, cb) {
@@ -695,35 +585,58 @@ define(function(require) {
             };
 
             inboxMock.openMailbox.yields();
-            inboxMock.uidListMessages.withArgs(123, 123).yields(null, [{
-                UID: 123,
-                messageId: 'beepboop',
-                from: 'zuhause@aol.com',
-                to: ['bankrupt@duh.com'],
-                title: 'Hello world!',
-                sentDate: '',
-                flags: ['\\Seen', '\\Answered'],
-                bodystructure: {
-                    part: '1',
-                    type: 'text/plain',
-                    parameters: {
-                        charset: 'utf-8'
-                    },
-                    encoding: 'quoted-printable',
-                    size: 11, // that's not the actual value ...
-                    lines: 1 // that's not the actual value ...
-                }
-            }]);
             inboxMock.createStream.returns(ee);
 
-            imap.getMessage({
+            imap.getBody({
                 path: 'INBOX',
-                uid: 123,
+                message: {
+                    uid: 123,
+                    body: null,
+                    textParts: [{
+                        part: '1',
+                    }]
+                }
             }, function(error, message) {
                 expect(error).to.exist;
                 expect(error.message).to.equal('New Shit Has Come To Light!');
                 expect(message).to.not.exist;
                 done();
+            });
+        });
+
+        it('should not get a message due to error while opening the mail box', function(done) {
+            inboxMock.openMailbox.yields(new Error('fubar'));
+
+            imap.getBody({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    body: null,
+                    textParts: [{
+                        part: '1',
+                    }]
+                }
+            }, function(error, msg) {
+                expect(error).to.exist;
+                expect(msg).to.not.exist;
+                done();
+            });
+        });
+
+        it('should not get a message when not logged in', function() {
+            imap._loggedIn = false;
+            imap.getBody({
+                path: 'INBOX',
+                message: {
+                    uid: 123,
+                    body: null,
+                    textParts: [{
+                        part: '1',
+                    }]
+                }
+            }, function(error, msg) {
+                expect(error).to.exist;
+                expect(msg).to.not.exist;
             });
         });
 

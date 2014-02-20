@@ -166,6 +166,7 @@ describe('ImapClient integration tests', function() {
             expect(messages[0].id).to.not.be.empty;
             expect(/[<>]/g.test(messages[0].id)).to.be.false;
             expect(messages[0].bodystructure).to.exist;
+            expect(messages[0].textParts.length).to.equal(1);
             done();
         });
     });
@@ -183,38 +184,38 @@ describe('ImapClient integration tests', function() {
     });
 
     it('should get message in plain text', function(done) {
-        ic.getMessage({
+        ic.listMessagesByUid({
             path: 'INBOX',
-            uid: 2
-        }, function(error, message) {
-            expect(error).to.not.exist;
-            expect(message).to.exist;
-            expect(message.body).to.equal("Hello world");
-            done();
+            firstUid: 2,
+            lastUid: 2
+        }, function(error, messages) {
+            ic.getBody({
+                path: 'INBOX',
+                message: messages[0]
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal("Hello world");
+                done();
+            });
         });
     });
 
     it('should get cyphertext of an encrypted message', function(done) {
-        ic.getMessage({
+        ic.listMessagesByUid({
             path: 'INBOX',
-            uid: 4
-        }, function(error, message) {
-            expect(error).to.not.exist;
-            expect(message).to.exist;
-            expect(message.body).to.equal("insert pgp here.\r\n");
-            done();
-        });
-    });
-
-    it('should not get a non-existent message', function(done) {
-        ic.getMessage({
-            path: 'INBOX',
-            uid: 999
-        }, function(error, message) {
-            expect(error).to.exist;
-            expect(message).to.not.exist;
-
-            done();
+            firstUid: 4,
+            lastUid: 4
+        }, function(error, messages) {
+            ic.getBody({
+                path: 'INBOX',
+                message: messages[0]
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal("insert pgp here.");
+                done();
+            });
         });
     });
 
