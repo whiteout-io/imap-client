@@ -459,12 +459,12 @@ define(function(require) {
     };
 
     /**
-     * Stream the message from the server
+     * Stream the message body from the server
      * @param {String} options.path The folder's path
      * @param {Number} options.message The message
      * @param {Function} callback(error, message) will be called the message is parsed
      */
-    ImapClient.prototype.streamPlaintext = function(options, callback) {
+    ImapClient.prototype.getBody = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {

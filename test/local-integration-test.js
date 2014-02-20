@@ -189,7 +189,7 @@ describe('ImapClient integration tests', function() {
             firstUid: 2,
             lastUid: 2
         }, function(error, messages) {
-            ic.streamPlaintext({
+            ic.getBody({
                 path: 'INBOX',
                 message: messages[0]
             }, function(error, message) {
@@ -207,7 +207,7 @@ describe('ImapClient integration tests', function() {
             firstUid: 4,
             lastUid: 4
         }, function(error, messages) {
-            ic.streamPlaintext({
+            ic.getBody({
                 path: 'INBOX',
                 message: messages[0]
             }, function(error, message) {

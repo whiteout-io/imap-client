@@ -556,7 +556,7 @@ define(function(require) {
                 part: '1'
             }).returns(payloadStream);
 
-            imap.streamPlaintext({
+            imap.getBody({
                 path: 'INBOX',
                 message: {
                     uid: 123,
@@ -587,7 +587,7 @@ define(function(require) {
             inboxMock.openMailbox.yields();
             inboxMock.createStream.returns(ee);
 
-            imap.streamPlaintext({
+            imap.getBody({
                 path: 'INBOX',
                 message: {
                     uid: 123,
@@ -607,7 +607,7 @@ define(function(require) {
         it('should not get a message due to error while opening the mail box', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
-            imap.streamPlaintext({
+            imap.getBody({
                 path: 'INBOX',
                 message: {
                     uid: 123,
@@ -625,7 +625,7 @@ define(function(require) {
 
         it('should not get a message when not logged in', function() {
             imap._loggedIn = false;
-            imap.streamPlaintext({
+            imap.getBody({
                 path: 'INBOX',
                 message: {
                     uid: 123,

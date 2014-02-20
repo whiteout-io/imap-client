@@ -127,7 +127,7 @@ define(function(require) {
                 path: 'INBOX',
                 firstUid: 1
             }, function(error, messages) {
-                ic.streamPlaintext({
+                ic.getBody({
                     path: 'INBOX',
                     message: messages[0]
                 }, function(error, message) {
