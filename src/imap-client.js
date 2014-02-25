@@ -6,9 +6,8 @@ define(function(require) {
     'use strict';
 
     var inbox = require('inbox'),
-        mime = require("mime"),
-        MailParser = require('mailparser').MailParser,
-        ImapClient;
+        mime = require('mime'),
+        mailreader = require('mailreader');
 
     require('setimmediate');
 
@@ -23,12 +22,14 @@ define(function(require) {
      * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
-    ImapClient = function(options, ibx) {
+    var ImapClient = function(options, reader, ibx) {
         var self = this;
 
         /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
          * @private */
         self._loggedIn = false;
+
+        self._mailreader = reader || mailreader;
 
         /* Instance of our imap library
          * @private */
@@ -489,25 +490,23 @@ define(function(require) {
             options.message.body = '';
 
             /*
-             * to be able to use mailparser, we have to piece together one node of the message, e.g.
-             * if the attachment is in body part 2, we cannot simply fetch body part 2, since the headers are missing.
-             * however, we fetch the MIME-headers and piece them together with the payload of the body part,
-             * so that mailparser can nicely parse them.
-             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the
-             * payload, in order to not end() the mailparser stream prematurely.
+             * we have to piece together one MIME-node of the message, e.g. if the attachment is in body part 2,
+             * we cannot simply fetch body part 2, since the headers are missing. however, we fetch the MIME-headers
+             * and piece them together with the payload of the body part, so we can nicely parse them.
+             * the flag streamHeader is set to false when we stop streaming the headers and start streaming the payload.
              */
-            var stream, mailparser,
+            var stream,
                 streamHeader = true, // helper flag if we're streaming MIME-headers or text content
-                currentTextpart; // helper flag if the MIME-headers are done
+                currentTextpart, // helper flag if the MIME-headers are done
+                raw; // buffers raw rfc content
 
             // start streaming text parts
             streamNextPart();
 
             // set up the stream
             function streamNextPart() {
-                // are there are more text parts left to stream?
-                // if not, we're done here.
-                if (options.message.textParts.length === 0 && !currentTextpart) {
+                // are we in MIME-header-mode and there are no more text parts left to stream? then we're done.
+                if (streamHeader && options.message.textParts.length === 0) {
                     callback(null, options.message);
                     return;
                 }
@@ -515,23 +514,7 @@ define(function(require) {
                 // we need to get the next body part
                 if (streamHeader) {
                     currentTextpart = options.message.textParts.shift();
-                    mailparser = new MailParser();
-                    mailparser.on('end', function(parsed) {
-                        // the mailparser parses the pgp/mime attachments, so we need to do a little extra work here
-                        var text = parsed.text || parsed.attachments[0].content.toString('binary');
-
-                        // remove the unnecessary \n and \r\n at the end of the string...
-                        text = text.replace(/[\r]?\n$/g, '');
-
-                        // the mailparser parsed the content of the text node, so let's add it to the mail body
-                        options.message.body += text;
-
-                        // the current part parsed, so let's stream the next text part
-                        streamHeader = true;
-                        currentTextpart = undefined;
-                        streamNextPart();
-                    });
-
+                    raw = '';
                 }
 
                 stream = self._client.createStream({
@@ -543,59 +526,38 @@ define(function(require) {
                 stream.on('end', onEnd);
             }
 
-            // just forward all the 'data' events to the mailparser and update attachment.progress
+            function onEnd(chunk) {
+                onData(chunk);
+
+                // toggle between header and body
+                streamHeader = !streamHeader;
+
+                // the first end event is received after the MIME-headers have been received,
+                // the second after the body has been received
+                if (!streamHeader) {
+                    // we have the mime header, now stream the attachment's raw payload
+                    streamNextPart();
+                } else {
+                    // parse the raw rfc stuff and attach it to the body
+                    self._mailreader.parseText({
+                        message: options.message,
+                        raw: raw
+                    }, function() {
+                        // the current part parsed, so let's stream the next text part
+                        streamNextPart();
+                    });
+                }
+            }
+
             function onData(chunk) {
                 if (!chunk) {
                     return;
                 }
 
-                // write to mailparser                
-                mailparser.write(chunk);
-            }
-
-            // do *not* forward the first 'end' event to the mailparser, we don't
-            // want to close the parser stream after the headers are done.
-            // this is why we can't simply pipe the streams to the parser.
-            function onEnd(chunk) {
-                onData(chunk);
-
-                if (streamHeader) {
-                    // we have the mime header, now stream the attachment's raw payload
-                    streamHeader = false;
-                    streamNextPart();
-                } else {
-                    // parse the whole attachment
-                    mailparser.end();
-                }
+                // piece together the raw data
+                raw += chunk.toString('binary');
             }
         });
-    };
-
-    /**
-     * Parses a message
-     * @param {Number} options.message The meta data of the message, as retrieved by ImapClient.listMessagesByUid()
-     * @param {String} options.block The string representation of the decrypted PGP message block
-     * @param {Function} callback(error, message) will be called when the message decrypted PGP message block was parsed
-     */
-    ImapClient.prototype.parseDecryptedMessageBlock = function(options, callback) {
-        var mailparser = new MailParser(),
-            message = options.message;
-
-        mailparser.on("end", function(parsed) {
-            message.body = parsed.text ? parsed.text : '';
-            if (parsed.attachments) {
-                parsed.attachments.forEach(function(attmt) {
-                    message.attachments.push({
-                        filename: attmt.generatedFileName,
-                        filesize: attmt.length,
-                        mimeType: attmt.contentType,
-                        content: bufferToTypedArray(attmt.content)
-                    });
-                });
-            }
-            callback(null, message);
-        });
-        mailparser.end(options.block);
     };
 
     /**
@@ -620,23 +582,14 @@ define(function(require) {
             }
 
             /*
-             * to be able to use mailparser, we have to piece together one node of the message, e.g.
-             * if the attachment is in body part 2, we cannot simply fetch body part 2, since the headers are missing.
-             * however, we fetch the MIME-headers and piece them together with the payload of the body part,
-             * so that mailparser can nicely parse them.
-             * the flag streamingPayload is set to true when we stop streaming the headers and start streaming the
-             * payload, in order to not end() the mailparser stream prematurely.
+             * we have to piece together one MIME-node of the message, e.g. if the attachment is in body part 2,
+             * we cannot simply fetch body part 2, since the headers are missing. however, we fetch the MIME-headers
+             * and piece them together with the payload of the body part, so we can nicely parse them.
+             * the flag streamHeader is set to false when we stop streaming the headers and start streaming the payload.
              */
-            var stream, mailparser,
-                bytesRead = 0,
-                progress, // helper to update attachment.progress 
-                streamingPayload = false; // helper flag if the MIME-headers are done
-
-            mailparser = new MailParser();
-            mailparser.on("end", function(parsed) {
-                options.attachment.content = bufferToTypedArray(parsed.attachments[0].content);
-                callback(null, options.attachment);
-            });
+            var stream, bytesRead = 0, progress,
+                streamHeader = true, // helper flag if the MIME-headers are done
+                raw = ''; // buffers raw rfc content
 
             // set the progress flag for the attachment
             options.attachment.progress = 0;
@@ -655,37 +608,38 @@ define(function(require) {
                 stream.on('end', onEnd);
             }
 
-            // just forward all the 'data' events to the mailparser and update attachment.progress
+            function onEnd(chunk) {
+                onData(chunk);
+
+                // toggle between header and body
+                streamHeader = !streamHeader;
+
+                if (!streamHeader) {
+                    // we have the mime header, now stream the attachment's raw payload
+                    streamAttachmentPart(options.attachment.part);
+                } else {
+                    // parse the raw rfc stuff and attach it to the attachment object
+                    self._mailreader.parseAttachment({
+                        attachment: options.attachment,
+                        raw: raw
+                    }, callback);
+                }
+            }
+
             function onData(chunk) {
                 if (!chunk) {
                     return;
                 }
 
-                // write to mailparser                
-                mailparser.write(chunk);
+                // piece together the raw data
+                raw += chunk.toString('binary');
 
-                // update attachment.progress
-                if (streamingPayload) {
+                if (!streamHeader) {
+                    // update attachment.progress
                     bytesRead += chunk.length;
                     progress = bytesRead / options.attachment.filesize;
                     progress = progress <= 1 ? progress : 1;
                     options.attachment.progress = progress;
-                }
-            }
-
-            // do *not* forward the first 'end' event to the mailparser, we don't
-            // want to close the parser stream after the headers are done.
-            // this is why we can't simply pipe the streams to the parser.
-            function onEnd(chunk) {
-                onData(chunk);
-
-                if (!streamingPayload) {
-                    // we have the mime header, now stream the attachment's raw payload
-                    streamingPayload = true;
-                    streamAttachmentPart(options.attachment.part);
-                } else {
-                    // parse the whole attachment
-                    mailparser.end();
                 }
             }
         });
@@ -836,22 +790,6 @@ define(function(require) {
     //
     // Helper Methods
     //
-
-    /**
-     * Turns a node-style buffer into a typed array
-     * @param  {Buffer} buffer A node-style buffer
-     * @return {Uint8Array}    Uint8Array view on the ArrayBuffer
-     */
-    function bufferToTypedArray(buffer) {
-        var ab = new ArrayBuffer(buffer.length),
-            view = new Uint8Array(ab),
-            i, len;
-
-        for (i = 0, len = buffer.length; i < len; i++) {
-            view[i] = buffer.readUInt8(i);
-        }
-        return view;
-    }
 
     /**
      * Helper function that walks the mime tree in a dfs and calls back every time it has found a node the matches the search
