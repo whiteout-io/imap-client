@@ -9,6 +9,7 @@ define(function(require) {
         expect = chai.expect,
         inbox = require('inbox'),
         sinon = require('sinon'),
+        mailreader = require('mailreader'),
         ImapClient = require('..');
 
     chai.Assertion.includeStack = true;
@@ -36,7 +37,7 @@ define(function(require) {
                 }
             });
 
-            imap = new ImapClient(loginOptions, inbox);
+            imap = new ImapClient(loginOptions, mailreader, inbox);
             imap._loggedIn = true;
             imap.onIncomingMessage = function(mail) {
                 expect(mail.uid).to.equal(1337);
@@ -936,21 +937,6 @@ define(function(require) {
             }, function(error, attmt) {
                 expect(error).to.exist;
                 expect(attmt).to.not.exist;
-                done();
-            });
-        });
-
-        it('should parse decrypted message block', function(done) {
-            imap.parseDecryptedMessageBlock({
-                message: {
-                    attachments: []
-                },
-                block: 'Content-Type: multipart/signed;\r\n boundary="Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710";\r\n    protocol="application/pgp-signature";\r\n   micalg=pgp-sha512\r\n\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710\r\nContent-Type: multipart/mixed;\r\n   boundary="Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D"\r\n\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D\r\nContent-Disposition: attachment;\r\n  filename="user test 20131210 dad.md"\r\nContent-Type: application/octet-stream;\r\n x-unix-mode=0644;\r\n   name="user test 20131210 dad.md"\r\nContent-Transfer-Encoding: 7bit\r\n\r\n- sichere und unsichere absender sind sichtbar und unterscheidbar\r\n- was ist ein pgp key?\r\n- hamburger button ist selbsterklaerend, "das kennt man"\r\n- arbeitsweise der app und value assumption sind verstaendlich\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: text/plain;\r\n  charset=us-ascii\r\n\r\n\r\n\r\n--Apple-Mail=_096BEDB9-F742-4C28-ABC3-225E390C070D--\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: attachment;\r\n   filename=signature.asc\r\nContent-Type: application/pgp-signature;\r\n  name=signature.asc\r\nContent-Description: Message signed with OpenPGP using GPGMail\r\n\r\n-----BEGIN PGP SIGNATURE-----\r\nComment: GPGTools - https://gpgtools.org\r\n\r\niQEcBAEBCgAGBQJS1+TtAAoJEDzmUwH7XO/cQoUH/AtZlFzQYLECIxrxj14PFDLP\r\nS36ZYBe2BUBDyGmacqGEGmHYyYbAWWz5ju1YQZq6tfS8YCZpV+YFrXhgx16MSXi6\r\neNC02rb0KztkaI7DlwA+AhfbZ8VwhXkHGKW8zG6fXSgmEoOZbbdHpb8aSshJWWBB\r\nDYUU2SNZQRO2OCuHLr7fGmCzpQGDehcRIhdFTTZIskuYOlGvlj+wDC7qGQ4QWmzi\r\nnaPOA4egdAkbskN3DqYm4Zi/pzR7oVSwQIyaYuh/Vw69m1P48Eg6HndJS6cZWk7m\r\nnA3YnoIna6JTanxRi0/jb2QFDpZ1eQvq8v9qZqTomRivZdqlyxO5/fQIYLhjJvg=\r\n=UF7l\r\n-----END PGP SIGNATURE-----\r\n\r\n--Apple-Mail=_433FF43D-2E02-4B38-942D-9AE0C7953710--\r\n'
-            }, function(error, message) {
-                expect(error).to.be.null;
-                expect(message.body).to.exist;
-                expect(message.attachments).to.not.be.empty;
-
                 done();
             });
         });
