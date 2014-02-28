@@ -503,6 +503,52 @@ define(function(require) {
             });
         });
 
+        it('should provide fallbacks for funky mails', function(done) {
+            var listing = [{
+                UID: 1,
+                messageId: 'asdasd'
+            }, {
+                UID: 2,
+                messageId: 'qweqwe',
+                bodystructure: {
+                    '1': {
+                        part: '1',
+                        disposition: [{}]
+                    },
+                    type: 'multipart/mixed'
+                }
+            }];
+            inboxMock.openMailbox.withArgs('foobar').yields();
+            inboxMock.uidListMessages.yields(null, listing);
+            imap.listMessagesByUid({
+                path: 'foobar',
+                firstUid: 1,
+                lastUid: 2
+            }, function(error, msgs) {
+                expect(error).to.be.null;
+                expect(msgs.length).to.equal(2);
+
+                expect(msgs[0].bodystructure).to.exist;
+
+                expect(msgs[1].from).to.deep.equal([]);
+                expect(msgs[1].to).to.deep.equal([]);
+                expect(msgs[1].cc).to.deep.equal([]);
+                expect(msgs[1].bcc).to.deep.equal([]);
+                expect(msgs[1].subject).to.equal('(no subject)');
+                expect(msgs[1].sentDate).to.exist;
+
+                expect(msgs[1].attachments).to.not.be.empty;
+                expect(msgs[1].attachments[0].filename).to.equal('attachment');
+                expect(msgs[1].attachments[0].filesize).to.equal(0);
+                expect(msgs[1].attachments[0].mimeType).to.equal('application/octet-stream');
+                expect(msgs[1].attachments[0].part).to.equal('1');
+                expect(msgs[1].attachments[0].content).to.be.null;
+                expect(msgs[1].encrypted).to.be.false;
+
+                done();
+            });
+        });
+
         it('should not list messages by uid due to error', function(done) {
             inboxMock.openMailbox.yields(new Error('fubar'));
 
