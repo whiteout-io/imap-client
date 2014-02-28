@@ -354,7 +354,7 @@ define(function(require) {
 
         // look for nodes that contain well-formed pgp/mime and add them to the list of body parts. (bind to mailObj!)
         var handlePgpMime = function(node) {
-            if (!(node.type && node.type === 'multipart/encrypted' && node['2'])) {
+            if (!(node.type && node.type && node.type === 'multipart/encrypted' && node['2'])) {
                 return false;
             }
 
@@ -365,7 +365,7 @@ define(function(require) {
 
         // look for text/plain nodes that are not attachments and add them to the list of body parts. (bind to mailObj!)
         var handlePlainText = function(node) {
-            if (!(node.type.indexOf('text/plain') === 0 && !node.disposition)) {
+            if (!(node.type && node.type.indexOf('text/plain') === 0 && !node.disposition)) {
                 return false;
             }
 
@@ -381,16 +381,18 @@ define(function(require) {
                 return false;
             }
 
+
             node.disposition.forEach(function(attmt) {
+                var filename = attmt.filename || (node.parameters && node.parameters.name) || 'attachment';
+                var filesize = node.size || 0;
+
                 // if we have a generic content type, try to infer the mime type based on the file ending
-                var mimeType = node.type;
-                if (mimeType === "application/octet-stream") {
-                    mimeType = mime.lookup(attmt.filename.split(".").pop().toLowerCase());
-                }
+                var mimeType = (node.type !== 'application/octet-stream') ? node.type : mime.lookup(filename.split(".").pop().toLowerCase());
+                mimeType = mimeType || "application/octet-stream";
 
                 self.attachments.push({
-                    filename: attmt.filename,
-                    filesize: node.size,
+                    filename: filename,
+                    filesize: filesize,
                     mimeType: mimeType,
                     part: node.part,
                     content: null
@@ -418,23 +420,25 @@ define(function(require) {
 
             var processedMails = [];
             mails.forEach(function(mail) {
-                mail.flags = mail.flags || [];
-                mail.messageId = mail.messageId.replace(/[<>]/g, '');
+                if (!mail.UID || !mail.messageId) {
+                    // we rely on those parameters, everything else can be recovered from
+                    return;
+                }
 
                 // construct a cleansed mail object
                 var processedMail = {
                     uid: mail.UID,
-                    id: mail.messageId,
-                    from: [mail.from],
-                    to: mail.to,
-                    cc: mail.cc,
-                    bcc: mail.bcc,
-                    subject: mail.title,
+                    id: mail.messageId.replace(/[<>]/g, ''),
+                    from: mail.from ? [mail.from] : [],
+                    to: mail.to || [],
+                    cc: mail.cc || [],
+                    bcc: mail.bcc || [],
+                    subject: mail.title || '(no subject)',
                     body: null,
-                    sentDate: mail.date,
-                    unread: mail.flags.indexOf('\\Seen') === -1,
-                    answered: mail.flags.indexOf('\\Answered') > -1,
-                    bodystructure: mail.bodystructure,
+                    sentDate: mail.date || new Date(),
+                    unread: (mail.flags || []).indexOf('\\Seen') === -1,
+                    answered: (mail.flags || []).indexOf('\\Answered') > -1,
+                    bodystructure: mail.bodystructure || {},
                     attachments: [],
                     textParts: []
                 };
@@ -587,7 +591,8 @@ define(function(require) {
              * and piece them together with the payload of the body part, so we can nicely parse them.
              * the flag streamHeader is set to false when we stop streaming the headers and start streaming the payload.
              */
-            var stream, bytesRead = 0, progress,
+            var stream, bytesRead = 0,
+                progress,
                 streamHeader = true, // helper flag if the MIME-headers are done
                 raw = ''; // buffers raw rfc content
 
@@ -802,15 +807,13 @@ define(function(require) {
             return;
         }
 
-        if (mimeNode.type.indexOf('multipart/') === 0) {
+        if (mimeNode.type && mimeNode.type.indexOf('multipart/') === 0) {
             // this is a multipart/* part, we have to go deeper
             for (var i = 1; typeof mimeNode[i] !== 'undefined'; i++) {
                 walkMimeTree(mimeNode[i], handler);
             }
         }
     }
-
-
 
     return ImapClient;
 });
