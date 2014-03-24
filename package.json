@@ -9,9 +9,9 @@
 	"dependencies": {
 		"amdefine": ">=0.0.8",
 		"setimmediate": ">=1.0.1",
-		"mime": "https://github.com/whiteout-io/node-mime/tarball/amd",
-		"inbox": "https://github.com/whiteout-io/inbox/tarball/amd",
-		"mailreader": "https://github.com/whiteout-io/mailreader/tarball/master"
+		"mime": "https://github.com/whiteout-io/node-mime/tarball/v1.3.0",
+		"inbox": "https://github.com/whiteout-io/inbox/tarball/v0.2.0",
+		"mailreader": "https://github.com/whiteout-io/mailreader/tarball/v0.1.0"
 	},
 	"devDependencies": {
 		"mocha": "~1.12.0",
