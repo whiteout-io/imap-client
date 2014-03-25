@@ -1,6 +1,6 @@
 {
 	"name": "imap-client",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"scripts": {
 		"pretest": "grunt integration",
 		"test": "grunt unit"
@@ -10,7 +10,7 @@
 		"amdefine": ">=0.0.8",
 		"setimmediate": ">=1.0.1",
 		"mime": "https://github.com/whiteout-io/node-mime/tarball/v1.3.0",
-		"inbox": "https://github.com/whiteout-io/inbox/tarball/v0.2.0",
+		"inbox": "https://github.com/whiteout-io/inbox/tarball/v1.2.0",
 		"mailreader": "https://github.com/whiteout-io/mailreader/tarball/v0.1.0"
 	},
 	"devDependencies": {
