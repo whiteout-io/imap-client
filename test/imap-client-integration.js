@@ -1,7 +1,3 @@
-if (typeof define !== 'function') {
-    var define = require('amdefine')(module);
-}
-
 define(function(require) {
     'use strict';
 
@@ -26,6 +22,11 @@ define(function(require) {
         var ic;
 
         beforeEach(function(done) {
+            //
+            // WEB WORKERS ARE DISABLED DUE TO THE ISSUE OF LOADING STRINGENCODING POLYFILLS IN A WORKER CONTEXT
+            //
+            window.Worker = undefined;
+            
             ic = new ImapClient(loginOptions);
             ic.login(done);
         });
@@ -40,6 +41,7 @@ define(function(require) {
                 expect(error).to.not.exist;
 
                 expect(folders).to.exist;
+                
                 expect(folders.inbox).to.exist;
                 expect(folders.inbox.name).to.exist;
                 expect(folders.inbox.type).to.exist;
@@ -49,52 +51,11 @@ define(function(require) {
                 expect(folders.sent).to.exist;
                 expect(folders.trash).to.exist;
                 expect(folders.junk).to.exist;
-
-                expect(folders.flagged).to.be.instanceof(Array);
-                expect(folders.flagged).to.not.be.empty;
+                expect(folders.flagged).to.exist;
 
                 expect(folders.other).to.be.instanceof(Array);
                 expect(folders.other).to.not.be.empty;
 
-                expect(folders.normal).to.be.instanceof(Array);
-                expect(folders.normal).to.not.be.empty;
-
-                done();
-            });
-        });
-
-
-        it('should list all folders', function(done) {
-            ic.listAllFolders(function(error, mailboxes) {
-                expect(error).to.not.exist;
-                expect(mailboxes).to.be.instanceof(Array);
-                expect(mailboxes).to.not.be.empty;
-                done();
-            });
-        });
-
-        it('should list folders', function(done) {
-            ic.listFolders(function(error, mailboxes) {
-                expect(error).to.not.exist;
-                expect(mailboxes).to.exist;
-                done();
-            });
-        });
-
-        it('should list an empty subfolder', function(done) {
-            ic.listFolders('[Gmail]/Gesendet', function(error, mailboxes) {
-                expect(error).to.not.exist;
-                expect(mailboxes).to.exist;
-                expect(mailboxes).to.be.empty;
-                done();
-            });
-        });
-
-        it('should list subfolders', function(done) {
-            ic.listFolders('[Gmail]', function(error, mailboxes) {
-                expect(error).to.not.exist;
-                expect(mailboxes).to.exist;
-                expect(mailboxes).to.not.be.empty;
                 done();
             });
         });

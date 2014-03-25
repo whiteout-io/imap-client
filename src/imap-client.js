@@ -1,15 +1,8 @@
-if (typeof define !== 'function') {
-    var define = require('amdefine')(module);
-}
-
 define(function(require) {
     'use strict';
 
-    var inbox = require('inbox'),
-        mime = require('mime'),
+    var BrowserBox = require('browserbox'),
         mailreader = require('mailreader');
-
-    require('setimmediate');
 
     /**
      * Create an instance of ImapClient. To observe new mails, assign your callback to this.onIncomingMessage.
@@ -22,45 +15,25 @@ define(function(require) {
      * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
-    var ImapClient = function(options, reader, ibx) {
-        var self = this;
-
+    var ImapClient = function(options, reader, browserbox) {
         /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
          * @private */
-        self._loggedIn = false;
+        this._loggedIn = false;
 
-        self._mailreader = reader || mailreader;
+        this._mailreader = reader || mailreader;
 
         /* Instance of our imap library
          * @private */
-        self._client = (ibx || inbox).createConnection(options.port, options.host, {
-            timeout: options.timeout,
-            secureConnection: options.secure,
-            auth: options.auth,
-            ca: options.ca
-        });
-        self._client.on('new', function(message) {
-            if (typeof self.onIncomingMessage === 'function') {
-                message.flags = message.flags || [];
-                self.onIncomingMessage({
-                    uid: message.UID,
-                    id: message.messageId,
-                    from: [message.from],
-                    to: message.to,
-                    cc: message.cc,
-                    bcc: message.bcc,
-                    subject: message.title,
-                    body: null,
-                    sentDate: message.date,
-                    unread: message.flags.indexOf('\\Seen') === -1,
-                    answered: message.flags.indexOf('\\Answered') > -1
-                });
-            }
-        });
-
-        self._client.on('error', function(error) {
-            self.onError(error);
-        });
+        if (browserbox) {
+            this._client = browserbox;
+        } else {
+            this._client = new BrowserBox(options.host, options.port, {
+                useSSL: options.secure,
+                auth: options.auth,
+                ca: options.ca
+            });
+        }
+        this._client.onerror = this.onError;
     };
 
     /**
@@ -76,11 +49,12 @@ define(function(require) {
             return;
         }
 
-        self._client.connect();
-        self._client.once('connect', function() {
+        self._client.onauth = function() {
             self._loggedIn = true;
             callback();
-        });
+        };
+
+        self._client.connect();
     };
 
     /**
@@ -94,8 +68,12 @@ define(function(require) {
             return;
         }
 
+        self._client.onclose = function() {
+            self._loggedIn = false;
+            callback();
+        };
+
         self._client.close();
-        self._client.once('close', callback);
     };
 
     /**
@@ -103,211 +81,74 @@ define(function(require) {
      * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
      */
     ImapClient.prototype.listWellKnownFolders = function(callback) {
-        var self = this,
-            types = {
-                INBOX: 'Inbox',
-                DRAFTS: 'Drafts',
-                SENT: 'Sent',
-                TRASH: 'Trash',
-                FLAGGED: 'Flagged',
-                JUNK: 'Junk',
-                NORMAL: 'Normal'
-            };
+        var self = this;
 
         if (!self._loggedIn) {
             callback(new Error('Can not list well known folders, cause: Not logged in!'));
             return;
         }
 
-        self.listAllFolders(filterWellKnownFolders);
+        var wellKnownFolders = {
+            other: []
+        };
 
-        function filterWellKnownFolders(error, folders) {
+        self._client.listMailboxes(function(error, mailbox) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            var wellKnownFolders = {}, folder, i;
-            wellKnownFolders.normal = [];
-            wellKnownFolders.flagged = [];
-            wellKnownFolders.other = [];
+            walkMailbox(mailbox);
 
-            for (i = folders.length - 1; i >= 0; i--) {
-                folder = {
-                    name: folders[i].name,
-                    type: folders[i].type,
-                    path: folders[i].path
+            callback(null, wellKnownFolders);
+        });
+
+        function walkMailbox(mailbox) {
+            if (mailbox.name && mailbox.path) {
+                var folder = {
+                    name: mailbox.name,
+                    path: mailbox.path
                 };
 
-                if (folders[i].type === types.INBOX) {
+                if (mailbox.name.toUpperCase() === 'INBOX') {
+                    folder.type = 'Inbox';
                     wellKnownFolders.inbox = folder;
-                } else if (folders[i].type === types.DRAFTS) {
+                } else if (mailbox.specialUse === '\\Drafts' || mailbox.flags.indexOf('\\Drafts') >= 0) {
+                    folder.type = 'Drafts';
                     wellKnownFolders.drafts = folder;
-                } else if (folders[i].type === types.SENT) {
+                } else if (mailbox.specialUse === '\\All' || mailbox.flags.indexOf('\\All') >= 0) {
+                    folder.type = 'All';
+                    wellKnownFolders.all = folder;
+                } else if (mailbox.specialUse === '\\Flagged' || mailbox.flags.indexOf('\\Flagged') >= 0) {
+                    folder.type = 'Flagged';
+                    wellKnownFolders.flagged = folder;
+                } else if (mailbox.specialUse === '\\Sent' || mailbox.flags.indexOf('\\Sent') >= 0) {
+                    folder.type = 'Sent';
                     wellKnownFolders.sent = folder;
-                } else if (folders[i].type === types.TRASH) {
+                } else if (mailbox.specialUse === '\\Trash' || mailbox.flags.indexOf('\\Trash') >= 0) {
+                    folder.type = 'Trash';
                     wellKnownFolders.trash = folder;
-                } else if (folders[i].type === types.JUNK) {
+                } else if (mailbox.specialUse === '\\Junk' || mailbox.flags.indexOf('\\Junk') >= 0) {
+                    folder.type = 'Junk';
                     wellKnownFolders.junk = folder;
-                } else if (folders[i].type === types.FLAGGED) {
-                    wellKnownFolders.flagged.push(folder);
-                } else if (folders[i].type === types.NORMAL) {
-                    wellKnownFolders.normal.push(folder);
+                } else if (mailbox.specialUse === '\\Archive' || mailbox.flags.indexOf('\\Archive') >= 0) {
+                    folder.type = 'Archive';
+                    wellKnownFolders.archive = folder;
                 } else {
+                    folder.type = 'Other';
                     wellKnownFolders.other.push(folder);
                 }
             }
 
-            callback(null, wellKnownFolders);
-        }
-    };
-
-    /**
-     * Will traverse all available IMAP folders via DFS and return their paths as Array
-     * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
-     */
-    ImapClient.prototype.listAllFolders = function(callback) {
-        var self = this,
-            folders = [],
-            mbxQueue = [],
-            error;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not list all folders, cause: Not logged in!'));
-            return;
-        }
-
-        function subfolders(someError, mailboxes) {
-            if (someError) {
-                // we have an error, so store it and stop processing. processQueue will catch this.
-                error = someError;
-            } else {
-                while (mailboxes.length) {
-                    // add all mailboxes to the mbxQueue
-                    mbxQueue.push(mailboxes.splice(0, 1)[0]);
-                }
-            }
-
-            // done with this layer, process this subtree
-            setImmediate(processQueue);
-        }
-
-        function processQueue() {
-            var mailbox;
-
-            if (typeof error !== 'undefined') {
-                callback(error);
-                return;
-            }
-
-            if (!mbxQueue.length) {
-                // nothing left to process, we're done
-                callback(null, folders);
-                return;
-            }
-
-            mailbox = mbxQueue.splice(0, 1)[0];
-            folders.push(mailbox);
-            if (mailbox.hasChildren) {
-                // we have reached an inner node, process the subtree
-                mailbox.listChildren(subfolders);
-            } else {
-                // we have reached a leaf, process the next sibling
-                setImmediate(processQueue);
+            if (mailbox.children) {
+                mailbox.children.forEach(walkMailbox);
             }
         }
-
-        self._client.listMailboxes(subfolders);
-    };
-
-    /**
-     * List available IMAP folders
-     * @param {String} path [optional] If present, its subfolders will be listed
-     * @param callback [Function] callback(error, mailboxes) triggered when the folders are available
-     */
-    ImapClient.prototype.listFolders = function(path, callback) {
-        var self = this,
-            args = arguments;
-
-        if (typeof args[0] === 'function') {
-            if (!self._loggedIn) {
-                args[0](new Error('Can not list folders, cause: Not logged in!'));
-                return;
-            }
-            listTopLevelFolders.bind(self)(args[0]); // called via ImapClient.listFolders(callback)
-        } else if (typeof args[0] === 'string') {
-            if (!self._loggedIn) {
-                callback(new Error('Can not list folders, cause: Not logged in!'));
-                return;
-            }
-
-            listSubFolders.bind(self)(path, callback); // called via ImapClient.listFolders(parent, callback)
-        }
-    };
-
-    /*
-     * This is the simple path, where we just list the top level folders and we're good
-     */
-    var listTopLevelFolders = function(callback) {
-        var self = this;
-
-        self._client.listMailboxes(callback);
-    };
-
-    /*
-     * This path is a bit more complicated than listTopLevelFolders. Since inbox does not provide a nicer API, we'll do a
-     * search along the path until we've reached the target. The folders are always declared via L0/L1/L2/..., so we just
-     * track how deep we're in the IMAP folder hierarchy and look for the next nested folders there.
-     */
-    var listSubFolders = function(path, callback) {
-        var self = this,
-            pathComponents = path.split('/'),
-            maxDepth = pathComponents.length;
-
-        function subfolders(error, mailboxes) {
-            var mailbox, mailboxPathComponents, currentDepth, i = mailboxes.length;
-
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            while (i--) {
-                mailbox = mailboxes[i];
-                mailboxPathComponents = mailbox.path.split('/');
-                currentDepth = mailboxPathComponents.length;
-
-                if (pathComponents[currentDepth - 1] !== mailboxPathComponents[currentDepth - 1]) {
-                    // we're on the wrong track, keep searching
-                    continue;
-                }
-
-                // we're on the right track
-                if (currentDepth === maxDepth) {
-                    // we're there, let's go.
-                    if (mailbox.hasChildren) {
-                        mailbox.listChildren(callback);
-                    } else {
-                        // there are no children... the inbox API doc is a bit unclear about the 
-                        // behavior if no children are present, also we do not want to do the
-                        // roundtrip to the server again, so we call back ourselves.
-                        callback(null, []);
-                    }
-                    return;
-                }
-
-                // we have to go deeper
-                mailbox.listChildren(subfolders);
-            }
-        }
-
-        self._client.listMailboxes(subfolders);
     };
 
     /**
      * Returns the uids of messages containing the search terms in the options
      * @param {String} options.path The folder's path
-     * @param {String} options.subject (optional) Mails containing string in the subject
      * @param {Boolean} options.answered (optional) Mails with or without the \Answered flag set.
      * @param {Boolean} options.unread (optional) Mails with or without the \Seen flag set.
      * @param {Function} callback(error, uids) invoked with the uids of messages matching the search terms, or an error object if an error occurred
@@ -320,21 +161,38 @@ define(function(require) {
             return;
         }
 
-        self._client.openMailbox(options.path, function(error) {
+        var query = {},
+            queryOptions = {
+                byUid: true
+            };
+
+        if (options.unread === true) {
+            query.unseen = true;
+        } else if (options.unread === false) {
+            query.seen = true;
+        }
+
+        if (options.answered === true) {
+            query.answered = true;
+        } else if (options.answered === false) {
+            query.unanswered = true;
+        }
+
+        self._client.selectMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.search(options, callback);
+            self._client.search(query, queryOptions, callback);
         });
     };
 
     /**
      * List messages in an IMAP folder based on their uid
      * @param {String} options.path The folder's path
-     * @param {Number} options.firstUid The uid of the first message
-     * @param {Number} options.lastUid (optional) The uid of the last message. if omitted, lists all availble messages
+     * @param {Number} options.firstUid The uid of the first message. if omitted, defaults to 1
+     * @param {Number} options.lastUid (optional) The uid of the last message. if omitted, defaults to *
      * @param {Function} callback(error, messages) will be called at completion, contains an array of messages with their respective envelope data, or information if an error occurred.
      */
     ImapClient.prototype.listMessagesByUid = function(options, callback) {
@@ -345,7 +203,6 @@ define(function(require) {
             return;
         }
 
-
         // 
         // matchers for the mime tree
         // 
@@ -354,18 +211,18 @@ define(function(require) {
 
         // look for nodes that contain well-formed pgp/mime and add them to the list of body parts. (bind to mailObj!)
         var handlePgpMime = function(node) {
-            if (!(node.type && node.type && node.type === 'multipart/encrypted' && node['2'])) {
+            if (!(node.type === 'multipart/encrypted' && node.childNodes && node.childNodes[2])) {
                 return false;
             }
 
             // as the standard dictates, the second child node of a multipart/encrypted node contains the pgp payload
-            this.textParts.push(node['2']);
+            this.textParts.push(node.childNodes[2]);
             return true;
         };
 
         // look for text/plain nodes that are not attachments and add them to the list of body parts. (bind to mailObj!)
         var handlePlainText = function(node) {
-            if (!(node.type && node.type.indexOf('text/plain') === 0 && !node.disposition)) {
+            if (!(node.type === 'text/plain' && !node.disposition)) {
                 return false;
             }
 
@@ -375,91 +232,94 @@ define(function(require) {
 
         // look for attachment nodes and add all of them to the array of attachments. (bind to mailObj!)
         var handleAttachment = function(node) {
-            var self = this;
-
-            if (!node.disposition) {
+            if (node.disposition !== 'attachment') {
                 return false;
             }
 
+            var attmt = {
+                part: node.part,
+                content: null,
+                filesize: node.size || 0,
+                mimeType: node.type || "application/octet-stream",
+                filename: 'attachment' // placeholder, if there is a better file name, use it
+            };
 
-            node.disposition.forEach(function(attmt) {
-                var filename = attmt.filename || (node.parameters && node.parameters.name) || 'attachment';
-                var filesize = node.size || 0;
+            if (node.dispositionParameters && node.dispositionParameters.filename) {
+                attmt.filename = node.dispositionParameters.filename;
+            } else if (node.parameters && node.parameters.name) {
+                attmt.filename = node.parameters.name;
+            }
 
-                // if we have a generic content type, try to infer the mime type based on the file ending
-                var mimeType = (node.type !== 'application/octet-stream') ? node.type : mime.lookup(filename.split(".").pop().toLowerCase());
-                mimeType = mimeType || "application/octet-stream";
-
-                self.attachments.push({
-                    filename: filename,
-                    filesize: filesize,
-                    mimeType: mimeType,
-                    part: node.part,
-                    content: null
-                });
-            });
+            this.attachments.push(attmt);
             return true;
         };
 
+        var first = options.firstUid || 1,
+            last = options.lastUid || '*',
+            query = ['uid', 'bodystructure', 'flags', 'envelope'],
+            queryOptions = {
+                byUid: true
+            };
+
         // open the mailbox
-        self._client.openMailbox(options.path, function(error) {
+        self._client.selectMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.uidListMessages(options.firstUid, options.lastUid, processHeaders);
+            self._client.listMessages(first + ':' + last, query, queryOptions, onList);
         });
 
         // process what inbox returns into a usable form for our client
-        function processHeaders(error, mails) {
+        function onList(error, messages) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            var processedMails = [];
-            mails.forEach(function(mail) {
-                if (!mail.UID || !mail.messageId) {
-                    // we rely on those parameters, everything else can be recovered from
-                    return;
-                }
+            // we rely on those parameters, everything else can be recovered from
+            messages = messages.filter(function(message) {
+                return message.uid && message.envelope['message-id'];
+            });
 
-                // construct a cleansed mail object
-                var processedMail = {
-                    uid: mail.UID,
-                    id: mail.messageId.replace(/[<>]/g, ''),
-                    from: mail.from ? [mail.from] : [],
-                    to: mail.to || [],
-                    cc: mail.cc || [],
-                    bcc: mail.bcc || [],
-                    subject: mail.title || '(no subject)',
-                    body: null,
-                    sentDate: mail.date || new Date(),
-                    unread: (mail.flags || []).indexOf('\\Seen') === -1,
-                    answered: (mail.flags || []).indexOf('\\Answered') > -1,
-                    bodystructure: mail.bodystructure || {},
+            var cleansedMessages = [];
+            messages.forEach(function(message) {
+                // construct a cleansed message object
+                var cleansed = {
+                    uid: message.uid,
+                    id: message.envelope['message-id'].replace(/[<>]/g, ''),
+                    from: message.envelope.from ? message.from : [],
+                    to: message.envelope.to || [],
+                    cc: message.envelope.cc || [],
+                    bcc: message.envelope.bcc || [],
+                    subject: message.envelope.subject || '(no subject)',
+                    sentDate: message.envelope.date || new Date(),
+                    unread: (message.flags || []).indexOf('\\Seen') === -1,
+                    answered: (message.flags || []).indexOf('\\Answered') > -1,
+                    bodystructure: message.bodystructure || {},
+                    bodyParts: [],
                     attachments: [],
                     textParts: []
                 };
 
-                processedMails.push(processedMail);
+                cleansedMessages.push(cleansed);
 
                 // walk the mime tree to find pgp/mime nodes
-                walkMimeTree(processedMail.bodystructure, handlePgpMime.bind(processedMail));
-                if (processedMail.textParts.length > 0) {
-                    processedMail.encrypted = true;
-                    // the mail contains pgp/mime, so forget about the plain text stuff and attachments
+                walkBodystructure(cleansed.bodystructure, handlePgpMime.bind(cleansed));
+                if (cleansed.textParts.length > 0) {
+                    cleansed.encrypted = true;
+                    // the message contains pgp/mime, so forget about the plain text stuff and attachments
                     return;
                 }
 
-                processedMail.encrypted = false;
-                // the mail does not contain pgp/mime, so find all the plain text body parts and attachments
-                walkMimeTree(processedMail.bodystructure, handlePlainText.bind(processedMail));
-                walkMimeTree(processedMail.bodystructure, handleAttachment.bind(processedMail));
+                cleansed.encrypted = false;
+                // the message does not contain pgp/mime, so find all the plain text body parts and attachments
+                walkBodystructure(cleansed.bodystructure, handlePlainText.bind(cleansed));
+                walkBodystructure(cleansed.bodystructure, handleAttachment.bind(cleansed));
             });
 
-            callback(null, processedMails);
+            callback(null, cleansedMessages);
         }
     };
 
@@ -470,223 +330,137 @@ define(function(require) {
      * @param {Function} callback(error, message) will be called the message is parsed
      */
     ImapClient.prototype.getBody = function(options, callback) {
-        var self = this;
+        var self = this,
+            message = options.message;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not get message preview for uid ' + options.message.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            callback(new Error('Can not get message preview for uid ' + message.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
             return;
         }
 
-        if (options.message.textParts.length === 0) {
+        if (message.textParts.length === 0) {
             // there are no plain text parts
-            options.message.body = 'This message contains no text content.';
-            callback(null, options.message);
+            message.body = 'This message contains no text content.';
+            callback(null, message);
             return;
         }
 
-        self._client.openMailbox(options.path, function(error) {
+        self._getParts({
+            path: options.path,
+            uid: message.uid,
+            parts: message.textParts
+        }, onList);
+
+        // we have received the part from the imap server
+        function onList(error, messages) {
             if (error) {
                 callback(error);
                 return;
             }
 
             // set an empty body to which text will be appended
-            options.message.body = '';
+            message.body = '';
 
-            /*
-             * we have to piece together one MIME-node of the message, e.g. if the attachment is in body part 2,
-             * we cannot simply fetch body part 2, since the headers are missing. however, we fetch the MIME-headers
-             * and piece them together with the payload of the body part, so we can nicely parse them.
-             * the flag streamHeader is set to false when we stop streaming the headers and start streaming the payload.
-             */
-            var stream,
-                streamHeader = true, // helper flag if we're streaming MIME-headers or text content
-                currentTextpart, // helper flag if the MIME-headers are done
-                raw; // buffers raw rfc content
+            // we retrieve only one message in this query, so we're only interested in the first element of the array
+            var msg = messages[0],
+                rawParts = [];
 
-            // start streaming text parts
-            streamNextPart();
+            // a raw part consists of its MIME header and the payload
+            message.textParts.forEach(function(textPart) {
+                rawParts.push(msg['body[' + textPart.part + '.mime]'] + msg['body[' + textPart.part + ']']);
+            });
 
-            // set up the stream
-            function streamNextPart() {
-                // are we in MIME-header-mode and there are no more text parts left to stream? then we're done.
-                if (streamHeader && options.message.textParts.length === 0) {
-                    callback(null, options.message);
+            // start parsing the raw parts one-by-one
+            parseRawParts();
+
+            function parseRawParts() {
+                if (rawParts.length === 0) {
+                    // we have parsed all the raw parts
+                    callback(null, message);
                     return;
                 }
 
-                // we need to get the next body part
-                if (streamHeader) {
-                    currentTextpart = options.message.textParts.shift();
-                    raw = '';
-                }
-
-                stream = self._client.createStream({
-                    uid: options.message.uid,
-                    part: currentTextpart.part + (streamHeader ? '.MIME' : '') // according to RFC3501 the MIME headers for part '1' are '1.MIME'
-                });
-                stream.on('error', callback);
-                stream.on('data', onData);
-                stream.on('end', onEnd);
+                // parse one raw part
+                var raw = rawParts.shift();
+                self._mailreader.parseText({
+                    message: message,
+                    raw: raw
+                }, parseRawParts);
             }
-
-            function onEnd(chunk) {
-                onData(chunk);
-
-                // toggle between header and body
-                streamHeader = !streamHeader;
-
-                // the first end event is received after the MIME-headers have been received,
-                // the second after the body has been received
-                if (!streamHeader) {
-                    // we have the mime header, now stream the attachment's raw payload
-                    streamNextPart();
-                } else {
-                    // parse the raw rfc stuff and attach it to the body
-                    self._mailreader.parseText({
-                        message: options.message,
-                        raw: raw
-                    }, function() {
-                        // the current part parsed, so let's stream the next text part
-                        streamNextPart();
-                    });
-                }
-            }
-
-            function onData(chunk) {
-                if (!chunk) {
-                    return;
-                }
-
-                // piece together the raw data
-                raw += chunk.toString('binary');
-            }
-        });
+        }
     };
 
     /**
      * Streams an attachment from the server
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
-     * @param {Object} options.attachment Attachment to fetch, as return in the array by ImapClient.getMessage(). A field 'content' and 'progress' is added during parsing
+     * @param {Object} options.attachment Attachment to fetch, as return in the array by ImapClient.getMessage(). A field 'content' is added when parsing is done
      * @param {Function} callback(error, attachment) will be called the message is parsed
      */
     ImapClient.prototype.getAttachment = function(options, callback) {
-        var self = this;
+        var self = this,
+            attmt = options.attachment;
 
         if (!self._loggedIn) {
             callback(new Error('Can not get attachment, cause: Not logged in!'));
             return;
         }
 
-        self._client.openMailbox(options.path, function(error) {
+        self._getParts({
+            path: options.path,
+            uid: options.uid,
+            parts: [attmt.part]
+        }, onList);
+
+        // we have received the attachment from the imap server
+        function onList(error, messages) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            /*
-             * we have to piece together one MIME-node of the message, e.g. if the attachment is in body part 2,
-             * we cannot simply fetch body part 2, since the headers are missing. however, we fetch the MIME-headers
-             * and piece them together with the payload of the body part, so we can nicely parse them.
-             * the flag streamHeader is set to false when we stop streaming the headers and start streaming the payload.
-             */
-            var stream, bytesRead = 0,
-                progress,
-                streamHeader = true, // helper flag if the MIME-headers are done
-                raw = ''; // buffers raw rfc content
+            // we retrieve only one message in this query, so we're only interested in the first element of the array
+            var msg = messages[0],
+                raw = msg['body[' + attmt.part + '.mime]'] + msg['body[' + attmt.part + ']'];
 
-            // set the progress flag for the attachment
-            options.attachment.progress = 0;
-
-            // stream the attachment's MIME-header first
-            streamAttachmentPart(options.attachment.part + '.MIME');
-
-            // set up the streams
-            function streamAttachmentPart(part) {
-                stream = self._client.createStream({
-                    uid: options.uid,
-                    part: part
-                });
-                stream.on('error', callback);
-                stream.on('data', onData);
-                stream.on('end', onEnd);
-            }
-
-            function onEnd(chunk) {
-                onData(chunk);
-
-                // toggle between header and body
-                streamHeader = !streamHeader;
-
-                if (!streamHeader) {
-                    // we have the mime header, now stream the attachment's raw payload
-                    streamAttachmentPart(options.attachment.part);
-                } else {
-                    // parse the raw rfc stuff and attach it to the attachment object
-                    self._mailreader.parseAttachment({
-                        attachment: options.attachment,
-                        raw: raw
-                    }, callback);
-                }
-            }
-
-            function onData(chunk) {
-                if (!chunk) {
-                    return;
-                }
-
-                // piece together the raw data
-                raw += chunk.toString('binary');
-
-                if (!streamHeader) {
-                    // update attachment.progress
-                    bytesRead += chunk.length;
-                    progress = bytesRead / options.attachment.filesize;
-                    progress = progress <= 1 ? progress : 1;
-                    options.attachment.progress = progress;
-                }
-            }
-        });
-    };
-
-    /**
-     * Fetches IMAP flags for a message with a given UID from the server
-     * @param {String} options.path The folder's path
-     * @param {Number} options.uid The uid of the message
-     * @param {Function} callback(error, flags) will be called the flags have been received from the server
-     */
-    ImapClient.prototype.getFlags = function(options, callback) {
-        var self = this;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not get flags, cause: Not logged in!'));
-            return;
+            self._mailreader.parseAttachment({
+                attachment: options.attachment,
+                raw: raw
+            }, callback);
         }
+    };
 
-        self._client.openMailbox(options.path, function(error) {
+    ImapClient.prototype._getParts = function(options, callback) {
+        var self = this,
+            query = [],
+            queryOptions = {
+                byUid: true
+            },
+            interval = options.uid + ':' + options.uid;
+
+        // formulate a query for each text part. for part 2.1 to be parsed, we need 2.1.MIME and 2.1
+        options.parts.forEach(function(part) {
+            query.push('body.peek[' + part.part + '.mime]');
+            query.push('body.peek[' + part.part + ']');
+        });
+
+        // open the mailbox and retrieve the message
+        self._client.selectMailbox(options.path, function(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
-            self._client.fetchFlags(options.uid, function(error, flags) {
-                if (error) {
-                    callback(error);
-                    return;
-                }
-
-                if (flags === null) {
-                    callback(null, {});
-                } else {
-                    callback(null, {
-                        unread: flags.indexOf('\\Seen') === -1,
-                        answered: flags.indexOf('\\Answered') > -1
-                    });
-                }
-            });
+            self._client.listMessages(interval, query, queryOptions, callback);
         });
     };
+
+
+    //
+    //
+    // Functionality below is not yet available in browserbox!
+    //
+    //
 
     /**
      * Update IMAP flags for a message with a given UID
@@ -697,51 +471,54 @@ define(function(require) {
      * @param {Function} callback(error, flags) will be called the flags have been received from the server
      */
     ImapClient.prototype.updateFlags = function(options, callback) {
-        var self = this,
-            READ_FLAG = '\\Seen',
-            ANSWERED_FLAG = '\\Answered';
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not update flags, cause: Not logged in!'));
-            return;
-        }
-
-        self._client.openMailbox(options.path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            var remove = [],
-                add = [];
-
-            if (typeof options.unread !== 'undefined') {
-                options.unread ? remove.push(READ_FLAG) : add.push(READ_FLAG);
-            }
-
-            if (typeof options.answered !== 'undefined') {
-                options.answered ? add.push(ANSWERED_FLAG) : remove.push(ANSWERED_FLAG);
-            }
-
-            self._client.removeFlags(options.uid, remove, function(error) {
-                if (error) {
-                    callback(error);
-                    return;
-                }
-
-                self._client.addFlags(options.uid, add, function(error, flags) {
-                    if (flags === true) {
-                        callback(null, {});
-                    } else {
-                        callback(null, {
-                            unread: flags.indexOf(READ_FLAG) === -1,
-                            answered: flags.indexOf(ANSWERED_FLAG) > -1
-                        });
-                    }
-                });
-            });
-        });
+        callback();
     };
+    // ImapClient.prototype.updateFlags = function(options, callback) {
+    //     var self = this,
+    //         READ_FLAG = '\\Seen',
+    //         ANSWERED_FLAG = '\\Answered';
+
+    //     if (!self._loggedIn) {
+    //         callback(new Error('Can not update flags, cause: Not logged in!'));
+    //         return;
+    //     }
+
+    //     self._client.selectMailbox(options.path, function(error) {
+    //         if (error) {
+    //             callback(error);
+    //             return;
+    //         }
+
+    //         var remove = [],
+    //             add = [];
+
+    //         if (typeof options.unread !== 'undefined') {
+    //             options.unread ? remove.push(READ_FLAG) : add.push(READ_FLAG);
+    //         }
+
+    //         if (typeof options.answered !== 'undefined') {
+    //             options.answered ? add.push(ANSWERED_FLAG) : remove.push(ANSWERED_FLAG);
+    //         }
+
+    //         self._client.removeFlags(options.uid, remove, function(error) {
+    //             if (error) {
+    //                 callback(error);
+    //                 return;
+    //             }
+
+    //             self._client.addFlags(options.uid, add, function(error, flags) {
+    //                 if (flags === true) {
+    //                     callback(null, {});
+    //                 } else {
+    //                     callback(null, {
+    //                         unread: flags.indexOf(READ_FLAG) === -1,
+    //                         answered: flags.indexOf(ANSWERED_FLAG) > -1
+    //                     });
+    //                 }
+    //             });
+    //         });
+    //     });
+    // };
 
     /**
      * Move a message to a destination folder
@@ -751,22 +528,25 @@ define(function(require) {
      * @param {Function} callback(error) Callback with an error object in case something went wrong.
      */
     ImapClient.prototype.moveMessage = function(options, callback) {
-        var self = this;
-
-        if (!self._loggedIn) {
-            callback(new Error('Cannot move message, cause: Not logged in!'));
-            return;
-        }
-
-        self._client.openMailbox(options.path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            self._client.moveMessage(options.uid, options.destination, callback);
-        });
+        callback();
     };
+    // ImapClient.prototype.moveMessage = function(options, callback) {
+    //     var self = this;
+
+    //     if (!self._loggedIn) {
+    //         callback(new Error('Cannot move message, cause: Not logged in!'));
+    //         return;
+    //     }
+
+    //     self._client.selectMailbox(options.path, function(error) {
+    //         if (error) {
+    //             callback(error);
+    //             return;
+    //         }
+
+    //         self._client.moveMessage(options.uid, options.destination, callback);
+    //     });
+    // };
 
     /**
      * Purges a message from a folder
@@ -775,22 +555,25 @@ define(function(require) {
      * @param {Function} callback(error) Callback with an error object in case something went wrong.
      */
     ImapClient.prototype.deleteMessage = function(options, callback) {
-        var self = this;
-
-        if (!self._loggedIn) {
-            callback(new Error('Cannot delete message, cause: Not logged in!'));
-            return;
-        }
-
-        self._client.openMailbox(options.path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            self._client.deleteMessage(options.uid, callback);
-        });
+        callback();
     };
+    // ImapClient.prototype.deleteMessage = function(options, callback) {
+    //     var self = this;
+
+    //     if (!self._loggedIn) {
+    //         callback(new Error('Cannot delete message, cause: Not logged in!'));
+    //         return;
+    //     }
+
+    //     self._client.selectMailbox(options.path, function(error) {
+    //         if (error) {
+    //             callback(error);
+    //             return;
+    //         }
+
+    //         self._client.deleteMessage(options.uid, callback);
+    //     });
+    // };
 
     //
     // Helper Methods
@@ -798,21 +581,22 @@ define(function(require) {
 
     /**
      * Helper function that walks the mime tree in a dfs and calls back every time it has found a node the matches the search
-     * @param  {Object}   mimeNode  The initial mime-node whose subtree should be traversed
-     * @param  {function} handler   Callback invoked with the current mime node. Returns true if the mime node was interesting, returns false to go deeper.
+     * @param {Object} mimeNode The initial mime-node whose subtree should be traversed
+     * @param {function} handler Callback invoked with the current mime node. Returns true if the mime node was interesting, returns false to go deeper.
      */
-    function walkMimeTree(mimeNode, handler) {
+    function walkBodystructure(mimeNode, handler) {
         if (handler(mimeNode)) {
             // the node was interesting, so no need to look further down the mime tree
             return;
         }
 
-        if (mimeNode.type && mimeNode.type.indexOf('multipart/') === 0) {
-            // this is a multipart/* part, we have to go deeper
-            for (var i = 1; typeof mimeNode[i] !== 'undefined'; i++) {
-                walkMimeTree(mimeNode[i], handler);
-            }
+        if (!mimeNode.childNodes) {
+            return;
         }
+
+        mimeNode.childNodes.forEach(function(childNode) {
+            walkBodystructure(childNode, handler);
+        });
     }
 
     return ImapClient;
