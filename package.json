@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "scripts": {
     "pretest": "cd node_modules/node-forge/ && npm install && npm run minify && cd ../..",
-    "test": "grunt unit"
+    "test": "grunt"
   },
   "main": "src/imap-client.js",
   "dependencies": {
