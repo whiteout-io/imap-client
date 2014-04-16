@@ -9,53 +9,85 @@ module.exports = function(grunt) {
                 jshintrc: '.jshintrc'
             }
         },
-        mochaTest: {
-            test: {
+
+        connect: {
+            dev: {
+                options: {
+                    port: 10000,
+                    base: '.',
+                    keepalive: true
+                }
+            }
+        },
+
+        mocha_phantomjs: {
+            all: {
                 options: {
                     reporter: 'spec'
                 },
-                src: ['test/unit-test.js', 'test/local-integration-test.js']
+                src: ['test/unit.html']
             }
         },
-        watch: {
+
+        mochaTest: {
+            gmail: {
+                options: {
+                    reporter: 'spec'
+                },
+                src: ['test/integration-test.js']
+            },
+            local: {
+                options: {
+                    reporter: 'spec'
+                },
+                src: ['test/local-integration-test.js']
+            },
             unit: {
-                files: ['test/unit-test.js'],
-                tasks: ['unit']
-            },
-            integration: {
-                files: ['test/integration-test.js', 'test/browser-test.js'],
-                tasks: ['integration']
-            },
-            js: {
-                files: ['src/*.js'],
-                tasks: ['unit']
+                options: {
+                    reporter: 'spec'
+                },
+                src: ['test/unit-test.js']
             }
         },
+
+        watch: {
+            js: {
+                files: ['src/*.js', 'test/*.js', 'test/*.html'],
+                tasks: ['deps']
+            }
+        },
+
         copy: {
             npm: {
                 expand: true,
-                flatten: true,
+                flatten: false,
                 cwd: 'node_modules/',
                 src: [
-                    'chai/chai.js',
                     'mocha/mocha.js',
                     'mocha/mocha.css',
+                    'chai/chai.js',
+                    'sinon/pkg/sinon.js',
                     'requirejs/require.js',
-                    'inbox/src/*.js',
-                    'inbox/node_modules/node-shims/src/*.js',
-                    'inbox/node_modules/node-shims/node_modules/node-forge/js/*.js',
-                    'inbox/node_modules/utf7/src/utf7.js',
-                    'inbox/node_modules/xoauth2/src/xoauth2.js',
-                    'mime/src/mime.js',
-                    'mailreader/node_modules/mailparser/node_modules/mimelib/src/mimelib.js',
-                    'mailreader/node_modules/mailparser/node_modules/mimelib/node_modules/addressparser/src/addressparser.js',
-                    'mailreader/node_modules/mailparser/node_modules/encoding/src/encoding.js',
-                    'mailreader/node_modules/mailparser/node_modules/encoding/node_modules/iconv-lite/src/*.js',
+                    'tcp-socket/src/*.js',
+                    'node-forge/js/forge.min.js',
+                    'arraybuffer-slice/index.js',
+                    'browserbox/src/*.js',
+                    'browserbox/node_modules/utf7/src/*.js',
+                    'browserbox/node_modules/imap-handler/src/*.js',
+                    'browserbox/node_modules/mimefuncs/src/*.js',
                     'mailreader/src/*.js',
-                    'mailreader/node_modules/mailparser/src/*.js',
-                    'setimmediate/setImmediate.js'
+                    'mailreader/node_modules/mimeparser/src/*.js',
+                    'mailreader/node_modules/mimeparser/node_modules/addressparser/src/*.js',
+                    'mailreader/node_modules/stringencoding/dist/*'
                 ],
-                dest: 'test/lib/'
+                dest: 'test/lib/',
+                rename: function(dest, src) {
+                    if (src === 'arraybuffer-slice/index.js') {
+                        // 'index.js' is obviously a good name for a polyfill. duh.
+                        return dest + 'arraybuffer-slice.js';
+                    }
+                    return dest + '/' + src.split('/').pop();
+                }
             },
             app: {
                 expand: true,
@@ -67,21 +99,22 @@ module.exports = function(grunt) {
                 dest: 'test/lib/'
             }
         },
-        clean: {
-            test: ['test/lib/']
-        }
+
+        clean: ['test/lib/**/*']
     });
 
     // Load the plugin(s)
-    grunt.loadNpmTasks('grunt-contrib-jshint');
     grunt.loadNpmTasks('grunt-mocha-test');
+    grunt.loadNpmTasks('grunt-mocha-phantomjs');
+    grunt.loadNpmTasks('grunt-contrib-jshint');
+    grunt.loadNpmTasks('grunt-contrib-connect');
     grunt.loadNpmTasks('grunt-contrib-watch');
     grunt.loadNpmTasks('grunt-contrib-copy');
     grunt.loadNpmTasks('grunt-contrib-clean');
 
     // Default task(s).
-    grunt.registerTask('unit', ['jshint', 'mochaTest']);
-    grunt.registerTask('integration', ['jshint', 'clean:test', 'copy']);
-    grunt.registerTask('default', ['jshint', 'mochaTest', 'clean:test', 'copy']);
-
+    grunt.registerTask('deps', ['clean', 'copy']);
+    grunt.registerTask('dev', ['deps', 'connect:dev']);
+    grunt.registerTask('testlocal', ['jshint', 'deps', 'mochaTest:unit', 'mocha_phantomjs', 'mochaTest:local']);
+    grunt.registerTask('default', ['jshint', 'deps', 'mochaTest:unit', 'mocha_phantomjs', 'mochaTest:local', 'mochaTest:gmail']);
 };

@@ -1,11 +1,15 @@
 require.config({
-    baseUrl: '../lib',
+    baseUrl: 'lib',
     paths: {
         'test': '..',
-        'node-forge': 'forge',
-        'chai': 'chai',
-        'setimmediate': 'setImmediate'
+        'forge': 'forge.min'
+    },
+    shim: {
+        forge: {
+            exports: 'forge'
+        }
     }
+
 });
 
 require([], function() {
@@ -15,6 +19,5 @@ require([], function() {
 
     require(['test/integration-test'], function() {
         mocha.run();
-        mocha.checkLeaks();
     });
 });

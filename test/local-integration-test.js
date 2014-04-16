@@ -1,77 +1,82 @@
 'use strict';
 
-var ImapClient = require('../src/imap-client'),
-    chai = require('chai'),
+// this test is node-only (hoodiecrow is fired up)
+
+var chai = require('chai'),
     expect = chai.expect,
+    ImapClient = require('../src/imap-client'),
     hoodiecrow = require('hoodiecrow'),
-    loginOptions;
+    loginOptions = {
+        port: 12345,
+        host: 'localhost',
+        auth: {
+            user: 'testuser',
+            pass: 'testpass'
+        },
+        secure: false
+    };
 
-chai.Assertion.includeStack = true;
+describe('ImapClient local integration tests', function() {
+    var ic, imap;
 
-loginOptions = {
-    port: 12345,
-    host: 'localhost',
-    auth: {
-        user: 'testuser',
-        pass: 'testpass'
-    },
-    secure: false,
-    timeout: 1000
-};
-
-describe('ImapClient integration tests', function() {
-    var ic, server;
-
-    before(function(done) {
-        var messages = [{
-            raw: 'Delivered-To: receiver@example.com\r\nMIME-Version: 1.0\r\nX-Mailer: Nodemailer (0.5.3-dev; +http://www.nodemailer.com/)\r\nDate: Mon, 07 Oct 2013 02:04:29 -0700 (PDT)\r\nMessage-Id: <1381136667884.3c5d64c9@Nodemailer>\r\nFrom: sender@example.com\r\nTo: receiver@example.com\r\nSubject: [whiteout] Encrypted message\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHi receiver,\r\n\r\nthis is a private conversation. To read my encrypted message below, simply =\r\ninstall Whiteout Mail for Chrome. The app is really easy to use and =\r\nautomatically encrypts sent emails, so that only the two of us can read =\r\nthem: https://chrome.google.com/webstore/detail/whiteout-mail/jjgghafhamhol=\r\njigjoghcfcekhkonijg\r\n\r\n\r\n-----BEGIN ENCRYPTED MESSAGE-----\r\nYADDAYADDACRYPTOBLABLA123\r\n-----END ENCRYPTED MESSAGE-----\r\n\r\n\r\nSent securely from whiteout mail\r\nhttp://whiteout.io\r\n\r\n',
-            flags: ['\\Seen']
-        }, {
-            raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
-            flags: []
-        }, {
-            raw: 'Date: Tue, 15 Oct 2013 10:51:57 +0000\r\nMessage-ID: <123123@foobar>\r\nFrom: bla@blubb.io\r\nTo: blubb@bla.com\r\nSubject: blablubb\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\nMIME-Version: 1.0\r\n\r\nblubb bla',
-            flags: ['\\Seen']
-        }, {
-            raw: 'Content-Type: multipart/encrypted; boundary="Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69"; protocol="application/pgp-encrypted";\r\nSubject: [whiteout] attachment only\r\nFrom: Felix Hammerl <felix.hammerl@gmail.com>\r\nDate: Thu, 16 Jan 2014 14:55:56 +0100\r\nContent-Transfer-Encoding: 7bit\r\nMessage-Id: <3ECDF9DC-895E-4475-B2A9-52AF1F117652@gmail.com>\r\nContent-Description: OpenPGP encrypted message\r\nTo: safewithme.testuser@gmail.com\r\n\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: application/pgp-encrypted\r\nContent-Description: PGP/MIME Versions Identification\r\n\r\nVersion: 1\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: inline;\r\n    filename=encrypted.asc\r\nContent-Type: application/octet-stream;\r\n    name=encrypted.asc\r\nContent-Description: OpenPGP encrypted message\r\n\r\ninsert pgp here.\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69--',
-            flags: []
-        }];
-        server = hoodiecrow({
+    chai.Assertion.includeStack = true;
+    before(function() {
+        imap = hoodiecrow({
             storage: {
-                "INBOX": {
-                    messages: messages
+                'INBOX': {
+                    messages: [{
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 1\r\n\r\nWorld 1!'
+                    }, {
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 2\r\n\r\nWorld 2!',
+                        flags: ['\\Seen']
+                    }, {
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 3\r\n\r\nWorld 3!'
+                    }, {
+                        raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
+                    }, {
+                        raw: 'Content-Type: multipart/encrypted; boundary="Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69"; protocol="application/pgp-encrypted";\r\nSubject: [whiteout] attachment only\r\nFrom: Felix Hammerl <felix.hammerl@gmail.com>\r\nDate: Thu, 16 Jan 2014 14:55:56 +0100\r\nContent-Transfer-Encoding: 7bit\r\nMessage-Id: <3ECDF9DC-895E-4475-B2A9-52AF1F117652@gmail.com>\r\nContent-Description: OpenPGP encrypted message\r\nTo: safewithme.testuser@gmail.com\r\n\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: application/pgp-encrypted\r\nContent-Description: PGP/MIME Versions Identification\r\n\r\nVersion: 1\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: inline;\r\n    filename=encrypted.asc\r\nContent-Type: application/octet-stream;\r\n    name=encrypted.asc\r\nContent-Description: OpenPGP encrypted message\r\n\r\ninsert pgp here.\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69--',
+                    }, {
+                        raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
+                    }]
                 },
-                "": {
-                    "separator": "/",
-                    "folders": {
-                        "[Gmail]": {
-                            "flags": ["\\Noselect"],
-                            "folders": {
-                                "Drafts": {
-                                    "special-use": "\\Drafts"
+                '': {
+                    'separator': '/',
+                    'folders': {
+                        '[Gmail]': {
+                            'flags': ['\\Noselect'],
+                            'folders': {
+                                'All Mail': {
+                                    'flags': '\\All'
                                 },
-                                "Important": {
-                                    "special-use": "\\Important"
+                                'Drafts': {
+                                    'special-use': '\\Drafts'
                                 },
-                                "Sent": {
-                                    "special-use": "\\Sent"
+                                'Important': {
+                                    'flags': '\\Important'
                                 },
-                                "Spam": {
-                                    "special-use": "\\Junk"
+                                'Sent Mail': {
+                                    'flags': '\\Sent'
                                 },
-                                "Starred": {
-                                    "special-use": "\\Flagged"
+                                'Spam': {
+                                    'special-use': '\\Junk'
                                 },
-                                "Trash": {
-                                    "special-use": "\\Trash"
+                                'Starred': {
+                                    'flags': '\\Flagged'
+                                },
+                                'Trash': {
+                                    'special-use': '\\Trash'
                                 }
                             }
                         }
                     }
                 }
             }
-        });
-        server.listen(12345, done);
+        }),
+        imap.listen(loginOptions.port);
+    });
+
+    after(function(done) {
+        imap.close(done);
     });
 
     beforeEach(function(done) {
@@ -83,60 +88,26 @@ describe('ImapClient integration tests', function() {
         ic.logout(done);
     });
 
-    after(function(done) {
-        server.close(done);
-    });
-
-    it('should list all folders', function(done) {
-        ic.listAllFolders(function(error, mailboxes) {
-            expect(error).to.not.exist;
-            expect(mailboxes).to.be.instanceof(Array);
-            expect(mailboxes).to.not.be.empty;
-            done();
-        });
-    });
-
     it('should list well known folders', function(done) {
         ic.listWellKnownFolders(function(error, folders) {
             expect(error).to.not.exist;
 
             expect(folders).to.exist;
-            expect(folders.drafts).to.exist;
-            expect(folders.drafts.name).to.exist;
-            expect(folders.drafts.type).to.exist;
-            expect(folders.drafts.path).to.exist;
 
+            expect(folders.inbox).to.exist;
+            expect(folders.inbox.name).to.exist;
+            expect(folders.inbox.type).to.exist;
+            expect(folders.inbox.path).to.exist;
+
+            expect(folders.drafts).to.exist;
             expect(folders.sent).to.exist;
             expect(folders.trash).to.exist;
             expect(folders.junk).to.exist;
+            expect(folders.flagged).to.exist;
 
-            done();
-        });
-    });
+            expect(folders.other).to.be.instanceof(Array);
+            expect(folders.other).to.not.be.empty;
 
-    it('should list folders', function(done) {
-        ic.listFolders(function(error, mailboxes) {
-            expect(error).to.not.exist;
-            expect(mailboxes).to.exist;
-            expect(mailboxes).to.not.be.empty;
-            done();
-        });
-    });
-
-    it('should list an empty subfolder', function(done) {
-        ic.listFolders('[Gmail]/Important', function(error, mailboxes) {
-            expect(error).to.not.exist;
-            expect(mailboxes).to.exist;
-            expect(mailboxes).to.be.empty;
-            done();
-        });
-    });
-
-    it('should list subfolders', function(done) {
-        ic.listFolders('[Gmail]', function(error, mailboxes) {
-            expect(error).to.not.exist;
-            expect(mailboxes).to.exist;
-            expect(mailboxes).to.not.be.empty;
             done();
         });
     });
@@ -164,44 +135,25 @@ describe('ImapClient integration tests', function() {
             expect(messages).to.not.be.empty;
             expect(messages.length).to.equal(3);
             expect(messages[0].id).to.not.be.empty;
-            expect(/[<>]/g.test(messages[0].id)).to.be.false;
             expect(messages[0].bodystructure).to.exist;
             expect(messages[0].textParts.length).to.equal(1);
             done();
         });
     });
 
-    it('should list messages by uid without providing lastUid parameter', function(done) {
+    it('should list all messages by uid', function(done) {
         ic.listMessagesByUid({
             path: 'INBOX',
             firstUid: 1
         }, function(error, messages) {
             expect(error).to.not.exist;
             expect(messages).to.not.be.empty;
-            expect(messages.length).to.equal(4);
+            expect(messages.length).to.equal(6);
             done();
         });
     });
 
     it('should get message in plain text', function(done) {
-        ic.listMessagesByUid({
-            path: 'INBOX',
-            firstUid: 2,
-            lastUid: 2
-        }, function(error, messages) {
-            ic.getBody({
-                path: 'INBOX',
-                message: messages[0]
-            }, function(error, message) {
-                expect(error).to.not.exist;
-                expect(message).to.exist;
-                expect(message.body).to.equal("Hello world");
-                done();
-            });
-        });
-    });
-
-    it('should get cyphertext of an encrypted message', function(done) {
         ic.listMessagesByUid({
             path: 'INBOX',
             firstUid: 4,
@@ -213,21 +165,27 @@ describe('ImapClient integration tests', function() {
             }, function(error, message) {
                 expect(error).to.not.exist;
                 expect(message).to.exist;
-                expect(message.body).to.equal("insert pgp here.");
+                expect(message.body).to.equal('Hello world');
                 done();
             });
         });
     });
 
-    it('should get flags', function(done) {
-        ic.getFlags({
+    it('should get cyphertext of an encrypted message', function(done) {
+        ic.listMessagesByUid({
             path: 'INBOX',
-            uid: 1
-        }, function(error, flags) {
-            expect(error).to.be.null;
-            expect(flags.unread).to.be.false;
-            expect(flags.answered).to.be.false;
-            done();
+            firstUid: 5,
+            lastUid: 5
+        }, function(error, messages) {
+            ic.getBody({
+                path: 'INBOX',
+                message: messages[0]
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal('insert pgp here.');
+                done();
+            });
         });
     });
 
@@ -248,49 +206,69 @@ describe('ImapClient integration tests', function() {
     it('should purge message', function(done) {
         ic.listMessagesByUid({
             path: 'INBOX',
-            uid: 1,
+            firstUid: 1
         }, function(error, messages) {
-            var i, l;
             expect(error).to.not.exist;
+            expect(messages).to.not.be.empty;
 
-            for (i = 0, l = messages.length; i < l; i++) {
-                if (messages[i].subject === 'blablubb') {
-                    purge(messages[i].uid);
-                    break;
-                }
-            }
+            ic.deleteMessage({
+                path: 'INBOX',
+                uid: 2
+            }, function(error) {
+                expect(error).to.not.exist;
 
-            function purge(uid) {
-                ic.deleteMessage({
+                ic.listMessagesByUid({
                     path: 'INBOX',
-                    uid: uid
-                }, function(error) {
-                    expect(error).to.be.null;
+                    firstUid: 1
+                }, function(error, messages) {
+                    expect(error).to.not.exist;
+                    expect(messages).to.not.be.empty;
+
+                    messages.forEach(function(message) {
+                        expect(message.uid).to.not.equal(2);
+                    });
+
                     done();
                 });
-            }
-
-            done();
+            });
         });
     });
 
     it('should move message', function(done) {
-        ic.moveMessage({
-            path: 'INBOX',
-            uid: 1,
-            destination: '[Gmail]/Trash'
-        }, function(error) {
-            expect(error).to.not.exist;
+        var destination = '[Gmail]/Trash';
 
-            done();
+        ic.listMessagesByUid({
+            path: destination,
+            firstUid: 1
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+            expect(messages).to.be.empty;
+
+            ic.moveMessage({
+                path: 'INBOX',
+                uid: 3,
+                destination: destination
+            }, function(error) {
+                expect(error).to.not.exist;
+
+                ic.listMessagesByUid({
+                    path: destination,
+                    firstUid: 1
+                }, function(error, messages) {
+                    expect(error).to.not.exist;
+                    expect(messages).to.not.be.empty;
+
+                    done();
+                });
+            });
         });
     });
 
     it('should get attachments', function(done) {
         ic.listMessagesByUid({
             path: 'INBOX',
-            firstUid: 2,
-            lastUid: 2
+            firstUid: 6,
+            lastUid: 6
         }, function(error, messages) {
             expect(error).to.not.exist;
 
@@ -302,7 +280,6 @@ describe('ImapClient integration tests', function() {
                 expect(error).to.not.exist;
                 expect(attachment).to.exist;
                 expect(attachment.content).to.exist;
-                expect(attachment.progress).to.equal(1);
 
                 done();
             });
