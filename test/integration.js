@@ -2,8 +2,14 @@ require.config({
     baseUrl: 'lib',
     paths: {
         'test': '..',
-        'forge': 'forge.min',
+        'forge': 'forge.min'
+    },
+    shim: {
+        forge: {
+            exports: 'forge'
+        }
     }
+
 });
 
 require([], function() {
@@ -11,7 +17,7 @@ require([], function() {
 
     mocha.setup('bdd');
 
-    require(['test/imap-client-integration'], function() {
+    require(['test/integration-test'], function() {
         mocha.run();
     });
 });

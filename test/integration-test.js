@@ -1,8 +1,15 @@
-define(function(require) {
+(function (factory) {
     'use strict';
 
-    var ImapClient = require('imap-client'),
-        expect = require('chai').expect,
+    if (typeof define === 'function' && define.amd) {
+        define(['chai', 'mailreader', 'imap-client'], factory);
+    } else if (typeof exports === 'object') {
+        module.exports = factory(require('chai'), require('mailreader'), require('../src/imap-client'));
+    }
+})(function (chai, mailreader, ImapClient) {
+    'use strict';
+
+    var expect = chai.expect,
         loginOptions;
 
     loginOptions = {
@@ -10,23 +17,24 @@ define(function(require) {
         host: 'imap.gmail.com', // 'secureimap.t-online.de'
         auth: {
             user: 'safewithme.testuser@gmail.com', // whiteout.test@t-online.de
-            pass: 'hellosafe' // '@6IyFg1SIlWH91Co'
+            pass: 'hellosafer' // '@6IyFg1SIlWH91Co'
         },
         secure: true,
         ca: ['-----BEGIN CERTIFICATE-----\r\nMIIEBDCCAuygAwIBAgIDAjppMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT\r\nMRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i\r\nYWwgQ0EwHhcNMTMwNDA1MTUxNTU1WhcNMTUwNDA0MTUxNTU1WjBJMQswCQYDVQQG\r\nEwJVUzETMBEGA1UEChMKR29vZ2xlIEluYzElMCMGA1UEAxMcR29vZ2xlIEludGVy\r\nbmV0IEF1dGhvcml0eSBHMjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\r\nAJwqBHdc2FCROgajguDYUEi8iT/xGXAaiEZ+4I/F8YnOIe5a/mENtzJEiaB0C1NP\r\nVaTOgmKV7utZX8bhBYASxF6UP7xbSDj0U/ck5vuR6RXEz/RTDfRK/J9U3n2+oGtv\r\nh8DQUB8oMANA2ghzUWx//zo8pzcGjr1LEQTrfSTe5vn8MXH7lNVg8y5Kr0LSy+rE\r\nahqyzFPdFUuLH8gZYR/Nnag+YyuENWllhMgZxUYi+FOVvuOAShDGKuy6lyARxzmZ\r\nEASg8GF6lSWMTlJ14rbtCMoU/M4iarNOz0YDl5cDfsCx3nuvRTPPuj5xt970JSXC\r\nDTWJnZ37DhF5iR43xa+OcmkCAwEAAaOB+zCB+DAfBgNVHSMEGDAWgBTAephojYn7\r\nqwVkDBF9qn1luMrMTjAdBgNVHQ4EFgQUSt0GFhu89mi1dvWBtrtiGrpagS8wEgYD\r\nVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwOgYDVR0fBDMwMTAvoC2g\r\nK4YpaHR0cDovL2NybC5nZW90cnVzdC5jb20vY3Jscy9ndGdsb2JhbC5jcmwwPQYI\r\nKwYBBQUHAQEEMTAvMC0GCCsGAQUFBzABhiFodHRwOi8vZ3RnbG9iYWwtb2NzcC5n\r\nZW90cnVzdC5jb20wFwYDVR0gBBAwDjAMBgorBgEEAdZ5AgUBMA0GCSqGSIb3DQEB\r\nBQUAA4IBAQA21waAESetKhSbOHezI6B1WLuxfoNCunLaHtiONgaX4PCVOzf9G0JY\r\n/iLIa704XtE7JW4S615ndkZAkNoUyHgN7ZVm2o6Gb4ChulYylYbc3GrKBIxbf/a/\r\nzG+FA1jDaFETzf3I93k9mTXwVqO94FntT0QJo544evZG0R0SnU++0ED8Vf4GXjza\r\nHFa9llF7b1cq26KqltyMdMKVvvBulRP/F/A8rLIQjcxz++iPAsbw+zOzlTvjwsto\r\nWHPbqCRiOwY1nQ2pM714A5AuTHhdUDqB1O6gyHA43LL5Z/qHQF1hwFGPa4NrzQU6\r\nyuGnBXj8ytqU0CwIPX4WecigUCAkVDNx\r\n-----END CERTIFICATE-----\r\n']
     };
 
-    describe('ImapClient integration tests', function() {
+    describe('ImapClient gmail integration tests', function() {
         this.timeout(5000);
 
         var ic;
 
+        before(function() {
+            if (typeof window !== 'undefined' && window.Worker) {
+                mailreader.startWorker('lib/mailreader-parser-worker.js');
+            }
+        });
+
         beforeEach(function(done) {
-            //
-            // WEB WORKERS ARE DISABLED DUE TO THE ISSUE OF LOADING STRINGENCODING POLYFILLS IN A WORKER CONTEXT
-            //
-            window.Worker = undefined;
-            
             ic = new ImapClient(loginOptions);
             ic.login(done);
         });
@@ -90,7 +98,7 @@ define(function(require) {
             }, function(error, messages) {
                 ic.getBody({
                     path: 'INBOX',
-                    message: messages[0]
+                    message: messages.pop()
                 }, function(error, message) {
                     expect(error).to.not.exist;
                     expect(message).to.exist;

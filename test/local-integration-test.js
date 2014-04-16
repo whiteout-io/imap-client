@@ -1,220 +1,288 @@
-// define(function(require) {
-//     'use strict';
+'use strict';
 
-//     var chai = require('chai'),
-//         expect = chai.expect,
-//         ImapClient = require('imap-client'),
-//         loginOptions;
+// this test is node-only (hoodiecrow is fired up)
 
-//     chai.Assertion.includeStack = true;
+var chai = require('chai'),
+    expect = chai.expect,
+    ImapClient = require('../src/imap-client'),
+    hoodiecrow = require('hoodiecrow'),
+    loginOptions = {
+        port: 12345,
+        host: 'localhost',
+        auth: {
+            user: 'testuser',
+            pass: 'testpass'
+        },
+        secure: false
+    };
 
-//     loginOptions = {
-//         port: 12345,
-//         host: 'localhost',
-//         auth: {
-//             user: 'testuser',
-//             pass: 'testpass'
-//         },
-//         secure: false,
-//         ca: '-----BEGIN CERTIFICATE-----\r\nMIICKTCCAZICCQDpQ20Tsi+iMDANBgkqhkiG9w0BAQUFADBZMQswCQYDVQQGEwJB\r\nVTETMBEGA1UECBMKU29tZS1TdGF0ZTEhMB8GA1UEChMYSW50ZXJuZXQgV2lkZ2l0\r\ncyBQdHkgTHRkMRIwEAYDVQQDEwlsb2NhbGhvc3QwHhcNMTQwMzE3MTM1MzMxWhcN\r\nMTQwNDE2MTM1MzMxWjBZMQswCQYDVQQGEwJBVTETMBEGA1UECBMKU29tZS1TdGF0\r\nZTEhMB8GA1UEChMYSW50ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMRIwEAYDVQQDEwls\r\nb2NhbGhvc3QwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAMD2N+TDbLNTJ9zX\r\nm8QLMYxlPbB8zg7mXKhsUf9nesY16vE8jCYPLGU4KrlwTz8rwU25o2b02RsQJJf1\r\nZHvLJRMbyRftwboeHDUgKwTlEpZr/u4gkhq7nXtDk3oDbMEzhgsIB7BBmF2/h9g0\r\nLPe+xO7IbOcPmkBHtsh8IdHqVuUFAgMBAAEwDQYJKoZIhvcNAQEFBQADgYEAbs6+\r\nswTx03uGJfihujLC7sUiTmv9rFOTiqgElhK0R3Pft4nbWL1Jhn4twUwCa+csCDEA\r\nroItaeKZAC5zUGA4uXn1R0dZdOdLOff7998zSY3V5/cMAUYFztqSJjvqllDXxAmF\r\n30HHOMhiXQI1Wm0pqKlgzGCBt0fObgSaob9Zqbs=\r\n-----END CERTIFICATE-----\r\n'
-//     };
+describe('ImapClient local integration tests', function() {
+    var ic, imap;
 
-//     describe('ImapClient integration tests', function() {
-//         var ic;
+    chai.Assertion.includeStack = true;
+    before(function() {
+        imap = hoodiecrow({
+            storage: {
+                'INBOX': {
+                    messages: [{
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 1\r\n\r\nWorld 1!'
+                    }, {
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 2\r\n\r\nWorld 2!',
+                        flags: ['\\Seen']
+                    }, {
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 3\r\n\r\nWorld 3!'
+                    }, {
+                        raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
+                    }, {
+                        raw: 'Content-Type: multipart/encrypted; boundary="Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69"; protocol="application/pgp-encrypted";\r\nSubject: [whiteout] attachment only\r\nFrom: Felix Hammerl <felix.hammerl@gmail.com>\r\nDate: Thu, 16 Jan 2014 14:55:56 +0100\r\nContent-Transfer-Encoding: 7bit\r\nMessage-Id: <3ECDF9DC-895E-4475-B2A9-52AF1F117652@gmail.com>\r\nContent-Description: OpenPGP encrypted message\r\nTo: safewithme.testuser@gmail.com\r\n\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: application/pgp-encrypted\r\nContent-Description: PGP/MIME Versions Identification\r\n\r\nVersion: 1\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: inline;\r\n    filename=encrypted.asc\r\nContent-Type: application/octet-stream;\r\n    name=encrypted.asc\r\nContent-Description: OpenPGP encrypted message\r\n\r\ninsert pgp here.\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69--',
+                    }, {
+                        raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
+                    }]
+                },
+                '': {
+                    'separator': '/',
+                    'folders': {
+                        '[Gmail]': {
+                            'flags': ['\\Noselect'],
+                            'folders': {
+                                'All Mail': {
+                                    'flags': '\\All'
+                                },
+                                'Drafts': {
+                                    'special-use': '\\Drafts'
+                                },
+                                'Important': {
+                                    'flags': '\\Important'
+                                },
+                                'Sent Mail': {
+                                    'flags': '\\Sent'
+                                },
+                                'Spam': {
+                                    'special-use': '\\Junk'
+                                },
+                                'Starred': {
+                                    'flags': '\\Flagged'
+                                },
+                                'Trash': {
+                                    'special-use': '\\Trash'
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }),
+        imap.listen(loginOptions.port);
+    });
 
-//         beforeEach(function(done) {
-//             ic = new ImapClient(loginOptions);
-//             ic.login(done);
-//         });
+    after(function(done) {
+        imap.close(done);
+    });
 
-//         afterEach(function(done) {
-//             ic.logout(done);
-//         });
+    beforeEach(function(done) {
+        ic = new ImapClient(loginOptions);
+        ic.login(done);
+    });
 
-//         it('should list well known folders', function(done) {
-//             ic.listWellKnownFolders(function(error, folders) {
-//                 expect(error).to.not.exist;
+    afterEach(function(done) {
+        ic.logout(done);
+    });
 
-//                 expect(folders).to.exist;
-//                 expect(folders.drafts).to.exist;
-//                 expect(folders.drafts.name).to.exist;
-//                 expect(folders.drafts.type).to.exist;
-//                 expect(folders.drafts.path).to.exist;
+    it('should list well known folders', function(done) {
+        ic.listWellKnownFolders(function(error, folders) {
+            expect(error).to.not.exist;
 
-//                 expect(folders.sent).to.exist;
-//                 expect(folders.trash).to.exist;
-//                 expect(folders.junk).to.exist;
+            expect(folders).to.exist;
 
-//                 done();
-//             });
-//         });
+            expect(folders.inbox).to.exist;
+            expect(folders.inbox.name).to.exist;
+            expect(folders.inbox.type).to.exist;
+            expect(folders.inbox.path).to.exist;
 
-//         // it('should search messages', function(done) {
-//         //     ic.search({
-//         //         path: 'INBOX',
-//         //         subject: 'blablubb',
-//         //         unread: false,
-//         //         answered: false
-//         //     }, function(error, uids) {
-//         //         expect(error).to.not.exist;
-//         //         expect(uids).to.not.be.empty;
-//         //         done();
-//         //     });
-//         // });
+            expect(folders.drafts).to.exist;
+            expect(folders.sent).to.exist;
+            expect(folders.trash).to.exist;
+            expect(folders.junk).to.exist;
+            expect(folders.flagged).to.exist;
 
-//         it('should list messages by uid', function(done) {
-//             ic.listMessagesByUid({
-//                 path: 'INBOX',
-//                 firstUid: 1,
-//                 lastUid: 3
-//             }, function(error, messages) {
-//                 expect(error).to.not.exist;
-//                 expect(messages).to.not.be.empty;
-//                 expect(messages.length).to.equal(3);
-//                 expect(messages[0].id).to.not.be.empty;
-//                 expect(/[<>]/g.test(messages[0].id)).to.be.false;
-//                 expect(messages[0].bodystructure).to.exist;
-//                 expect(messages[0].textParts.length).to.equal(1);
-//                 done();
-//             });
-//         });
+            expect(folders.other).to.be.instanceof(Array);
+            expect(folders.other).to.not.be.empty;
 
-//         it('should list messages by uid without providing lastUid parameter', function(done) {
-//             ic.listMessagesByUid({
-//                 path: 'INBOX',
-//                 firstUid: 1
-//             }, function(error, messages) {
-//                 expect(error).to.not.exist;
-//                 expect(messages).to.not.be.empty;
-//                 expect(messages.length).to.equal(4);
-//                 done();
-//             });
-//         });
+            done();
+        });
+    });
 
-//         it('should get message in plain text', function(done) {
-//             ic.listMessagesByUid({
-//                 path: 'INBOX',
-//                 firstUid: 2,
-//                 lastUid: 2
-//             }, function(error, messages) {
-//                 ic.getBody({
-//                     path: 'INBOX',
-//                     message: messages[0]
-//                 }, function(error, message) {
-//                     expect(error).to.not.exist;
-//                     expect(message).to.exist;
-//                     expect(message.body).to.equal("Hello world");
-//                     done();
-//                 });
-//             });
-//         });
+    it('should search messages', function(done) {
+        ic.search({
+            path: 'INBOX',
+            subject: 'blablubb',
+            unread: false,
+            answered: false
+        }, function(error, uids) {
+            expect(error).to.not.exist;
+            expect(uids).to.not.be.empty;
+            done();
+        });
+    });
 
-//         it('should get cyphertext of an encrypted message', function(done) {
-//             ic.listMessagesByUid({
-//                 path: 'INBOX',
-//                 firstUid: 4,
-//                 lastUid: 4
-//             }, function(error, messages) {
-//                 ic.getBody({
-//                     path: 'INBOX',
-//                     message: messages[0]
-//                 }, function(error, message) {
-//                     expect(error).to.not.exist;
-//                     expect(message).to.exist;
-//                     expect(message.body).to.equal("insert pgp here.");
-//                     done();
-//                 });
-//             });
-//         });
+    it('should list messages by uid', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 1,
+            lastUid: 3
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+            expect(messages).to.not.be.empty;
+            expect(messages.length).to.equal(3);
+            expect(messages[0].id).to.not.be.empty;
+            expect(messages[0].bodystructure).to.exist;
+            expect(messages[0].textParts.length).to.equal(1);
+            done();
+        });
+    });
 
-//         // it('should get flags', function(done) {
-//         //     ic.getFlags({
-//         //         path: 'INBOX',
-//         //         uid: 1
-//         //     }, function(error, flags) {
-//         //         expect(error).to.be.null;
-//         //         expect(flags.unread).to.be.false;
-//         //         expect(flags.answered).to.be.false;
-//         //         done();
-//         //     });
-//         // });
+    it('should list all messages by uid', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 1
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+            expect(messages).to.not.be.empty;
+            expect(messages.length).to.equal(6);
+            done();
+        });
+    });
 
-//         // it('should update flags', function(done) {
-//         //     ic.updateFlags({
-//         //         path: 'INBOX',
-//         //         uid: 1,
-//         //         unread: true,
-//         //         answered: true
-//         //     }, function(error, flags) {
-//         //         expect(error).to.be.null;
-//         //         expect(flags.unread).to.be.true;
-//         //         expect(flags.answered).to.be.true;
-//         //         done();
-//         //     });
-//         // });
+    it('should get message in plain text', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 4,
+            lastUid: 4
+        }, function(error, messages) {
+            ic.getBody({
+                path: 'INBOX',
+                message: messages[0]
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal('Hello world');
+                done();
+            });
+        });
+    });
 
-//         // it('should purge message', function(done) {
-//         //     ic.listMessagesByUid({
-//         //         path: 'INBOX',
-//         //         uid: 1,
-//         //     }, function(error, messages) {
-//         //         var i, l;
-//         //         expect(error).to.not.exist;
+    it('should get cyphertext of an encrypted message', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 5,
+            lastUid: 5
+        }, function(error, messages) {
+            ic.getBody({
+                path: 'INBOX',
+                message: messages[0]
+            }, function(error, message) {
+                expect(error).to.not.exist;
+                expect(message).to.exist;
+                expect(message.body).to.equal('insert pgp here.');
+                done();
+            });
+        });
+    });
 
-//         //         for (i = 0, l = messages.length; i < l; i++) {
-//         //             if (messages[i].subject === 'blablubb') {
-//         //                 purge(messages[i].uid);
-//         //                 break;
-//         //             }
-//         //         }
+    it('should update flags', function(done) {
+        ic.updateFlags({
+            path: 'INBOX',
+            uid: 1,
+            unread: true,
+            answered: true
+        }, function(error, flags) {
+            expect(error).to.be.null;
+            expect(flags.unread).to.be.true;
+            expect(flags.answered).to.be.true;
+            done();
+        });
+    });
 
-//         //         function purge(uid) {
-//         //             ic.deleteMessage({
-//         //                 path: 'INBOX',
-//         //                 uid: uid
-//         //             }, function(error) {
-//         //                 expect(error).to.be.null;
-//         //                 done();
-//         //             });
-//         //         }
+    it('should purge message', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 1
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+            expect(messages).to.not.be.empty;
 
-//         //         done();
-//         //     });
-//         // });
+            ic.deleteMessage({
+                path: 'INBOX',
+                uid: 2
+            }, function(error) {
+                expect(error).to.not.exist;
 
-//         // it('should move message', function(done) {
-//         //     ic.moveMessage({
-//         //         path: 'INBOX',
-//         //         uid: 1,
-//         //         destination: '[Gmail]/Trash'
-//         //     }, function(error) {
-//         //         expect(error).to.not.exist;
+                ic.listMessagesByUid({
+                    path: 'INBOX',
+                    firstUid: 1
+                }, function(error, messages) {
+                    expect(error).to.not.exist;
+                    expect(messages).to.not.be.empty;
 
-//         //         done();
-//         //     });
-//         // });
+                    messages.forEach(function(message) {
+                        expect(message.uid).to.not.equal(2);
+                    });
 
-//         it('should get attachments', function(done) {
-//             ic.listMessagesByUid({
-//                 path: 'INBOX',
-//                 firstUid: 2,
-//                 lastUid: 2
-//             }, function(error, messages) {
-//                 expect(error).to.not.exist;
+                    done();
+                });
+            });
+        });
+    });
 
-//                 ic.getAttachment({
-//                     path: 'INBOX',
-//                     uid: messages[0].uid,
-//                     attachment: messages[0].attachments[0]
-//                 }, function(error, attachment) {
-//                     expect(error).to.not.exist;
-//                     expect(attachment).to.exist;
-//                     expect(attachment.content).to.exist;
-//                     expect(attachment.progress).to.equal(1);
+    it('should move message', function(done) {
+        var destination = '[Gmail]/Trash';
 
-//                     done();
-//                 });
-//             });
-//         });
-//     });
-// });
+        ic.listMessagesByUid({
+            path: destination,
+            firstUid: 1
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+            expect(messages).to.be.empty;
+
+            ic.moveMessage({
+                path: 'INBOX',
+                uid: 3,
+                destination: destination
+            }, function(error) {
+                expect(error).to.not.exist;
+
+                ic.listMessagesByUid({
+                    path: destination,
+                    firstUid: 1
+                }, function(error, messages) {
+                    expect(error).to.not.exist;
+                    expect(messages).to.not.be.empty;
+
+                    done();
+                });
+            });
+        });
+    });
+
+    it('should get attachments', function(done) {
+        ic.listMessagesByUid({
+            path: 'INBOX',
+            firstUid: 6,
+            lastUid: 6
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+
+            ic.getAttachment({
+                path: 'INBOX',
+                uid: messages[0].uid,
+                attachment: messages[0].attachments[0]
+            }, function(error, attachment) {
+                expect(error).to.not.exist;
+                expect(attachment).to.exist;
+                expect(attachment.content).to.exist;
+
+                done();
+            });
+        });
+    });
+});

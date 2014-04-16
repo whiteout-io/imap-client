@@ -1,8 +1,13 @@
-define(function(require) {
+(function (factory) {
     'use strict';
 
-    var BrowserBox = require('browserbox'),
-        mailreader = require('mailreader');
+    if (typeof define === 'function' && define.amd) {
+        define(['browserbox', 'mailreader'], factory);
+    } else if (typeof exports === 'object') {
+        module.exports = factory(require('browserbox'), require('mailreader'));
+    }
+})(function (BrowserBox, mailreader) {
+    'use strict';
 
     /**
      * Create an instance of ImapClient. To observe new mails, assign your callback to this.onIncomingMessage.
@@ -33,7 +38,9 @@ define(function(require) {
                 ca: options.ca
             });
         }
-        this._client.onerror = this.onError;
+        this._client.onerror = function(err) {
+            console.error(err);
+        };
     };
 
     /**
@@ -211,12 +218,12 @@ define(function(require) {
 
         // look for nodes that contain well-formed pgp/mime and add them to the list of body parts. (bind to mailObj!)
         var handlePgpMime = function(node) {
-            if (!(node.type === 'multipart/encrypted' && node.childNodes && node.childNodes[2])) {
+            if (!(node.type === 'multipart/encrypted' && node.childNodes && node.childNodes[1])) {
                 return false;
             }
 
             // as the standard dictates, the second child node of a multipart/encrypted node contains the pgp payload
-            this.textParts.push(node.childNodes[2]);
+            this.textParts.push(node.childNodes[1]);
             return true;
         };
 
@@ -254,8 +261,7 @@ define(function(require) {
             return true;
         };
 
-        var first = options.firstUid || 1,
-            last = options.lastUid || '*',
+        var interval = (options.firstUid || 1) + ':' + (options.lastUid || '*'),
             query = ['uid', 'bodystructure', 'flags', 'envelope'],
             queryOptions = {
                 byUid: true
@@ -268,7 +274,7 @@ define(function(require) {
                 return;
             }
 
-            self._client.listMessages(first + ':' + last, query, queryOptions, onList);
+            self._client.listMessages(interval, query, queryOptions, onList);
         });
 
         // process what inbox returns into a usable form for our client
@@ -289,7 +295,7 @@ define(function(require) {
                 var cleansed = {
                     uid: message.uid,
                     id: message.envelope['message-id'].replace(/[<>]/g, ''),
-                    from: message.envelope.from ? message.from : [],
+                    from: message.envelope.from || [],
                     to: message.envelope.to || [],
                     cc: message.envelope.cc || [],
                     bcc: message.envelope.bcc || [],
@@ -367,7 +373,11 @@ define(function(require) {
 
             // a raw part consists of its MIME header and the payload
             message.textParts.forEach(function(textPart) {
-                rawParts.push(msg['body[' + textPart.part + '.mime]'] + msg['body[' + textPart.part + ']']);
+                if (textPart.part) {
+                    rawParts.push(msg['body[' + textPart.part + '.mime]'] + msg['body[' + textPart.part + ']']);
+                } else {
+                    rawParts.push(msg['body[]']);
+                }
             });
 
             // start parsing the raw parts one-by-one
@@ -409,7 +419,7 @@ define(function(require) {
         self._getParts({
             path: options.path,
             uid: options.uid,
-            parts: [attmt.part]
+            parts: [attmt]
         }, onList);
 
         // we have received the attachment from the imap server
@@ -440,8 +450,12 @@ define(function(require) {
 
         // formulate a query for each text part. for part 2.1 to be parsed, we need 2.1.MIME and 2.1
         options.parts.forEach(function(part) {
-            query.push('body.peek[' + part.part + '.mime]');
-            query.push('body.peek[' + part.part + ']');
+            if (part.part) {
+                query.push('body.peek[' + part.part + '.mime]');
+                query.push('body.peek[' + part.part + ']');
+            } else {
+                query.push('body.peek[]');
+            }
         });
 
         // open the mailbox and retrieve the message
@@ -455,13 +469,6 @@ define(function(require) {
         });
     };
 
-
-    //
-    //
-    // Functionality below is not yet available in browserbox!
-    //
-    //
-
     /**
      * Update IMAP flags for a message with a given UID
      * @param {String} options.path The folder's path
@@ -471,54 +478,60 @@ define(function(require) {
      * @param {Function} callback(error, flags) will be called the flags have been received from the server
      */
     ImapClient.prototype.updateFlags = function(options, callback) {
-        callback();
+        var self = this,
+            interval = options.uid + ':' + options.uid,
+            queryOptions = {
+                byUid: true
+            },
+            query,
+            remove = [],
+            add = [],
+            READ_FLAG = '\\Seen',
+            ANSWERED_FLAG = '\\Answered';
+
+        if (options.unread === true) {
+            remove.push(READ_FLAG);
+        } else if (options.unread === false) {
+            add.push(READ_FLAG);
+        }
+
+        if (options.answered === true) {
+            add.push(ANSWERED_FLAG);
+        } else if (options.answered === true) {
+            remove.push(ANSWERED_FLAG);
+        }
+
+        query = {
+            add: add,
+            remove: remove
+        };
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not update flags, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.selectMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._client.setFlags(interval, query, queryOptions, onFlags);
+        });
+
+        function onFlags(error, messages) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            callback(null, {
+                unread: messages[0].flags.indexOf(READ_FLAG) === -1,
+                answered: messages[0].flags.indexOf(ANSWERED_FLAG) > -1
+            });
+        }
     };
-    // ImapClient.prototype.updateFlags = function(options, callback) {
-    //     var self = this,
-    //         READ_FLAG = '\\Seen',
-    //         ANSWERED_FLAG = '\\Answered';
-
-    //     if (!self._loggedIn) {
-    //         callback(new Error('Can not update flags, cause: Not logged in!'));
-    //         return;
-    //     }
-
-    //     self._client.selectMailbox(options.path, function(error) {
-    //         if (error) {
-    //             callback(error);
-    //             return;
-    //         }
-
-    //         var remove = [],
-    //             add = [];
-
-    //         if (typeof options.unread !== 'undefined') {
-    //             options.unread ? remove.push(READ_FLAG) : add.push(READ_FLAG);
-    //         }
-
-    //         if (typeof options.answered !== 'undefined') {
-    //             options.answered ? add.push(ANSWERED_FLAG) : remove.push(ANSWERED_FLAG);
-    //         }
-
-    //         self._client.removeFlags(options.uid, remove, function(error) {
-    //             if (error) {
-    //                 callback(error);
-    //                 return;
-    //             }
-
-    //             self._client.addFlags(options.uid, add, function(error, flags) {
-    //                 if (flags === true) {
-    //                     callback(null, {});
-    //                 } else {
-    //                     callback(null, {
-    //                         unread: flags.indexOf(READ_FLAG) === -1,
-    //                         answered: flags.indexOf(ANSWERED_FLAG) > -1
-    //                     });
-    //                 }
-    //             });
-    //         });
-    //     });
-    // };
 
     /**
      * Move a message to a destination folder
@@ -528,25 +541,26 @@ define(function(require) {
      * @param {Function} callback(error) Callback with an error object in case something went wrong.
      */
     ImapClient.prototype.moveMessage = function(options, callback) {
-        callback();
+        var self = this,
+            interval = options.uid + ':' + options.uid,
+            queryOptions = {
+                byUid: true
+            };
+
+        if (!self._loggedIn) {
+            callback(new Error('Cannot move message, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.selectMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._client.moveMessages(interval, options.destination, queryOptions, callback);
+        });
     };
-    // ImapClient.prototype.moveMessage = function(options, callback) {
-    //     var self = this;
-
-    //     if (!self._loggedIn) {
-    //         callback(new Error('Cannot move message, cause: Not logged in!'));
-    //         return;
-    //     }
-
-    //     self._client.selectMailbox(options.path, function(error) {
-    //         if (error) {
-    //             callback(error);
-    //             return;
-    //         }
-
-    //         self._client.moveMessage(options.uid, options.destination, callback);
-    //     });
-    // };
 
     /**
      * Purges a message from a folder
@@ -555,25 +569,26 @@ define(function(require) {
      * @param {Function} callback(error) Callback with an error object in case something went wrong.
      */
     ImapClient.prototype.deleteMessage = function(options, callback) {
-        callback();
+        var self = this,
+            interval = options.uid + ':' + options.uid,
+            queryOptions = {
+                byUid: true
+            };
+
+        if (!self._loggedIn) {
+            callback(new Error('Cannot delete message, cause: Not logged in!'));
+            return;
+        }
+
+        self._client.selectMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._client.deleteMessages(interval, queryOptions, callback);
+        });
     };
-    // ImapClient.prototype.deleteMessage = function(options, callback) {
-    //     var self = this;
-
-    //     if (!self._loggedIn) {
-    //         callback(new Error('Cannot delete message, cause: Not logged in!'));
-    //         return;
-    //     }
-
-    //     self._client.selectMailbox(options.path, function(error) {
-    //         if (error) {
-    //             callback(error);
-    //             return;
-    //         }
-
-    //         self._client.deleteMessage(options.uid, callback);
-    //     });
-    // };
 
     //
     // Helper Methods
