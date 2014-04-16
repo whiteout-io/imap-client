@@ -9,7 +9,7 @@ module.exports = function(grunt) {
                 jshintrc: '.jshintrc'
             }
         },
-        
+
         connect: {
             dev: {
                 options: {
@@ -71,14 +71,14 @@ module.exports = function(grunt) {
                     'tcp-socket/src/*.js',
                     'node-forge/js/forge.min.js',
                     'arraybuffer-slice/index.js',
-                    'stringencoding/dist/*',
                     'browserbox/src/*.js',
                     'browserbox/node_modules/utf7/src/*.js',
                     'browserbox/node_modules/imap-handler/src/*.js',
                     'browserbox/node_modules/mimefuncs/src/*.js',
                     'mailreader/src/*.js',
                     'mailreader/node_modules/mimeparser/src/*.js',
-                    'mailreader/node_modules/mimeparser/node_modules/addressparser/src/*.js'
+                    'mailreader/node_modules/mimeparser/node_modules/addressparser/src/*.js',
+                    'mailreader/node_modules/stringencoding/dist/*'
                 ],
                 dest: 'test/lib/',
                 rename: function(dest, src) {

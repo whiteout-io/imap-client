@@ -8,7 +8,7 @@
   "main": "src/imap-client.js",
   "dependencies": {
     "browserbox": "https://github.com/whiteout-io/browserbox/tarball/v0.3.0",
-    "mailreader": "https://github.com/whiteout-io/mailreader/tarball/dev/browser"
+    "mailreader": "https://github.com/whiteout-io/mailreader/tarball/v0.2.0"
   },
   "devDependencies": {
     "chai": "~1.8.1",
@@ -25,7 +25,6 @@
     "hoodiecrow": "1.1.x",
     "tcp-socket": "^0.2.1",
     "node-forge": "^0.2.33",
-    "stringencoding": "https://github.com/whiteout-io/stringencoding/tarball/v0.1.0",
     "arraybuffer-slice": "0.0.2",
     "mocha": "^1.18.2",
     "grunt-mocha-test": "^0.10.2"
