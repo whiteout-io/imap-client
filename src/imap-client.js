@@ -1,4 +1,4 @@
-(function (factory) {
+(function(factory) {
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
@@ -6,7 +6,7 @@
     } else if (typeof exports === 'object') {
         module.exports = factory(require('browserbox'), require('mailreader'));
     }
-})(function (BrowserBox, mailreader) {
+})(function(BrowserBox, mailreader) {
     'use strict';
 
     /**
@@ -17,7 +17,7 @@
      * @param {String} options.auth.user Username for login
      * @param {String} options.auth.pass Password for login
      * @param {Number} options.timeout (optional) Timeout to wait for server communication
-     * @param {Function} options.errorHandler(error) (optional) a global error handler, e.g. for connection issues
+     * @param {Boolean} options.debug (optional) Outputs all the imap traffic in the console
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
     var ImapClient = function(options, reader, browserbox) {
@@ -39,8 +39,12 @@
             });
         }
         this._client.onerror = function(err) {
-            console.error(err);
-        };
+            this.onError(err);
+        }.bind(this);
+
+        if (options.debug) {
+            this._client.onlog = console.log;
+        }
     };
 
     /**
@@ -173,6 +177,9 @@
                 byUid: true
             };
 
+        // initial request to XOR the following properties
+        query.all = true;
+
         if (options.unread === true) {
             query.unseen = true;
         } else if (options.unread === false) {
@@ -300,7 +307,7 @@
                     cc: message.envelope.cc || [],
                     bcc: message.envelope.bcc || [],
                     subject: message.envelope.subject || '(no subject)',
-                    sentDate: message.envelope.date || new Date(),
+                    sentDate: message.envelope.date ? new Date(message.envelope.date) : new Date(),
                     unread: (message.flags || []).indexOf('\\Seen') === -1,
                     answered: (message.flags || []).indexOf('\\Answered') > -1,
                     bodystructure: message.bodystructure || {},

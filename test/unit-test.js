@@ -65,6 +65,15 @@
             });
         });
 
+        describe('#onError', function() {
+            it('should report an error', function(done) {
+                imap.onError = function(err) {
+                    expect(err).to.exist;
+                    done();
+                };
+                imap._client.onerror({});
+            });
+        });
 
         describe('#listWellKnownFolders', function() {
             it('should list well known folders', function(done) {
@@ -128,6 +137,7 @@
             it('should search answered', function(done) {
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
+                    all: true,
                     answered: true
                 }, {
                     byUid: true
@@ -146,6 +156,7 @@
             it('should search unanswered', function(done) {
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
+                    all: true,
                     unanswered: true
                 }, {
                     byUid: true
@@ -164,6 +175,7 @@
             it('should search read', function(done) {
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
+                    all: true,
                     seen: true
                 }, {
                     byUid: true
@@ -182,6 +194,7 @@
             it('should search unread', function(done) {
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
+                    all: true,
                     unseen: true
                 }, {
                     byUid: true
