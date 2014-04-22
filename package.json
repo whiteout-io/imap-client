@@ -1,13 +1,13 @@
 {
   "name": "imap-client",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "scripts": {
     "pretest": "cd node_modules/node-forge/ && npm install && npm run minify && cd ../..",
     "test": "grunt testlocal"
   },
   "main": "src/imap-client.js",
   "dependencies": {
-    "browserbox": "https://github.com/whiteout-io/browserbox/tarball/v0.3.0",
+    "browserbox": "https://github.com/whiteout-io/browserbox/tarball/v0.3.1",
     "mailreader": "https://github.com/whiteout-io/mailreader/tarball/v0.2.0"
   },
   "devDependencies": {
