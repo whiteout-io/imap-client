@@ -225,7 +225,8 @@
 
         // look for nodes that contain well-formed pgp/mime and add them to the list of body parts. (bind to mailObj!)
         var handlePgpMime = function(node) {
-            if (!(node.type === 'multipart/encrypted' && node.childNodes && node.childNodes[1])) {
+            var isPgpMime = /^multipart\/encrypted/i.test(node.type) && node.childNodes && node.childNodes[1];
+            if (!isPgpMime) {
                 return false;
             }
 
@@ -236,7 +237,8 @@
 
         // look for text/plain nodes that are not attachments and add them to the list of body parts. (bind to mailObj!)
         var handlePlainText = function(node) {
-            if (!(node.type === 'text/plain' && !node.disposition)) {
+            var isPlainText = (/^text\/plain/i.test(node.type) && !node.disposition);
+            if (!isPlainText) {
                 return false;
             }
 
@@ -246,7 +248,8 @@
 
         // look for attachment nodes and add all of them to the array of attachments. (bind to mailObj!)
         var handleAttachment = function(node) {
-            if (node.disposition !== 'attachment') {
+            var isAttachment = (/^text\//i.test(node.type) && node.disposition) || (!/^text\//i.test(node.type) && !/^multipart\//i.test(node.type));
+            if (!isAttachment) {
                 return false;
             }
 
