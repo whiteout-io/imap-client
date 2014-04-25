@@ -60,7 +60,7 @@ module.exports = function(grunt) {
         copy: {
             npm: {
                 expand: true,
-                flatten: false,
+                flatten: true,
                 cwd: 'node_modules/',
                 src: [
                     'mocha/mocha.js',
@@ -70,7 +70,6 @@ module.exports = function(grunt) {
                     'requirejs/require.js',
                     'tcp-socket/src/*.js',
                     'node-forge/js/forge.min.js',
-                    'arraybuffer-slice/index.js',
                     'browserbox/src/*.js',
                     'browserbox/node_modules/utf7/src/*.js',
                     'browserbox/node_modules/imap-handler/src/*.js',
@@ -80,14 +79,7 @@ module.exports = function(grunt) {
                     'mailreader/node_modules/mimeparser/node_modules/addressparser/src/*.js',
                     'mailreader/node_modules/stringencoding/dist/*'
                 ],
-                dest: 'test/lib/',
-                rename: function(dest, src) {
-                    if (src === 'arraybuffer-slice/index.js') {
-                        // 'index.js' is obviously a good name for a polyfill. duh.
-                        return dest + 'arraybuffer-slice.js';
-                    }
-                    return dest + '/' + src.split('/').pop();
-                }
+                dest: 'test/lib/'
             },
             app: {
                 expand: true,
