@@ -75,9 +75,7 @@ module.exports = function(grunt) {
                     'browserbox/node_modules/imap-handler/src/*.js',
                     'browserbox/node_modules/mimefuncs/src/*.js',
                     'mailreader/src/*.js',
-                    'mailreader/node_modules/mimeparser/src/*.js',
-                    'mailreader/node_modules/mimeparser/node_modules/addressparser/src/*.js',
-                    'mailreader/node_modules/stringencoding/dist/*'
+                    'stringencoding/dist/*'
                 ],
                 dest: 'test/lib/'
             },

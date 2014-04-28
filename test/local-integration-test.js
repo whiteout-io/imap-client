@@ -126,7 +126,7 @@ describe('ImapClient local integration tests', function() {
     });
 
     it('should list messages by uid', function(done) {
-        ic.listMessagesByUid({
+        ic.listMessages({
             path: 'INBOX',
             firstUid: 1,
             lastUid: 3
@@ -136,13 +136,13 @@ describe('ImapClient local integration tests', function() {
             expect(messages.length).to.equal(3);
             expect(messages[0].id).to.not.be.empty;
             expect(messages[0].bodystructure).to.exist;
-            expect(messages[0].textParts.length).to.equal(1);
+            expect(messages[0].messageParts.length).to.equal(1);
             done();
         });
     });
 
     it('should list all messages by uid', function(done) {
-        ic.listMessagesByUid({
+        ic.listMessages({
             path: 'INBOX',
             firstUid: 1
         }, function(error, messages) {
@@ -153,37 +153,22 @@ describe('ImapClient local integration tests', function() {
         });
     });
 
-    it('should get message in plain text', function(done) {
-        ic.listMessagesByUid({
+    it('should get message parts', function(done) {
+        ic.listMessages({
             path: 'INBOX',
             firstUid: 4,
             lastUid: 4
         }, function(error, messages) {
-            ic.getBody({
+            ic.getMessageParts({
                 path: 'INBOX',
-                message: messages[0]
-            }, function(error, message) {
+                uid: messages[0].uid,
+                messageParts: messages[0].messageParts
+            }, function(error, messageParts) {
                 expect(error).to.not.exist;
-                expect(message).to.exist;
-                expect(message.body).to.equal('Hello world');
-                done();
-            });
-        });
-    });
+                expect(messages[0].messageParts).to.equal(messageParts);
+                expect(messageParts[0].type).to.equal('text');
+                expect(messageParts[0].raw).to.equal('Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world');
 
-    it('should get cyphertext of an encrypted message', function(done) {
-        ic.listMessagesByUid({
-            path: 'INBOX',
-            firstUid: 5,
-            lastUid: 5
-        }, function(error, messages) {
-            ic.getBody({
-                path: 'INBOX',
-                message: messages[0]
-            }, function(error, message) {
-                expect(error).to.not.exist;
-                expect(message).to.exist;
-                expect(message.body).to.equal('insert pgp here.');
                 done();
             });
         });
@@ -204,7 +189,7 @@ describe('ImapClient local integration tests', function() {
     });
 
     it('should purge message', function(done) {
-        ic.listMessagesByUid({
+        ic.listMessages({
             path: 'INBOX',
             firstUid: 1
         }, function(error, messages) {
@@ -217,7 +202,7 @@ describe('ImapClient local integration tests', function() {
             }, function(error) {
                 expect(error).to.not.exist;
 
-                ic.listMessagesByUid({
+                ic.listMessages({
                     path: 'INBOX',
                     firstUid: 1
                 }, function(error, messages) {
@@ -237,7 +222,7 @@ describe('ImapClient local integration tests', function() {
     it('should move message', function(done) {
         var destination = '[Gmail]/Trash';
 
-        ic.listMessagesByUid({
+        ic.listMessages({
             path: destination,
             firstUid: 1
         }, function(error, messages) {
@@ -251,7 +236,7 @@ describe('ImapClient local integration tests', function() {
             }, function(error) {
                 expect(error).to.not.exist;
 
-                ic.listMessagesByUid({
+                ic.listMessages({
                     path: destination,
                     firstUid: 1
                 }, function(error, messages) {
@@ -260,28 +245,6 @@ describe('ImapClient local integration tests', function() {
 
                     done();
                 });
-            });
-        });
-    });
-
-    it('should get attachments', function(done) {
-        ic.listMessagesByUid({
-            path: 'INBOX',
-            firstUid: 6,
-            lastUid: 6
-        }, function(error, messages) {
-            expect(error).to.not.exist;
-
-            ic.getAttachment({
-                path: 'INBOX',
-                uid: messages[0].uid,
-                attachment: messages[0].attachments[0]
-            }, function(error, attachment) {
-                expect(error).to.not.exist;
-                expect(attachment).to.exist;
-                expect(attachment.content).to.exist;
-
-                done();
             });
         });
     });
