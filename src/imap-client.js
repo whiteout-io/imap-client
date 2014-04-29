@@ -10,13 +10,13 @@
     'use strict';
 
     /**
-     * Create an instance of ImapClient. To observe new mails, assign your callback to this.onIncomingMessage.
+     * Create an instance of ImapClient.
      * @param {Number} options.port Port is the port to the server (defaults to 143 on non-secure and to 993 on secure connection).
      * @param {String} options.host Hostname of the server.
      * @param {Boolean} options.secure Indicates if the connection is using TLS or not
      * @param {String} options.auth.user Username for login
      * @param {String} options.auth.pass Password for login
-     * @param {Number} options.timeout (optional) Timeout to wait for server communication
+     * @param {String} options.auth.xoauth2 xoauth2 token for login
      * @param {Boolean} options.debug (optional) Outputs all the imap traffic in the console
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
@@ -30,20 +30,35 @@
         /* Instance of our imap library
          * @private */
         if (browserbox) {
-            this._client = browserbox;
+            this._client = this._listeningClient = browserbox;
         } else {
-            this._client = new BrowserBox(options.host, options.port, {
+            var credentials = {
                 useSSL: options.secure,
                 auth: options.auth,
                 ca: options.ca
-            });
+            };
+            this._client = new BrowserBox(options.host, options.port, credentials);
+            this._listeningClient = new BrowserBox(options.host, options.port, credentials);
         }
-        this._client.onerror = function(err) {
+        this._client.onerror = this._listeningClient.onerror = function(err) {
+            // the error handler is the same for both clients. if one instance
+            // of browserbox fails, just shutdown the client and avoid further
+            // operations
+            if (this._errored) {
+                return;
+            }
+
+            this._errored = true;
+            this._currentPath = undefined;
+            this._loggedIn = false;
+            this._listeningClient.close();
+            this._client.close();
+
             this.onError(err);
         }.bind(this);
 
         if (options.debug) {
-            this._client.onlog = console.log;
+            this._client.onlog = this._listeningClient.onlog = console.log;
         }
     };
 
@@ -53,18 +68,27 @@
      * @param {Function} callback Callback when the login was successful
      */
     ImapClient.prototype.login = function(callback) {
-        var self = this;
+        var self = this,
+            authCount = 0;
 
         if (self._loggedIn) {
             callback(new Error('Already logged in!'));
             return;
         }
 
-        self._client.onauth = function() {
-            self._loggedIn = true;
-            callback();
-        };
+        function onauth() {
+            authCount++;
 
+            if (authCount >= 2) {
+                self._loggedIn = true;
+                callback();
+            }
+        }
+
+        self._listeningClient.onauth = onauth;
+        self._client.onauth = onauth;
+
+        self._listeningClient.connect();
         self._client.connect();
     };
 
@@ -72,19 +96,63 @@
      * Log out of the current IMAP session
      */
     ImapClient.prototype.logout = function(callback) {
-        var self = this;
+        var self = this,
+            closeCount = 0;
 
         if (!self._loggedIn) {
             callback(new Error('Can not log out, cause: Not logged in!'));
             return;
         }
 
-        self._client.onclose = function() {
-            self._loggedIn = false;
-            callback();
-        };
+        function onclose() {
+            closeCount++;
 
+            if (closeCount >= 2) {
+                self._loggedIn = false;
+                callback();
+            }
+        }
+
+
+        self._listeningClient.onclose = onclose;
+        self._client.onclose = onclose;
+
+        self._listeningClient.close();
         self._client.close();
+    };
+
+    /**
+     * Starts listening for updates on a specific IMAP folder, calls back when a change occurrs,
+     * or includes information in case of an error
+     * @param {String} options.path The path to the folder to subscribe to
+     * @param {String} callback The callback when a change in the mailbox occurs
+     */
+    ImapClient.prototype.listenForChanges = function(options, callback) {
+        var self = this;
+
+        self._listeningClient.selectMailbox(options.path, function(error) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            self._listeningClient.onupdate = function(type) {
+                if (type !== 'exists') {
+                    return;
+                }
+
+                callback(null, options.path);
+            };
+
+            self._client.onupdate = function(type) {
+                // we do not need duplicated notifications
+                if (type !== 'exists' || this._currentPath === options.path) {
+                    return;
+                }
+
+                callback(null, this._currentPath);
+            };
+        });
     };
 
     /**
@@ -192,14 +260,22 @@
             query.unanswered = true;
         }
 
-        self._client.selectMailbox(options.path, function(error) {
+        if (self._currentPath !== options.path) {
+            self._client.selectMailbox(options.path, onMailboxSelected);
+        } else {
+            onMailboxSelected();
+        }
+
+        function onMailboxSelected(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
+            self._currentPath = options.path;
+
             self._client.search(query, queryOptions, callback);
-        });
+        }
     };
 
     /**
@@ -277,15 +353,23 @@
                 byUid: true
             };
 
-        // open the mailbox
-        self._client.selectMailbox(options.path, function(error) {
+
+        if (self._currentPath !== options.path) {
+            self._client.selectMailbox(options.path, onMailboxSelected);
+        } else {
+            onMailboxSelected();
+        }
+
+        function onMailboxSelected(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
+            self._currentPath = options.path;
+
             self._client.listMessages(interval, query, queryOptions, onList);
-        });
+        }
 
         // process what inbox returns into a usable form for our client
         function onList(error, messages) {
@@ -468,15 +552,24 @@
             }
         });
 
+
+        if (self._currentPath !== options.path) {
+            self._client.selectMailbox(options.path, onMailboxSelected);
+        } else {
+            onMailboxSelected();
+        }
+
         // open the mailbox and retrieve the message
-        self._client.selectMailbox(options.path, function(error) {
+        function onMailboxSelected(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
+            self._currentPath = options.path;
+
             self._client.listMessages(interval, query, queryOptions, callback);
-        });
+        }
     };
 
     /**
@@ -521,14 +614,22 @@
             return;
         }
 
-        self._client.selectMailbox(options.path, function(error) {
+        if (self._currentPath !== options.path) {
+            self._client.selectMailbox(options.path, onMailboxSelected);
+        } else {
+            onMailboxSelected();
+        }
+
+        function onMailboxSelected(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
+            self._currentPath = options.path;
+
             self._client.setFlags(interval, query, queryOptions, onFlags);
-        });
+        }
 
         function onFlags(error, messages) {
             if (error) {
@@ -562,14 +663,22 @@
             return;
         }
 
-        self._client.selectMailbox(options.path, function(error) {
+        if (self._currentPath !== options.path) {
+            self._client.selectMailbox(options.path, onMailboxSelected);
+        } else {
+            onMailboxSelected();
+        }
+
+        function onMailboxSelected(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
+            self._currentPath = options.path;
+
             self._client.moveMessages(interval, options.destination, queryOptions, callback);
-        });
+        }
     };
 
     /**
@@ -590,14 +699,22 @@
             return;
         }
 
-        self._client.selectMailbox(options.path, function(error) {
+        if (self._currentPath !== options.path) {
+            self._client.selectMailbox(options.path, onMailboxSelected);
+        } else {
+            onMailboxSelected();
+        }
+
+        function onMailboxSelected(error) {
             if (error) {
                 callback(error);
                 return;
             }
 
+            self._currentPath = options.path;
+
             self._client.deleteMessages(interval, queryOptions, callback);
-        });
+        }
     };
 
     //

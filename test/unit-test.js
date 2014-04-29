@@ -31,10 +31,11 @@
                 imap.login(function(error) {
                     expect(error).to.not.exist;
                     expect(imap._loggedIn).to.be.true;
-                    expect(bboxMock.connect.calledOnce).to.be.true;
+                    expect(bboxMock.connect.calledTwice).to.be.true;
 
                     done();
                 });
+                bboxMock.onauth();
                 bboxMock.onauth();
             });
 
@@ -49,11 +50,12 @@
         describe('#logout', function() {
             it('should logout', function(done) {
                 imap.logout(function() {
-                    expect(bboxMock.close.calledOnce).to.be.true;
+                    expect(bboxMock.close.calledTwice).to.be.true;
                     expect(imap._loggedIn).to.be.false;
 
                     done();
                 });
+                bboxMock.onclose();
                 bboxMock.onclose();
             });
 
@@ -66,12 +68,21 @@
         });
 
         describe('#onError', function() {
-            it('should report an error', function(done) {
+            it('should report an error', function() {
+                var count = 0;
                 imap.onError = function(err) {
                     expect(err).to.exist;
-                    done();
+                    count++;
                 };
                 imap._client.onerror({});
+                imap._client.onerror({});
+                imap._client.onerror({});
+
+                expect(imap._loggedIn).to.be.false;
+                expect(imap._errored).to.be.true;
+                expect(imap._currentPath).to.not.exist;
+                expect(bboxMock.close.calledTwice).to.be.true; // once for client and for listeningClient
+                expect(count).to.equal(1); // onError must only be called once
             });
         });
 
@@ -149,6 +160,7 @@
                 }, function(error, uids) {
                     expect(error).to.be.null;
                     expect(uids.length).to.equal(3);
+                    expect(imap._currentPath).to.equal('foobar');
                     done();
                 });
             });
@@ -390,6 +402,7 @@
                 }, function(error, msg) {
                     expect(error).to.not.exist;
                     expect(msg.body).to.equal('yaddayadda');
+                    expect(imap._currentPath).to.equal('foobar');
 
                     mailreader.parseText.restore();
                     done();
@@ -548,6 +561,7 @@
                     expect(error).to.be.null;
                     expect(flags.unread).to.be.false;
                     expect(flags.answered).to.be.true;
+                    expect(imap._currentPath).to.equal('INBOX');
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledOnce).to.be.true;
@@ -585,6 +599,7 @@
                     expect(error).to.exist;
                     expect(flags).to.not.exist;
 
+
                     done();
                 });
             });
@@ -612,6 +627,8 @@
                     expect(error).to.not.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.moveMessages.calledOnce).to.be.true;
+                    expect(imap._currentPath).to.equal('INBOX');
+
                     done();
                 });
             });
@@ -669,6 +686,8 @@
                     expect(error).to.be.null;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.deleteMessages.calledOnce).to.be.true;
+                    expect(imap._currentPath).to.equal('INBOX');
+
                     done();
                 });
 
@@ -706,6 +725,30 @@
                 imap.deleteMessage({}, function(error) {
                     expect(error).to.exist;
                 });
+            });
+        });
+
+        describe('#listenForChanges', function() {
+            it('should start listening', function(done) {
+                bboxMock.selectMailbox.withArgs('INBOX').yields();
+
+                imap.listenForChanges({
+                    path: 'INBOX'
+                }, done);
+                bboxMock.onupdate('exists');
+            });
+
+            it('should return an error when inbox could not be opened', function(done) {
+                bboxMock.selectMailbox.withArgs('INBOX').yields({});
+
+                imap.listenForChanges({
+                    path: 'INBOX'
+                }, function(err) {
+                    expect(err).to.exist;
+
+                    done();
+                });
+                bboxMock.onupdate('exists');
             });
         });
     });

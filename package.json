@@ -25,7 +25,6 @@
     "hoodiecrow": "1.1.x",
     "tcp-socket": "^0.2.1",
     "node-forge": "^0.2.33",
-    "arraybuffer-slice": "0.0.2",
     "mocha": "^1.18.2",
     "grunt-mocha-test": "^0.10.2"
   }
