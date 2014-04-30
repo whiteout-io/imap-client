@@ -586,11 +586,17 @@
             queryOptions = {
                 byUid: true
             },
-            query,
+            queryAdd,
+            queryRemove,
             remove = [],
             add = [],
             READ_FLAG = '\\Seen',
             ANSWERED_FLAG = '\\Answered';
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not update flags, cause: Not logged in!'));
+            return;
+        }
 
         if (options.unread === true) {
             remove.push(READ_FLAG);
@@ -604,15 +610,17 @@
             remove.push(ANSWERED_FLAG);
         }
 
-        query = {
-            add: add,
-            remove: remove
-        };
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not update flags, cause: Not logged in!'));
+        if (add.length === 0 && remove.length === 0) {
+            callback(new Error('Empty calls are not permitted'));
             return;
         }
+
+        queryAdd = {
+            add: add
+        };
+        queryRemove = {
+            remove: remove
+        };
 
         if (self._currentPath !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
@@ -622,16 +630,28 @@
 
         function onMailboxSelected(error) {
             if (error) {
-                callback(error);
-                return;
+                onFlagsAdded(error);
             }
 
             self._currentPath = options.path;
+            
+            if (add.length === 0) {
+                onFlagsAdded(error);
+            }
 
-            self._client.setFlags(interval, query, queryOptions, onFlags);
+            self._client.setFlags(interval, queryAdd, queryOptions, onFlagsAdded);
         }
 
-        function onFlags(error, messages) {
+        function onFlagsAdded(error, messages) {
+            if (error || remove.length === 0) {
+                onFlagsRemoved(error, messages);
+                return;
+            }
+
+            self._client.setFlags(interval, queryRemove, queryOptions, onFlagsRemoved);
+        }
+
+        function onFlagsRemoved(error, messages) {
             if (error) {
                 callback(error);
                 return;
