@@ -25,7 +25,6 @@
     "tcp-socket": "^0.2.1",
     "node-forge": "^0.2.33",
     "mocha": "^1.18.2",
-    "grunt-mocha-test": "^0.10.2",
-    "stringencoding": "https://github.com/whiteout-io/stringencoding/tarball/v0.1.0"
+    "grunt-mocha-test": "^0.10.2"
   }
 }
