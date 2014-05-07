@@ -136,7 +136,7 @@ describe('ImapClient local integration tests', function() {
             expect(messages.length).to.equal(3);
             expect(messages[0].id).to.not.be.empty;
             expect(messages[0].bodystructure).to.exist;
-            expect(messages[0].messageParts.length).to.equal(1);
+            expect(messages[0].bodyParts.length).to.equal(1);
             done();
         });
     });
@@ -159,15 +159,15 @@ describe('ImapClient local integration tests', function() {
             firstUid: 4,
             lastUid: 4
         }, function(error, messages) {
-            ic.getMessageParts({
+            ic.getBodyParts({
                 path: 'INBOX',
                 uid: messages[0].uid,
-                messageParts: messages[0].messageParts
-            }, function(error, messageParts) {
+                bodyParts: messages[0].bodyParts
+            }, function(error, bodyParts) {
                 expect(error).to.not.exist;
-                expect(messages[0].messageParts).to.equal(messageParts);
-                expect(messageParts[0].type).to.equal('text');
-                expect(messageParts[0].raw).to.equal('Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world');
+                expect(messages[0].bodyParts).to.equal(bodyParts);
+                expect(bodyParts[0].type).to.equal('text');
+                expect(bodyParts[0].raw).to.equal('Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world');
 
                 done();
             });

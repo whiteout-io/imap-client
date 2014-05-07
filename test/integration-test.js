@@ -91,14 +91,14 @@
                 firstUid: 1
             }, function(error, messages) {
                 var msg = messages.pop();
-                ic.getMessageParts({
+                ic.getBodyParts({
                     path: 'INBOX',
                     uid: msg.uid,
-                    messageParts: msg.messageParts
-                }, function(error, messageParts) {
+                    bodyParts: msg.bodyParts
+                }, function(error, bodyParts) {
                     expect(error).to.not.exist;
-                    expect(msg.messageParts).to.equal(messageParts);
-                    expect(messageParts[0].raw).to.not.be.empty;
+                    expect(msg.bodyParts).to.equal(bodyParts);
+                    expect(bodyParts[0].raw).to.not.be.empty;
 
                     done();
                 });

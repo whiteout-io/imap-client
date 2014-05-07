@@ -342,15 +342,15 @@
                     unread: (message.flags || []).indexOf('\\Seen') === -1,
                     answered: (message.flags || []).indexOf('\\Answered') > -1,
                     bodystructure: message.bodystructure || {},
-                    messageParts: []
+                    bodyParts: []
                 };
 
                 walkMimeTree(cleansed.bodystructure, cleansed);
-                cleansed.encrypted = cleansed.messageParts.filter(function(msgPart) {
-                    return msgPart.type === 'encrypted';
+                cleansed.encrypted = cleansed.bodyParts.filter(function(bodyPart) {
+                    return bodyPart.type === 'encrypted';
                 }).length > 0;
-                cleansed.signed = cleansed.messageParts.filter(function(msgPart) {
-                    return msgPart.type === 'signed';
+                cleansed.signed = cleansed.bodyParts.filter(function(bodyPart) {
+                    return bodyPart.type === 'signed';
                 }).length > 0;
 
                 cleansedMessages.push(cleansed);
@@ -362,35 +362,35 @@
 
     /**
      * Fetches parts of a message from the imap server
-     * @param  {Array} options.messageParts Parts of a message, as returned by #listMessages
+     * @param  {Array} options.bodyParts Parts of a message, as returned by #listMessages
      * @param  {Function} callback [description]
      */
-    ImapClient.prototype.getMessageParts = function(options, callback) {
+    ImapClient.prototype.getBodyParts = function(options, callback) {
         var self = this,
             query = [],
             queryOptions = {
                 byUid: true
             },
             interval = options.uid + ':' + options.uid,
-            messageParts = options.messageParts;
+            bodyParts = options.bodyParts;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not get messageParts for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            callback(new Error('Can not get bodyParts for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
             return;
         }
 
-        if (messageParts.length === 0) {
-            callback(null, messageParts);
+        if (bodyParts.length === 0) {
+            callback(null, bodyParts);
             return;
         }
 
         // formulate a query for each text part. for part 2.1 to be parsed, we need 2.1.MIME and 2.1
-        messageParts.forEach(function(msgPart) {
-            if (msgPart.bodyPart === '') {
+        bodyParts.forEach(function(bodyPart) {
+            if (bodyPart.partNumber === '') {
                 query.push('body.peek[]');
             } else {
-                query.push('body.peek[' + msgPart.bodyPart + '.mime]');
-                query.push('body.peek[' + msgPart.bodyPart + ']');
+                query.push('body.peek[' + bodyPart.partNumber + '.mime]');
+                query.push('body.peek[' + bodyPart.partNumber + ']');
             }
         });
 
@@ -418,15 +418,17 @@
             }
 
             var message = messages[0];
-            messageParts.forEach(function(msgPart) {
-                if (msgPart.bodyPart === '') {
-                    msgPart.raw = message['body[]'];
+            bodyParts.forEach(function(bodyPart) {
+                if (bodyPart.partNumber === '') {
+                    bodyPart.raw = message['body[]'];
                 } else {
-                    msgPart.raw = message['body[' + msgPart.bodyPart + '.mime]'] + message['body[' + msgPart.bodyPart + ']'];
+                    bodyPart.raw = message['body[' + bodyPart.partNumber + '.mime]'] + message['body[' + bodyPart.partNumber + ']'];
                 }
+
+                delete bodyPart.partNumber;
             });
 
-            callback(null, messageParts);
+            callback(null, bodyParts);
         }
     };
 
@@ -641,13 +643,11 @@
             return false;
         }
 
-        var msgpart = {
+        message.bodyParts.push({
             type: 'encrypted',
-            bodyPart: node.part || '',
+            partNumber: node.part || '',
             content: []
-        };
-
-        message.messageParts.push(msgpart);
+        });
         return true;
     }
 
@@ -667,13 +667,11 @@
             return false;
         }
 
-        var msgpart = {
+        message.bodyParts.push({
             type: 'signed',
-            bodyPart: node.part || '',
+            partNumber: node.part || '',
             content: []
-        };
-
-        message.messageParts.push(msgpart);
+        });
         return true;
     }
 
@@ -686,9 +684,9 @@
             return false;
         }
 
-        message.messageParts.push({
+        message.bodyParts.push({
             type: 'text',
-            bodyPart: node.part || ''
+            partNumber: node.part || ''
         });
         return true;
     }
@@ -702,9 +700,9 @@
             return false;
         }
 
-        message.messageParts.push({
+        message.bodyParts.push({
             type: 'html',
-            bodyPart: node.part || ''
+            partNumber: node.part || ''
         });
         return true;
     }
@@ -718,22 +716,22 @@
             return false;
         }
 
-        var msgpart = {
+        var bodyPart = {
             type: 'attachment',
-            bodyPart: node.part || '',
+            partNumber: node.part || '',
             mimeType: node.type || 'application/octet-stream',
             id: node.id ? node.id.replace(/[<>]/g, '') : undefined
         };
 
         if (node.dispositionParameters && node.dispositionParameters.filename) {
-            msgpart.filename = node.dispositionParameters.filename;
+            bodyPart.filename = node.dispositionParameters.filename;
         } else if (node.parameters && node.parameters.name) {
-            msgpart.filename = node.parameters.name;
+            bodyPart.filename = node.parameters.name;
         } else {
-            msgpart.filename = 'attachment';
+            bodyPart.filename = 'attachment';
         }
 
-        message.messageParts.push(msgpart);
+        message.bodyParts.push(bodyPart);
         return true;
     }
 
