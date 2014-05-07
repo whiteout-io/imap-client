@@ -646,7 +646,6 @@
         message.bodyParts.push({
             type: 'encrypted',
             partNumber: node.part || '',
-            content: []
         });
         return true;
     }
@@ -670,7 +669,6 @@
         message.bodyParts.push({
             type: 'signed',
             partNumber: node.part || '',
-            content: []
         });
         return true;
     }
