@@ -362,8 +362,10 @@
 
     /**
      * Fetches parts of a message from the imap server
-     * @param  {Array} options.bodyParts Parts of a message, as returned by #listMessages
-     * @param  {Function} callback [description]
+     * @param {String} options.path The folder's path
+     * @param {Number} options.uid The uid of the message
+     * @param {Array} options.bodyParts Parts of a message, as returned by #listMessages
+     * @param {Function} callback(error, flags) will be called the body parts have been received from the server
      */
     ImapClient.prototype.getBodyParts = function(options, callback) {
         var self = this,
