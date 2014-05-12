@@ -2,11 +2,11 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['chai', 'sinon', 'mailreader', 'browserbox', 'imap-client'], factory);
+        define(['chai', 'sinon', 'browserbox', 'imap-client'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('chai'), require('sinon'), require('mailreader'), require('browserbox'), require('../src/imap-client'));
+        module.exports = factory(require('chai'), require('sinon'), require('browserbox'), require('../src/imap-client'));
     }
-})(function(chai, sinon, mailreader, browserbox, ImapClient) {
+})(function(chai, sinon, browserbox, ImapClient) {
     'use strict';
 
     describe('ImapClient', function() {
@@ -17,7 +17,7 @@
 
         beforeEach(function() {
             bboxMock = sinon.createStubInstance(browserbox);
-            imap = new ImapClient({}, mailreader, bboxMock);
+            imap = new ImapClient({}, bboxMock);
             expect(imap._client).to.equal(bboxMock);
             imap._loggedIn = true;
         });
@@ -233,7 +233,7 @@
             });
         });
 
-        describe('#listMessagesByUid', function() {
+        describe('#listMessages', function() {
             it('should list messages by uid', function(done) {
                 var listing = [{
                     uid: 1,
@@ -288,7 +288,7 @@
                     byUid: true
                 }).yieldsAsync(null, listing);
 
-                imap.listMessagesByUid({
+                imap.listMessages({
                     path: 'foobar',
                     firstUid: 1,
                     lastUid: 2
@@ -306,17 +306,19 @@
                     expect(msgs[0].subject).to.equal('SHIAAAT');
                     expect(msgs[0].unread).to.be.false;
                     expect(msgs[0].answered).to.be.true;
-                    expect(msgs[0].attachments).to.not.be.empty;
-                    expect(msgs[0].textParts[0]).to.equal(listing[0].bodystructure.childNodes[0]);
-                    expect(msgs[0].encrypted).to.be.false;
-                    expect(msgs[0].attachments).to.not.be.empty;
-                    expect(msgs[0].attachments[0].filename).to.equal('foobar.md');
-                    expect(msgs[0].attachments[0].filesize).to.equal(211);
-                    expect(msgs[0].attachments[0].mimeType).to.equal('text/plain');
-                    expect(msgs[0].attachments[0].part).to.equal('2');
-                    expect(msgs[0].attachments[0].content).to.be.null;
 
-                    expect(msgs[1].textParts[0]).to.equal(listing[1].bodystructure.childNodes[1].childNodes[1]);
+                    expect(msgs[0].encrypted).to.be.false;
+                    expect(msgs[1].encrypted).to.be.true;
+
+                    expect(msgs[0].bodyParts).to.not.be.empty;
+                    expect(msgs[0].bodyParts[0].type).to.equal('text');
+                    expect(msgs[0].bodyParts[0].partNumber).to.equal('1');
+                    expect(msgs[0].bodyParts[1].type).to.equal('attachment');
+                    expect(msgs[0].bodyParts[1].partNumber).to.equal('2');
+
+                    expect(msgs[1].bodyParts[0].type).to.equal('text');
+                    expect(msgs[1].bodyParts[1].type).to.equal('encrypted');
+                    expect(msgs[1].bodyParts[1].partNumber).to.equal('2');
 
                     done();
                 });
@@ -325,7 +327,7 @@
             it('should not list messages by uid due to select mailbox error', function(done) {
                 bboxMock.selectMailbox.yields({});
 
-                imap.listMessagesByUid({
+                imap.listMessages({
                     path: 'foobar',
                     firstUid: 1,
                     lastUid: 2
@@ -339,7 +341,7 @@
                 bboxMock.selectMailbox.yields();
                 bboxMock.listMessages.yields({});
 
-                imap.listMessagesByUid({
+                imap.listMessages({
                     path: 'foobar',
                     firstUid: 1,
                     lastUid: 2
@@ -351,25 +353,13 @@
 
             it('should not list messages by uid when not logged in', function() {
                 imap._loggedIn = false;
-                imap.listMessagesByUid({}, function(error) {
+                imap.listMessages({}, function(error) {
                     expect(error).to.exist;
                 });
             });
         });
 
-        describe('#getBody', function() {
-            it('should have no text content', function(done) {
-                imap.getBody({
-                    message: {
-                        textParts: []
-                    }
-                }, function(error, msg) {
-                    expect(error).to.not.exist;
-                    expect(msg.body).to.equal('This message contains no text content.');
-                    done();
-                });
-            });
-
+        describe('#getBodyParts', function() {
             it('should get the plain text body', function(done) {
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.listMessages.withArgs('123:123', ['body.peek[1.mime]', 'body.peek[1]', 'body.peek[2.mime]', 'body.peek[2]'], {
@@ -380,31 +370,26 @@
                     'body[2.mime]': 'bla',
                     'body[2]': 'blubb'
                 }]);
-                sinon.stub(mailreader, 'parseText', function(opts, cb) {
-                    expect(opts.message).to.exist;
-                    // this gets called twice, once with raw text 'qweasd' and once with 'blablubb'
-                    expect(opts.raw === 'qweasd' || opts.raw === 'blablubb').to.be.true;
-                    opts.message.body += 'yadda';
 
-                    cb();
-                });
-
-                imap.getBody({
+                var parts = [{
+                    partNumber: '1'
+                }, {
+                    partNumber: '2'
+                }];
+                imap.getBodyParts({
                     path: 'foobar',
-                    message: {
-                        uid: 123,
-                        textParts: [{
-                            part: 1
-                        }, {
-                            part: 2
-                        }]
-                    }
-                }, function(error, msg) {
+                    uid: 123,
+                    bodyParts: parts
+                }, function(error, cbParts) {
                     expect(error).to.not.exist;
-                    expect(msg.body).to.equal('yaddayadda');
+                    expect(cbParts).to.equal(parts);
                     expect(imap._currentPath).to.equal('foobar');
 
-                    mailreader.parseText.restore();
+                    expect(parts[0].raw).to.equal('qweasd');
+                    expect(parts[1].raw).to.equal('blablubb');
+                    expect(parts[0].partNumber).to.not.exist;
+                    expect(parts[1].partNumber).to.not.exist;
+
                     done();
                 });
             });
@@ -413,16 +398,14 @@
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.listMessages.yieldsAsync({});
 
-                imap.getBody({
+                imap.getBodyParts({
                     path: 'foobar',
-                    message: {
-                        uid: 123,
-                        textParts: [{
-                            part: 1
-                        }, {
-                            part: 2
-                        }]
-                    }
+                    uid: 123,
+                    bodyParts: [{
+                        partNumber: '1'
+                    }, {
+                        partNumber: '2'
+                    }]
                 }, function(error) {
                     expect(error).to.exist;
                     done();
@@ -432,16 +415,14 @@
             it('should fail when select mailbox fails', function(done) {
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync({});
 
-                imap.getBody({
+                imap.getBodyParts({
                     path: 'foobar',
-                    message: {
-                        uid: 123,
-                        textParts: [{
-                            part: 1
-                        }, {
-                            part: 2
-                        }]
-                    }
+                    uid: 123,
+                    bodyParts: [{
+                        partNumber: '1'
+                    }, {
+                        partNumber: '2'
+                    }]
                 }, function(error) {
                     expect(error).to.exist;
                     done();
@@ -450,89 +431,9 @@
 
             it('should not work when not logged in', function(done) {
                 imap._loggedIn = false;
-                imap.getBody({
+                imap.getBodyParts({
                     path: 'foobar',
-                    message: {
-                        uid: 123
-                    }
-                }, function(error) {
-                    expect(error).to.exist;
-                    done();
-                });
-            });
-        });
-
-        describe('#getAttachment', function() {
-            it('should get the attachment', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
-                bboxMock.listMessages.withArgs('123:123', ['body.peek[1.mime]', 'body.peek[1]'], {
-                    byUid: true
-                }).yieldsAsync(null, [{
-                    'body[1.mime]': 'qwe',
-                    'body[1]': 'asd'
-                }]);
-                sinon.stub(mailreader, 'parseAttachment', function(opts, cb) {
-                    expect(opts.attachment).to.exist;
-                    expect(opts.raw).to.equal('qweasd');
-                    opts.attachment.content = 'asdasd';
-
-                    cb(null, opts.attachment);
-                });
-
-                imap.getAttachment({
-                    path: 'foobar',
-                    uid: 123,
-                    attachment: {
-                        part: 1
-                    }
-                }, function(error, attmt) {
-                    expect(error).to.not.exist;
-                    expect(attmt.content).to.exist;
-
-                    mailreader.parseAttachment.restore();
-                    done();
-                });
-            });
-
-            it('should fail when list fails', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
-                bboxMock.listMessages.yieldsAsync({});
-
-                imap.getAttachment({
-                    path: 'foobar',
-                    uid: 123,
-                    attachment: {
-                        part: 1
-                    }
-                }, function(error) {
-                    expect(error).to.exist;
-                    done();
-                });
-            });
-
-            it('should fail when select mailbox fails', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync({});
-
-                imap.getAttachment({
-                    path: 'foobar',
-                    uid: 123,
-                    attachment: {
-                        part: 1
-                    }
-                }, function(error) {
-                    expect(error).to.exist;
-                    done();
-                });
-            });
-
-            it('should not work when not logged in', function(done) {
-                imap._loggedIn = false;
-                imap.getAttachment({
-                    path: 'foobar',
-                    uid: 123,
-                    attachment: {
-                        part: 1
-                    }
+                    uid: 123
                 }, function(error) {
                     expect(error).to.exist;
                     done();

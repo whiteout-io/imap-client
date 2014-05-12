@@ -2,11 +2,11 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['browserbox', 'mailreader'], factory);
+        define(['browserbox'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('browserbox'), require('mailreader'));
+        module.exports = factory(require('browserbox'));
     }
-})(function(BrowserBox, mailreader) {
+})(function(BrowserBox) {
     'use strict';
 
     /**
@@ -20,12 +20,10 @@
      * @param {Boolean} options.debug (optional) Outputs all the imap traffic in the console
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
-    var ImapClient = function(options, reader, browserbox) {
+    var ImapClient = function(options, browserbox) {
         /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
          * @private */
         this._loggedIn = false;
-
-        this._mailreader = reader || mailreader;
 
         /* Instance of our imap library
          * @private */
@@ -236,7 +234,7 @@
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not list messages, cause: Not logged in!'));
+            callback(new Error('Can not search messages, cause: Not logged in!'));
             return;
         }
 
@@ -285,67 +283,13 @@
      * @param {Number} options.lastUid (optional) The uid of the last message. if omitted, defaults to *
      * @param {Function} callback(error, messages) will be called at completion, contains an array of messages with their respective envelope data, or information if an error occurred.
      */
-    ImapClient.prototype.listMessagesByUid = function(options, callback) {
+    ImapClient.prototype.listMessages = function(options, callback) {
         var self = this;
 
         if (!self._loggedIn) {
             callback(new Error('Can not list messages, cause: Not logged in!'));
             return;
         }
-
-        // 
-        // matchers for the mime tree
-        // 
-        // note: i did not put them in the forEach loop because re-declaring them in each iteration seems redundant.
-        // 
-
-        // look for nodes that contain well-formed pgp/mime and add them to the list of body parts. (bind to mailObj!)
-        var handlePgpMime = function(node) {
-            var isPgpMime = /^multipart\/encrypted/i.test(node.type) && node.childNodes && node.childNodes[1];
-            if (!isPgpMime) {
-                return false;
-            }
-
-            // as the standard dictates, the second child node of a multipart/encrypted node contains the pgp payload
-            this.textParts.push(node.childNodes[1]);
-            return true;
-        };
-
-        // look for text/plain nodes that are not attachments and add them to the list of body parts. (bind to mailObj!)
-        var handlePlainText = function(node) {
-            var isPlainText = (/^text\/plain/i.test(node.type) && !node.disposition);
-            if (!isPlainText) {
-                return false;
-            }
-
-            this.textParts.push(node);
-            return true;
-        };
-
-        // look for attachment nodes and add all of them to the array of attachments. (bind to mailObj!)
-        var handleAttachment = function(node) {
-            var isAttachment = (/^text\//i.test(node.type) && node.disposition) || (!/^text\//i.test(node.type) && !/^multipart\//i.test(node.type));
-            if (!isAttachment) {
-                return false;
-            }
-
-            var attmt = {
-                part: node.part,
-                content: null,
-                filesize: node.size || 0,
-                mimeType: node.type || "application/octet-stream",
-                filename: 'attachment' // placeholder, if there is a better file name, use it
-            };
-
-            if (node.dispositionParameters && node.dispositionParameters.filename) {
-                attmt.filename = node.dispositionParameters.filename;
-            } else if (node.parameters && node.parameters.name) {
-                attmt.filename = node.parameters.name;
-            }
-
-            this.attachments.push(attmt);
-            return true;
-        };
 
         var interval = (options.firstUid || 1) + ':' + (options.lastUid || '*'),
             query = ['uid', 'bodystructure', 'flags', 'envelope'],
@@ -398,25 +342,18 @@
                     unread: (message.flags || []).indexOf('\\Seen') === -1,
                     answered: (message.flags || []).indexOf('\\Answered') > -1,
                     bodystructure: message.bodystructure || {},
-                    bodyParts: [],
-                    attachments: [],
-                    textParts: []
+                    bodyParts: []
                 };
 
+                walkMimeTree(cleansed.bodystructure, cleansed);
+                cleansed.encrypted = cleansed.bodyParts.filter(function(bodyPart) {
+                    return bodyPart.type === 'encrypted';
+                }).length > 0;
+                cleansed.signed = cleansed.bodyParts.filter(function(bodyPart) {
+                    return bodyPart.type === 'signed';
+                }).length > 0;
+
                 cleansedMessages.push(cleansed);
-
-                // walk the mime tree to find pgp/mime nodes
-                walkBodystructure(cleansed.bodystructure, handlePgpMime.bind(cleansed));
-                if (cleansed.textParts.length > 0) {
-                    cleansed.encrypted = true;
-                    // the message contains pgp/mime, so forget about the plain text stuff and attachments
-                    return;
-                }
-
-                cleansed.encrypted = false;
-                // the message does not contain pgp/mime, so find all the plain text body parts and attachments
-                walkBodystructure(cleansed.bodystructure, handlePlainText.bind(cleansed));
-                walkBodystructure(cleansed.bodystructure, handleAttachment.bind(cleansed));
             });
 
             callback(null, cleansedMessages);
@@ -424,134 +361,40 @@
     };
 
     /**
-     * Stream the message body from the server
-     * @param {String} options.path The folder's path
-     * @param {Number} options.message The message
-     * @param {Function} callback(error, message) will be called the message is parsed
-     */
-    ImapClient.prototype.getBody = function(options, callback) {
-        var self = this,
-            message = options.message;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not get message preview for uid ' + message.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
-            return;
-        }
-
-        if (message.textParts.length === 0) {
-            // there are no plain text parts
-            message.body = 'This message contains no text content.';
-            callback(null, message);
-            return;
-        }
-
-        self._getParts({
-            path: options.path,
-            uid: message.uid,
-            parts: message.textParts
-        }, onList);
-
-        // we have received the part from the imap server
-        function onList(error, messages) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            // set an empty body to which text will be appended
-            message.body = '';
-
-            // we retrieve only one message in this query, so we're only interested in the first element of the array
-            var msg = messages[0],
-                rawParts = [];
-
-            // a raw part consists of its MIME header and the payload
-            message.textParts.forEach(function(textPart) {
-                if (textPart.part) {
-                    rawParts.push(msg['body[' + textPart.part + '.mime]'] + msg['body[' + textPart.part + ']']);
-                } else {
-                    rawParts.push(msg['body[]']);
-                }
-            });
-
-            // start parsing the raw parts one-by-one
-            parseRawParts();
-
-            function parseRawParts() {
-                if (rawParts.length === 0) {
-                    // we have parsed all the raw parts
-                    callback(null, message);
-                    return;
-                }
-
-                // parse one raw part
-                var raw = rawParts.shift();
-                self._mailreader.parseText({
-                    message: message,
-                    raw: raw
-                }, parseRawParts);
-            }
-        }
-    };
-
-    /**
-     * Streams an attachment from the server
+     * Fetches parts of a message from the imap server
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
-     * @param {Object} options.attachment Attachment to fetch, as return in the array by ImapClient.getMessage(). A field 'content' is added when parsing is done
-     * @param {Function} callback(error, attachment) will be called the message is parsed
+     * @param {Array} options.bodyParts Parts of a message, as returned by #listMessages
+     * @param {Function} callback(error, flags) will be called the body parts have been received from the server
      */
-    ImapClient.prototype.getAttachment = function(options, callback) {
-        var self = this,
-            attmt = options.attachment;
-
-        if (!self._loggedIn) {
-            callback(new Error('Can not get attachment, cause: Not logged in!'));
-            return;
-        }
-
-        self._getParts({
-            path: options.path,
-            uid: options.uid,
-            parts: [attmt]
-        }, onList);
-
-        // we have received the attachment from the imap server
-        function onList(error, messages) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            // we retrieve only one message in this query, so we're only interested in the first element of the array
-            var msg = messages[0],
-                raw = msg['body[' + attmt.part + '.mime]'] + msg['body[' + attmt.part + ']'];
-
-            self._mailreader.parseAttachment({
-                attachment: options.attachment,
-                raw: raw
-            }, callback);
-        }
-    };
-
-    ImapClient.prototype._getParts = function(options, callback) {
+    ImapClient.prototype.getBodyParts = function(options, callback) {
         var self = this,
             query = [],
             queryOptions = {
                 byUid: true
             },
-            interval = options.uid + ':' + options.uid;
+            interval = options.uid + ':' + options.uid,
+            bodyParts = options.bodyParts;
+
+        if (!self._loggedIn) {
+            callback(new Error('Can not get bodyParts for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
+            return;
+        }
+
+        if (bodyParts.length === 0) {
+            callback(null, bodyParts);
+            return;
+        }
 
         // formulate a query for each text part. for part 2.1 to be parsed, we need 2.1.MIME and 2.1
-        options.parts.forEach(function(part) {
-            if (part.part) {
-                query.push('body.peek[' + part.part + '.mime]');
-                query.push('body.peek[' + part.part + ']');
-            } else {
+        bodyParts.forEach(function(bodyPart) {
+            if (bodyPart.partNumber === '') {
                 query.push('body.peek[]');
+            } else {
+                query.push('body.peek[' + bodyPart.partNumber + '.mime]');
+                query.push('body.peek[' + bodyPart.partNumber + ']');
             }
         });
-
 
         if (self._currentPath !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
@@ -567,8 +410,27 @@
             }
 
             self._currentPath = options.path;
+            self._client.listMessages(interval, query, queryOptions, onPartsReady);
+        }
 
-            self._client.listMessages(interval, query, queryOptions, callback);
+        function onPartsReady(error, messages) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            var message = messages[0];
+            bodyParts.forEach(function(bodyPart) {
+                if (bodyPart.partNumber === '') {
+                    bodyPart.raw = message['body[]'];
+                } else {
+                    bodyPart.raw = message['body[' + bodyPart.partNumber + '.mime]'] + message['body[' + bodyPart.partNumber + ']'];
+                }
+
+                delete bodyPart.partNumber;
+            });
+
+            callback(null, bodyParts);
         }
     };
 
@@ -634,7 +496,7 @@
             }
 
             self._currentPath = options.path;
-            
+
             if (add.length === 0) {
                 onFlagsAdded(error);
             }
@@ -737,28 +599,140 @@
         }
     };
 
-    //
-    // Helper Methods
-    //
+    /*
+     * Mime Tree Handling
+     * ==================
+     *
+     * matchEncrypted, matchSigned, ... are matchers that are called on each node of the mimde tree
+     * when it is being traversed in a DFS. if one of the matchers returns true, it indicates that it
+     * matched respective mime node, hence there is no need to look any further down in the tree.
+     *
+     */
+
+    var mimeTreeMatchers = [matchEncrypted, matchSigned, matchText, matchHtml, matchAttachment];
 
     /**
-     * Helper function that walks the mime tree in a dfs and calls back every time it has found a node the matches the search
-     * @param {Object} mimeNode The initial mime-node whose subtree should be traversed
-     * @param {function} handler Callback invoked with the current mime node. Returns true if the mime node was interesting, returns false to go deeper.
+     * Helper function that walks the MIME tree in a dfs and calls the handlers
+     * @param {Object} mimeNode The initial MIME node whose subtree should be traversed
+     * @param {Object} message The initial root MIME node whose subtree should be traversed
      */
-    function walkBodystructure(mimeNode, handler) {
-        if (handler(mimeNode)) {
-            // the node was interesting, so no need to look further down the mime tree
-            return;
+    function walkMimeTree(mimeNode, message) {
+        var i = mimeTreeMatchers.length;
+        while (i--) {
+            if (mimeTreeMatchers[i](mimeNode, message)) {
+                return;
+            }
         }
 
-        if (!mimeNode.childNodes) {
-            return;
+        if (mimeNode.childNodes) {
+            mimeNode.childNodes.forEach(function(childNode) {
+                walkMimeTree(childNode, message);
+            });
+        }
+    }
+
+    /**
+     * Matches encrypted PGP/MIME nodes
+     *
+     * multipart/encrypted
+     * |
+     * |-- application/pgp-encrypted
+     * |-- application/octet-stream <-- ciphertext
+     */
+    function matchEncrypted(node, message) {
+        var isEncrypted = /^multipart\/encrypted/i.test(node.type) && node.childNodes && node.childNodes[1];
+        if (!isEncrypted) {
+            return false;
         }
 
-        mimeNode.childNodes.forEach(function(childNode) {
-            walkBodystructure(childNode, handler);
+        message.bodyParts.push({
+            type: 'encrypted',
+            partNumber: node.part || '',
         });
+        return true;
+    }
+
+    /**
+     * Matches signed PGP/MIME nodes
+     *
+     * multipart/signed
+     * |
+     * |-- *** (signed mime sub-tree)
+     * |-- application/pgp-signature
+     */
+    function matchSigned(node, message) {
+        var c = node.childNodes;
+
+        var isSigned = /^multipart\/signed/i.test(node.type) && c && c[0] && c[1] && /^application\/pgp-signature/i.test(c[1].type);
+        if (!isSigned) {
+            return false;
+        }
+
+        message.bodyParts.push({
+            type: 'signed',
+            partNumber: node.part || '',
+        });
+        return true;
+    }
+
+    /**
+     * Matches non-attachment text/plain nodes
+     */
+    function matchText(node, message) {
+        var isText = (/^text\/plain/i.test(node.type) && node.disposition !== 'attachment');
+        if (!isText) {
+            return false;
+        }
+
+        message.bodyParts.push({
+            type: 'text',
+            partNumber: node.part || ''
+        });
+        return true;
+    }
+
+    /**
+     * Matches non-attachment text/html nodes
+     */
+    function matchHtml(node, message) {
+        var isHtml = (/^text\/html/i.test(node.type) && node.disposition !== 'attachment');
+        if (!isHtml) {
+            return false;
+        }
+
+        message.bodyParts.push({
+            type: 'html',
+            partNumber: node.part || ''
+        });
+        return true;
+    }
+
+    /**
+     * Matches non-attachment text/html nodes
+     */
+    function matchAttachment(node, message) {
+        var isAttachment = (/^text\//i.test(node.type) && node.disposition) || (!/^text\//i.test(node.type) && !/^multipart\//i.test(node.type));
+        if (!isAttachment) {
+            return false;
+        }
+
+        var bodyPart = {
+            type: 'attachment',
+            partNumber: node.part || '',
+            mimeType: node.type || 'application/octet-stream',
+            id: node.id ? node.id.replace(/[<>]/g, '') : undefined
+        };
+
+        if (node.dispositionParameters && node.dispositionParameters.filename) {
+            bodyPart.filename = node.dispositionParameters.filename;
+        } else if (node.parameters && node.parameters.name) {
+            bodyPart.filename = node.parameters.name;
+        } else {
+            bodyPart.filename = 'attachment';
+        }
+
+        message.bodyParts.push(bodyPart);
+        return true;
     }
 
     return ImapClient;

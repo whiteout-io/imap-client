@@ -1,12 +1,12 @@
-(function (factory) {
+(function(factory) {
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['chai', 'mailreader', 'imap-client'], factory);
+        define(['chai', 'imap-client'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('chai'), require('mailreader'), require('../src/imap-client'));
+        module.exports = factory(require('chai'), require('../src/imap-client'));
     }
-})(function (chai, mailreader, ImapClient) {
+})(function(chai, ImapClient) {
     'use strict';
 
     var expect = chai.expect,
@@ -28,12 +28,6 @@
 
         var ic;
 
-        before(function() {
-            if (typeof window !== 'undefined' && window.Worker) {
-                mailreader.startWorker('lib/mailreader-parser-worker.js');
-            }
-        });
-
         beforeEach(function(done) {
             ic = new ImapClient(loginOptions);
             ic.login(done);
@@ -49,7 +43,7 @@
                 expect(error).to.not.exist;
 
                 expect(folders).to.exist;
-                
+
                 expect(folders.inbox).to.exist;
                 expect(folders.inbox.name).to.exist;
                 expect(folders.inbox.type).to.exist;
@@ -81,7 +75,7 @@
         });
 
         it('should list messages by uid', function(done) {
-            ic.listMessagesByUid({
+            ic.listMessages({
                 path: 'INBOX',
                 firstUid: 1
             }, function(error, messages) {
@@ -91,18 +85,21 @@
             });
         });
 
-        it('should get plain text', function(done) {
-            ic.listMessagesByUid({
+        it('should get message parts', function(done) {
+            ic.listMessages({
                 path: 'INBOX',
                 firstUid: 1
             }, function(error, messages) {
-                ic.getBody({
+                var msg = messages.pop();
+                ic.getBodyParts({
                     path: 'INBOX',
-                    message: messages.pop()
-                }, function(error, message) {
+                    uid: msg.uid,
+                    bodyParts: msg.bodyParts
+                }, function(error, bodyParts) {
                     expect(error).to.not.exist;
-                    expect(message).to.exist;
-                    expect(message.body).to.not.be.empty;
+                    expect(msg.bodyParts).to.equal(bodyParts);
+                    expect(bodyParts[0].raw).to.not.be.empty;
+
                     done();
                 });
             });
