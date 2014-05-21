@@ -56,7 +56,7 @@
         }.bind(this);
 
         if (options.debug) {
-            this._client.onlog = this._listeningClient.onlog = console.log;
+            this._client.onlog = this._listeningClient.onlog = console.log.bind(console);
         }
     };
 
