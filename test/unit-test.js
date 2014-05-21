@@ -240,6 +240,7 @@
                     envelope: {
                         'message-id': 'beepboop',
                         from: ['zuhause@aol.com'],
+                        'reply-to': ['zzz@aol.com'],
                         to: ['bankrupt@duh.com'],
                         subject: 'SHIAAAT',
                         date: new Date()
@@ -259,7 +260,8 @@
                                 filename: 'foobar.md'
                             }
                         }]
-                    }
+                    },
+                    'body[header.fields (references)]': 'References: <abc>\n <def>\n\n'
                 }, {
                     uid: 2,
                     envelope: {
@@ -284,7 +286,7 @@
                     }
                 }];
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
-                bboxMock.listMessages.withArgs('1:2', ['uid', 'bodystructure', 'flags', 'envelope'], {
+                bboxMock.listMessages.withArgs('1:2', ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]'], {
                     byUid: true
                 }).yieldsAsync(null, listing);
 
@@ -302,10 +304,12 @@
                     expect(msgs[0].uid).to.equal(1);
                     expect(msgs[0].id).to.equal('beepboop');
                     expect(msgs[0].from).to.be.instanceof(Array);
+                    expect(msgs[0].replyTo).to.be.instanceof(Array);
                     expect(msgs[0].to).to.be.instanceof(Array);
                     expect(msgs[0].subject).to.equal('SHIAAAT');
                     expect(msgs[0].unread).to.be.false;
                     expect(msgs[0].answered).to.be.true;
+                    expect(msgs[0].references).to.deep.equal(['abc', 'def']);
 
                     expect(msgs[0].encrypted).to.be.false;
                     expect(msgs[1].encrypted).to.be.true;
@@ -319,6 +323,7 @@
                     expect(msgs[1].bodyParts[0].type).to.equal('text');
                     expect(msgs[1].bodyParts[1].type).to.equal('encrypted');
                     expect(msgs[1].bodyParts[1].partNumber).to.equal('2');
+                    expect(msgs[1].references).to.deep.equal([]);
 
                     done();
                 });

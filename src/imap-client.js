@@ -292,7 +292,7 @@
         }
 
         var interval = (options.firstUid || 1) + ':' + (options.lastUid || '*'),
-            query = ['uid', 'bodystructure', 'flags', 'envelope'],
+            query = ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]'],
             queryOptions = {
                 byUid: true
             };
@@ -330,14 +330,22 @@
             var cleansedMessages = [];
             messages.forEach(function(message) {
                 // construct a cleansed message object
+
+                var references = (message['body[header.fields (references)]'] || '').replace(/^references:\s*/i, '').trim();
+
                 var cleansed = {
                     uid: message.uid,
                     id: message.envelope['message-id'].replace(/[<>]/g, ''),
                     from: message.envelope.from || [],
+                    replyTo: message.envelope['reply-to'] || [],
                     to: message.envelope.to || [],
                     cc: message.envelope.cc || [],
                     bcc: message.envelope.bcc || [],
                     subject: message.envelope.subject || '(no subject)',
+                    inReplyTo: (message.envelope['in-reply-to'] || '').replace(/[<>]/g, ''),
+                    references: references ? references.split(/\s+/).map(function(reference){
+                        return reference.replace(/[<>]/g, '');
+                    }) : [],
                     sentDate: message.envelope.date ? new Date(message.envelope.date) : new Date(),
                     unread: (message.flags || []).indexOf('\\Seen') === -1,
                     answered: (message.flags || []).indexOf('\\Answered') > -1,
