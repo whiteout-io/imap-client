@@ -81,11 +81,27 @@ describe('ImapClient local integration tests', function() {
 
     beforeEach(function(done) {
         ic = new ImapClient(loginOptions);
+        ic.onSyncUpdate = function() {};
         ic.login(done);
     });
 
     afterEach(function(done) {
         ic.logout(done);
+    });
+
+    it('should throw', function(done) {
+        var ic = new ImapClient(loginOptions);
+        ic.onError = function(err) {
+            expect(err.message).to.equal('Sync handler not set');
+            ic.logout(done);
+        };
+        ic.login(function() {
+            ic.listMessages({
+                path: 'INBOX',
+                firstUid: 1,
+                lastUid: 3
+            }, function() {});
+        });
     });
 
     it('should list well known folders', function(done) {

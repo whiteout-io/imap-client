@@ -21,43 +21,258 @@
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
     var ImapClient = function(options, browserbox) {
+        var self = this;
+
         /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
          * @private */
-        this._loggedIn = false;
+        self._loggedIn = false;
 
         /* Instance of our imap library
          * @private */
         if (browserbox) {
-            this._client = this._listeningClient = browserbox;
+            self._client = self._listeningClient = browserbox;
         } else {
             var credentials = {
                 useSSL: options.secure,
                 auth: options.auth,
                 ca: options.ca
             };
-            this._client = new BrowserBox(options.host, options.port, credentials);
-            this._listeningClient = new BrowserBox(options.host, options.port, credentials);
+            self._client = new BrowserBox(options.host, options.port, credentials);
+            self._listeningClient = new BrowserBox(options.host, options.port, credentials);
         }
-        this._client.onerror = this._listeningClient.onerror = function(err) {
+        self._client.onerror = self._listeningClient.onerror = function(err) {
             // the error handler is the same for both clients. if one instance
             // of browserbox fails, just shutdown the client and avoid further
             // operations
-            if (this._errored) {
+            if (self._errored) {
                 return;
             }
 
-            this._errored = true;
-            this._currentPath = undefined;
-            this._loggedIn = false;
-            this._listeningClient.close();
-            this._client.close();
+            self._errored = true;
+            self._loggedIn = false;
+            self._listeningClient.close();
+            self._client.close();
 
-            this.onError(err);
-        }.bind(this);
+            self.onError(err);
+        };
+
+        /**
+         * Cache object with the following structure:
+         *
+         *  {
+         *      "INBOX": {
+         *          exists: 5,
+         *          uidNext: 6,
+         *          uidlist: [1, 2, 3, 4, 5],
+         *          highestModseq: 555
+         *      }
+         *  }
+         *
+         * @type {Object}
+         */
+        self.mailboxCache = {};
+
+        self._client.onselectmailbox = self._onSelectMailbox.bind(self, self._client);
+        self._client.onupdate = self._onUpdate.bind(self, self._client);
+        self._listeningClient.onselectmailbox = self._onSelectMailbox.bind(self, self._listeningClient);
+        self._listeningClient.onupdate = self._onUpdate.bind(self, self._listeningClient);
 
         if (options.debug) {
-            this._client.onlog = this._listeningClient.onlog = console.log.bind(console);
+            self._client.onlog = self._listeningClient.onlog = console.log.bind(console);
         }
+    };
+
+    ImapClient.prototype._onSelectMailbox = function(client, path, mailbox) {
+        var self = this,
+            cached;
+
+        if (client === self._listeningClient && self._listeningClient.selectedMailbox === self._client.selectedMailbox) {
+            return;
+        }
+
+        if (!self.mailboxCache[path]) {
+            self.mailboxCache[path] = {
+                exists: 0,
+                uidNext: 0,
+                uidlist: []
+            };
+        }
+
+        cached = self.mailboxCache[path];
+
+        if (cached.exists !== mailbox.exists || cached.uidNext !== mailbox.uidNext) {
+            if (!cached) {
+                cached = self.mailboxCache[path] = {};
+            }
+            cached.exists = mailbox.exists;
+            cached.uidNext = mailbox.uidNext;
+
+            self.search({
+                path: path,
+                client: client
+            }, function(err, uidlist) {
+                var deltaNew, deltaDeleted;
+
+                if (cached.uidlist) {
+                    // new messages
+                    if ((deltaNew = uidlist.filter(function(i) {
+                        return cached.uidlist.indexOf(i) < 0;
+                    })) && deltaNew.length) {
+                        self.onSyncUpdate({
+                            type: 'new',
+                            path: path,
+                            list: deltaNew
+                        });
+                    }
+
+                    // deleted messages
+                    if ((deltaDeleted = cached.uidlist.filter(function(i) {
+                        return uidlist.indexOf(i) < 0;
+                    })) && deltaDeleted.length) {
+                        self.onSyncUpdate({
+                            type: 'deleted',
+                            path: path,
+                            list: deltaDeleted
+                        });
+                    }
+                }
+                cached.uidlist = uidlist;
+                self.checkModseq({
+                    highestModseq: mailbox.highestModseq,
+                    client: client
+                }, function() {});
+            });
+        } else {
+            self.checkModseq({
+                highestModseq: mailbox.highestModseq,
+                client: client
+            }, function() {});
+        }
+    };
+
+    ImapClient.prototype._onUpdate = function(client, type, value) {
+        var self = this,
+            path = client.selectedMailbox,
+            cached = self.mailboxCache[path];
+
+        if (client === self._listeningClient && self._listeningClient.selectedMailbox === self._client.selectedMailbox) {
+            return;
+        }
+
+        if (!cached) {
+            return;
+        }
+
+        if (type === 'expunge') {
+            var deletedUid = cached.uidlist[value - 1];
+            cached.uidlist.splice(value - 1, 1);
+
+            if (deletedUid) {
+                self.onSyncUpdate({
+                    type: 'deleted',
+                    path: path,
+                    list: [deletedUid]
+                });
+            }
+        } else if (type === 'exists') {
+            // list new messages
+            cached.exists = value;
+            self.search({
+                path: client.selectedMailbox,
+                uid: cached.uidNext + ':*',
+                client: client
+            }, function(err, uidlist) {
+                if (err) {
+                    return;
+                }
+
+                if (!uidlist.length || (uidlist.length === 1 && cached.uidlist.indexOf(uidlist[0]) >= 0)) {
+                    return;
+                }
+
+                cached.uidlist = cached.uidlist.concat(uidlist);
+                cached.uidNext = cached.uidlist[cached.uidlist.length - 1] + 1;
+
+                self.onSyncUpdate({
+                    type: 'new',
+                    path: path,
+                    list: uidlist
+                });
+            });
+        } else if (type === 'fetch') {
+            self.onSyncUpdate({
+                type: 'messages',
+                path: path,
+                // listed message object does not contain uid by default
+                list: [value].map(function(message) {
+                    if (!message.uid && cached.uidlist) {
+                        message.uid = cached.uidlist[message['#'] - 1];
+                    }
+                    return message;
+                })
+            });
+        }
+    };
+
+    /**
+     * Lists messages with the last check
+     *
+     * @param {Number} options.highestModseq MODSEQ value
+     * @param {Function} callback Runs when the list is fetched
+     */
+    ImapClient.prototype.checkModseq = function(options, callback) {
+        var self = this,
+            highestModseq = options.highestModseq,
+            client = options.client || self._client,
+            path = client.selectedMailbox;
+        if (!highestModseq || !path) {
+            return callback(null, []);
+        }
+
+        var cached = self.mailboxCache[path];
+
+        // only do this when we actually do have a last know change number
+        if (cached && cached.highestModseq && cached.highestModseq !== highestModseq) {
+            client.listMessages('1:*', ['uid', 'flags', 'modseq'], {
+                byUid: true,
+                changedSince: cached.highestModseq
+            }, function(err, messages) {
+                if (err) {
+                    return callback(err);
+                }
+
+                cached.highestModseq = highestModseq;
+
+                if (!messages || !messages.length) {
+                    return callback(null, []);
+                }
+
+                self.onSyncUpdate({
+                    type: 'messages',
+                    path: path,
+                    list: messages
+                });
+                callback(null, messages);
+            });
+        } else {
+            return callback(null, []);
+        }
+    };
+
+    /**
+     * Synchronization handler
+     *
+     * type 'new' returns an array of UID values that are new messages
+     * type 'deleted' returns an array of UID values that are deleted
+     * type 'messages' returns an array of message objects that are somehow updated
+     *
+     * @param {Object} options Notification options
+     * @param {String} options.type Type of the update
+     * @param {Array} options.list List of uids/messages
+     * @param {String} options.path Selected mailbox
+     */
+    ImapClient.prototype.onSyncUpdate = function( /* options */ ) {
+        this.onError(new Error('Sync handler not set'));
     };
 
     /**
@@ -126,31 +341,13 @@
      * @param {String} callback The callback when a change in the mailbox occurs
      */
     ImapClient.prototype.listenForChanges = function(options, callback) {
-        var self = this;
+        this._listeningClient.selectMailbox(options.path, callback);
+    };
 
-        self._listeningClient.selectMailbox(options.path, function(error) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            self._listeningClient.onupdate = function(type) {
-                if (type !== 'exists') {
-                    return;
-                }
-
-                callback(null, options.path);
-            };
-
-            self._client.onupdate = function(type) {
-                // we do not need duplicated notifications
-                if (type !== 'exists' || this._currentPath === options.path) {
-                    return;
-                }
-
-                callback(null, this._currentPath);
-            };
-        });
+    ImapClient.prototype.selectMailbox = function(options, callback) {
+        if (this._client.selectedMailbox !== options.path) {
+            this._client.selectMailbox(options.path, callback);
+        }
     };
 
     /**
@@ -231,7 +428,8 @@
      * @param {Function} callback(error, uids) invoked with the uids of messages matching the search terms, or an error object if an error occurred
      */
     ImapClient.prototype.search = function(options, callback) {
-        var self = this;
+        var self = this,
+            client = options.client || self._client;
 
         if (!self._loggedIn) {
             callback(new Error('Can not search messages, cause: Not logged in!'));
@@ -258,8 +456,12 @@
             query.unanswered = true;
         }
 
-        if (self._currentPath !== options.path) {
-            self._client.selectMailbox(options.path, onMailboxSelected);
+        if (options.uid) {
+            query.uid = options.uid;
+        }
+
+        if (client.selectedMailbox !== options.path) {
+            client.selectMailbox(options.path, onMailboxSelected);
         } else {
             onMailboxSelected();
         }
@@ -270,9 +472,7 @@
                 return;
             }
 
-            self._currentPath = options.path;
-
-            self._client.search(query, queryOptions, callback);
+            client.search(query, queryOptions, callback);
         }
     };
 
@@ -298,7 +498,12 @@
             };
 
 
-        if (self._currentPath !== options.path) {
+        // only if client has CONDSTORE capability
+        if (this._client.hasCapability('CONDSTORE')) {
+            query.push('modseq');
+        }
+
+        if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
             onMailboxSelected();
@@ -309,8 +514,6 @@
                 callback(error);
                 return;
             }
-
-            self._currentPath = options.path;
 
             self._client.listMessages(interval, query, queryOptions, onList);
         }
@@ -341,9 +544,10 @@
                     to: message.envelope.to || [],
                     cc: message.envelope.cc || [],
                     bcc: message.envelope.bcc || [],
+                    modseq: message.modseq || 0,
                     subject: message.envelope.subject || '(no subject)',
                     inReplyTo: (message.envelope['in-reply-to'] || '').replace(/[<>]/g, ''),
-                    references: references ? references.split(/\s+/).map(function(reference){
+                    references: references ? references.split(/\s+/).map(function(reference) {
                         return reference.replace(/[<>]/g, '');
                     }) : [],
                     sentDate: message.envelope.date ? new Date(message.envelope.date) : new Date(),
@@ -404,7 +608,7 @@
             }
         });
 
-        if (self._currentPath !== options.path) {
+        if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
             onMailboxSelected();
@@ -417,7 +621,6 @@
                 return;
             }
 
-            self._currentPath = options.path;
             self._client.listMessages(interval, query, queryOptions, onPartsReady);
         }
 
@@ -492,7 +695,7 @@
             remove: remove
         };
 
-        if (self._currentPath !== options.path) {
+        if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
             onMailboxSelected();
@@ -503,7 +706,6 @@
                 onFlagsAdded(error);
             }
 
-            self._currentPath = options.path;
 
             if (add.length === 0) {
                 onFlagsAdded(error);
@@ -553,7 +755,7 @@
             return;
         }
 
-        if (self._currentPath !== options.path) {
+        if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
             onMailboxSelected();
@@ -565,7 +767,6 @@
                 return;
             }
 
-            self._currentPath = options.path;
 
             self._client.moveMessages(interval, options.destination, queryOptions, callback);
         }
@@ -589,7 +790,7 @@
             return;
         }
 
-        if (self._currentPath !== options.path) {
+        if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
             onMailboxSelected();
@@ -601,7 +802,6 @@
                 return;
             }
 
-            self._currentPath = options.path;
 
             self._client.deleteMessages(interval, queryOptions, callback);
         }
