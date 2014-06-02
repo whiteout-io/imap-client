@@ -82,14 +82,23 @@
         }
     };
 
+    /**
+     * Executed whenever 'onselectmailbox' event is emitted in BrowserBox
+     *
+     * @param {Object} client Listening client object
+     * @param {String} path Path to currently opened mailbox
+     * @param {Object} mailbox Information object for the opened mailbox
+     */
     ImapClient.prototype._onSelectMailbox = function(client, path, mailbox) {
         var self = this,
             cached;
 
+        // If both clients are currently listening the same mailbox, ignore data from listeningClient
         if (client === self._listeningClient && self._listeningClient.selectedMailbox === self._client.selectedMailbox) {
             return;
         }
 
+        // populate the cahce object for current path
         if (!self.mailboxCache[path]) {
             self.mailboxCache[path] = {
                 exists: 0,
@@ -100,13 +109,15 @@
 
         cached = self.mailboxCache[path];
 
+        // if exists count does not match, there might be new messages
+        // if exists count matches but uidNext is different, then something has been deleted and something added
         if (cached.exists !== mailbox.exists || cached.uidNext !== mailbox.uidNext) {
-            if (!cached) {
-                cached = self.mailboxCache[path] = {};
-            }
+
+            // store the new values to cache
             cached.exists = mailbox.exists;
             cached.uidNext = mailbox.uidNext;
 
+            // list all uid values in the selected mailbox
             self.search({
                 path: path,
                 client: client
@@ -136,13 +147,18 @@
                         });
                     }
                 }
+
+                // use the uidlist as the new sequence number array
                 cached.uidlist = uidlist;
+
+                // check for changed flags
                 self.checkModseq({
                     highestModseq: mailbox.highestModseq,
                     client: client
                 }, function() {});
             });
         } else {
+            // check for changed flags
             self.checkModseq({
                 highestModseq: mailbox.highestModseq,
                 client: client
@@ -155,6 +171,7 @@
             path = client.selectedMailbox,
             cached = self.mailboxCache[path];
 
+        // If both clients are currently listening the same mailbox, ignore data from listeningClient
         if (client === self._listeningClient && self._listeningClient.selectedMailbox === self._client.selectedMailbox) {
             return;
         }
@@ -164,7 +181,11 @@
         }
 
         if (type === 'expunge') {
+            // a message has been deleted
+            // input format: "* EXPUNGE 123" where 123 is the sequence number of the deleted message
+
             var deletedUid = cached.uidlist[value - 1];
+            // reorder the uidlist by removing deleted item
             cached.uidlist.splice(value - 1, 1);
 
             if (deletedUid) {
@@ -175,10 +196,12 @@
                 });
             }
         } else if (type === 'exists') {
-            // list new messages
+            // there might be new messages (or something was deleted) as the message count in the mailbox has changed
+            // input format: "* EXISTS 123" where 123 is the count of messages in the mailbox
             cached.exists = value;
             self.search({
                 path: client.selectedMailbox,
+                // search for messages with higher UID than last known uidNext
                 uid: cached.uidNext + ':*',
                 client: client
             }, function(err, uidlist) {
@@ -186,11 +209,18 @@
                     return;
                 }
 
+                // if we do not find anything or the returned item was already known then return
+                // if there was no new messages then we get back a single element array where the element
+                // is the message with the highest UID value ('*' -> highest UID)
+                // ie. if the largest UID in the mailbox is 100 and we search for 123:* then the query is
+                // translated to 100:123 as '*' is 100 and this matches the element 100 that we already know about
                 if (!uidlist.length || (uidlist.length === 1 && cached.uidlist.indexOf(uidlist[0]) >= 0)) {
                     return;
                 }
 
+                // update cahced uid list
                 cached.uidlist = cached.uidlist.concat(uidlist);
+                // predict the next UID, might not be the actual value set by the server
                 cached.uidNext = cached.uidlist[cached.uidlist.length - 1] + 1;
 
                 self.onSyncUpdate({
@@ -200,6 +230,10 @@
                 });
             });
         } else if (type === 'fetch') {
+            // probably some flag updates. A message or messages have been altered in some way
+            // and the server sends an unsolicited FETCH response
+            // input format: "* 123 FETCH (FLAGS (\Seen))"
+            // UID is probably not listed, only the sequence number
             self.onSyncUpdate({
                 type: 'messages',
                 path: path,
@@ -225,6 +259,9 @@
             highestModseq = options.highestModseq,
             client = options.client || self._client,
             path = client.selectedMailbox;
+
+        // do nothing if we do not have highestModseq value. it should be at least 1. if it is
+        // undefined then the server does not support CONDSTORE extension
         if (!highestModseq || !path) {
             return callback(null, []);
         }
