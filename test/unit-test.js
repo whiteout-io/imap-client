@@ -80,9 +80,23 @@
 
                 expect(imap._loggedIn).to.be.false;
                 expect(imap._errored).to.be.true;
-                expect(imap._currentPath).to.not.exist;
                 expect(bboxMock.close.calledTwice).to.be.true; // once for client and for listeningClient
                 expect(count).to.equal(1); // onError must only be called once
+            });
+        });
+        
+        describe('#selectMailbox', function() {
+            var path = 'foo';
+            
+            it('should select a different mailbox', function(done) {
+                bboxMock.selectMailbox.withArgs(path).yieldsAsync();
+
+                imap.selectMailbox({path: path}, done);
+            });
+
+            it('should not re-select the same mailbox', function() {
+                imap._client.selectedMailbox = path;
+                imap.selectMailbox({path: path});
             });
         });
 
@@ -160,7 +174,6 @@
                 }, function(error, uids) {
                     expect(error).to.be.null;
                     expect(uids.length).to.equal(3);
-                    expect(imap._currentPath).to.equal('foobar');
                     done();
                 });
             });
@@ -388,7 +401,6 @@
                 }, function(error, cbParts) {
                     expect(error).to.not.exist;
                     expect(cbParts).to.equal(parts);
-                    expect(imap._currentPath).to.equal('foobar');
 
                     expect(parts[0].raw).to.equal('qweasd');
                     expect(parts[1].raw).to.equal('blablubb');
@@ -473,7 +485,6 @@
                     expect(error).to.be.null;
                     expect(flags.unread).to.be.true;
                     expect(flags.answered).to.be.true;
-                    expect(imap._currentPath).to.equal('INBOX');
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledTwice).to.be.true;
@@ -500,7 +511,6 @@
                     expect(error).to.be.null;
                     expect(flags.unread).to.be.true;
                     expect(flags.answered).to.be.true;
-                    expect(imap._currentPath).to.equal('INBOX');
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledOnce).to.be.true;
@@ -527,7 +537,6 @@
                     expect(error).to.be.null;
                     expect(flags.unread).to.be.true;
                     expect(flags.answered).to.be.false;
-                    expect(imap._currentPath).to.equal('INBOX');
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledOnce).to.be.true;
@@ -593,7 +602,6 @@
                     expect(error).to.not.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.moveMessages.calledOnce).to.be.true;
-                    expect(imap._currentPath).to.equal('INBOX');
 
                     done();
                 });
@@ -652,7 +660,6 @@
                     expect(error).to.be.null;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.deleteMessages.calledOnce).to.be.true;
-                    expect(imap._currentPath).to.equal('INBOX');
 
                     done();
                 });
