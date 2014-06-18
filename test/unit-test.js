@@ -2,12 +2,15 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['chai', 'sinon', 'browserbox', 'imap-client'], factory);
+        define(['chai', 'sinon', 'browserbox', 'axe', 'imap-client'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('chai'), require('sinon'), require('browserbox'), require('../src/imap-client'));
+        module.exports = factory(require('chai'), require('sinon'), require('browserbox'), require('axe'), require('../src/imap-client'));
     }
-})(function(chai, sinon, browserbox, ImapClient) {
+})(function(chai, sinon, browserbox, axe, ImapClient) {
     'use strict';
+
+    // don't log in the tests
+    axe.removeAppender(axe.defaultAppender);
 
     describe('ImapClient', function() {
         var expect = chai.expect;
@@ -84,19 +87,23 @@
                 expect(count).to.equal(1); // onError must only be called once
             });
         });
-        
+
         describe('#selectMailbox', function() {
             var path = 'foo';
-            
+
             it('should select a different mailbox', function(done) {
                 bboxMock.selectMailbox.withArgs(path).yieldsAsync();
 
-                imap.selectMailbox({path: path}, done);
+                imap.selectMailbox({
+                    path: path
+                }, done);
             });
 
             it('should not re-select the same mailbox', function() {
                 imap._client.selectedMailbox = path;
-                imap.selectMailbox({path: path});
+                imap.selectMailbox({
+                    path: path
+                });
             });
         });
 

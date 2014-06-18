@@ -6,6 +6,7 @@ var chai = require('chai'),
     expect = chai.expect,
     ImapClient = require('../src/imap-client'),
     hoodiecrow = require('hoodiecrow'),
+    axe = require('axe'),
     loginOptions = {
         port: 12345,
         host: 'localhost',
@@ -15,6 +16,9 @@ var chai = require('chai'),
         },
         secure: false
     };
+
+// don't log in the tests
+axe.removeAppender(axe.defaultAppender);
 
 describe('ImapClient local integration tests', function() {
     var ic, imap;

@@ -2,12 +2,14 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['browserbox'], factory);
+        define(['browserbox', 'axe'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('browserbox'));
+        module.exports = factory(require('browserbox'), require('axe'));
     }
-})(function(BrowserBox) {
+})(function(BrowserBox, axe) {
     'use strict';
+
+    var DEBUG_TAG = 'imap-client';
 
     /**
      * Create an instance of ImapClient.
@@ -17,7 +19,6 @@
      * @param {String} options.auth.user Username for login
      * @param {String} options.auth.pass Password for login
      * @param {String} options.auth.xoauth2 xoauth2 token for login
-     * @param {Boolean} options.debug (optional) Outputs all the imap traffic in the console
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
      */
     var ImapClient = function(options, browserbox) {
@@ -44,6 +45,9 @@
             // the error handler is the same for both clients. if one instance
             // of browserbox fails, just shutdown the client and avoid further
             // operations
+
+            axe.error(DEBUG_TAG, 'error in imap connection, disconnecting! error: ' + err + '\n' + err.stack);
+
             if (self._errored) {
                 return;
             }
@@ -76,10 +80,6 @@
         self._client.onupdate = self._onUpdate.bind(self, self._client);
         self._listeningClient.onselectmailbox = self._onSelectMailbox.bind(self, self._listeningClient);
         self._listeningClient.onupdate = self._onUpdate.bind(self, self._listeningClient);
-
-        if (options.debug) {
-            self._client.onlog = self._listeningClient.onlog = console.log.bind(console);
-        }
     };
 
     /**
@@ -98,8 +98,11 @@
             return;
         }
 
+        axe.debug(DEBUG_TAG, 'selected mailbox ' + path);
+
         // populate the cahce object for current path
         if (!self.mailboxCache[path]) {
+            axe.debug(DEBUG_TAG, 'populating cache object for mailbox ' + path);
             self.mailboxCache[path] = {
                 exists: 0,
                 uidNext: 0,
@@ -112,6 +115,7 @@
         // if exists count does not match, there might be new messages
         // if exists count matches but uidNext is different, then something has been deleted and something added
         if (cached.exists !== mailbox.exists || cached.uidNext !== mailbox.uidNext) {
+            axe.debug(DEBUG_TAG, 'possible updates available in ' + path + '. exists: ' + mailbox.exists + ', uidNext: ' + mailbox.uidNext);
 
             // store the new values to cache
             cached.exists = mailbox.exists;
@@ -129,6 +133,7 @@
                     if ((deltaNew = uidlist.filter(function(i) {
                         return cached.uidlist.indexOf(i) < 0;
                     })) && deltaNew.length) {
+                        axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + deltaNew);
                         self.onSyncUpdate({
                             type: 'new',
                             path: path,
@@ -140,6 +145,7 @@
                     if ((deltaDeleted = cached.uidlist.filter(function(i) {
                         return uidlist.indexOf(i) < 0;
                     })) && deltaDeleted.length) {
+                        axe.debug(DEBUG_TAG, 'deleted uids in ' + path + ': ' + deltaDeleted);
                         self.onSyncUpdate({
                             type: 'deleted',
                             path: path,
@@ -155,14 +161,23 @@
                 self.checkModseq({
                     highestModseq: mailbox.highestModseq,
                     client: client
-                }, function() {});
+                }, function(error) {
+                    if (error) {
+                        axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
+                    }
+                });
             });
         } else {
+            axe.debug(DEBUG_TAG, 'no changes in message count in ' + path + '. exists: ' + mailbox.exists + ', uidNext: ' + mailbox.uidNext);
             // check for changed flags
             self.checkModseq({
                 highestModseq: mailbox.highestModseq,
                 client: client
-            }, function() {});
+            }, function(error) {
+                if (error) {
+                    axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
+                }
+            });
         }
     };
 
@@ -181,6 +196,7 @@
         }
 
         if (type === 'expunge') {
+            axe.debug(DEBUG_TAG, 'expunge notice received for ' + path + ' with sequence number: ' + value);
             // a message has been deleted
             // input format: "* EXPUNGE 123" where 123 is the sequence number of the deleted message
 
@@ -189,6 +205,7 @@
             cached.uidlist.splice(value - 1, 1);
 
             if (deletedUid) {
+                axe.debug(DEBUG_TAG, 'deleted uid in ' + path + ': ' + deletedUid);
                 self.onSyncUpdate({
                     type: 'deleted',
                     path: path,
@@ -196,6 +213,8 @@
                 });
             }
         } else if (type === 'exists') {
+            axe.debug(DEBUG_TAG, 'exists notice received for ' + path + ', checking for updates');
+
             // there might be new messages (or something was deleted) as the message count in the mailbox has changed
             // input format: "* EXISTS 123" where 123 is the count of messages in the mailbox
             cached.exists = value;
@@ -218,6 +237,8 @@
                     return;
                 }
 
+                axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + uidlist);
+
                 // update cahced uid list
                 cached.uidlist = cached.uidlist.concat(uidlist);
                 // predict the next UID, might not be the actual value set by the server
@@ -230,6 +251,8 @@
                 });
             });
         } else if (type === 'fetch') {
+            axe.debug(DEBUG_TAG, 'fetch notice received for ' + path);
+
             // probably some flag updates. A message or messages have been altered in some way
             // and the server sends an unsolicited FETCH response
             // input format: "* 123 FETCH (FLAGS (\Seen))"
@@ -263,6 +286,7 @@
         // do nothing if we do not have highestModseq value. it should be at least 1. if it is
         // undefined then the server does not support CONDSTORE extension
         if (!highestModseq || !path) {
+            axe.info(DEBUG_TAG, 'can not check MODSEQ, server does not support CONDSTORE extension');
             return callback(null, []);
         }
 
@@ -270,6 +294,7 @@
 
         // only do this when we actually do have a last know change number
         if (cached && cached.highestModseq && cached.highestModseq !== highestModseq) {
+            axe.debug(DEBUG_TAG, 'listing changes since MODSEQ ' + highestModseq + ' for ' + path);
             client.listMessages('1:*', ['uid', 'flags', 'modseq'], {
                 byUid: true,
                 changedSince: cached.highestModseq
@@ -284,6 +309,7 @@
                     return callback(null, []);
                 }
 
+                axe.debug(DEBUG_TAG, 'changes since MODSEQ ' + highestModseq + ' for ' + path + ' available!');
                 self.onSyncUpdate({
                     type: 'messages',
                     path: path,
@@ -322,6 +348,7 @@
             authCount = 0;
 
         if (self._loggedIn) {
+            axe.debug(DEBUG_TAG, 'refusing login while already logged in!');
             callback(new Error('Already logged in!'));
             return;
         }
@@ -330,6 +357,7 @@
             authCount++;
 
             if (authCount >= 2) {
+                axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
                 self._loggedIn = true;
                 callback();
             }
@@ -350,6 +378,7 @@
             closeCount = 0;
 
         if (!self._loggedIn) {
+            axe.debug(DEBUG_TAG, 'refusing logout while already logged out!');
             callback(new Error('Can not log out, cause: Not logged in!'));
             return;
         }
@@ -358,6 +387,7 @@
             closeCount++;
 
             if (closeCount >= 2) {
+                axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
                 self._loggedIn = false;
                 callback();
             }
@@ -378,11 +408,13 @@
      * @param {String} callback The callback when a change in the mailbox occurs
      */
     ImapClient.prototype.listenForChanges = function(options, callback) {
+        axe.debug(DEBUG_TAG, 'listening for changes in ' + options.path);
         this._listeningClient.selectMailbox(options.path, callback);
     };
 
     ImapClient.prototype.selectMailbox = function(options, callback) {
         if (this._client.selectedMailbox !== options.path) {
+            axe.debug(DEBUG_TAG, 'selecting mailbox ' + options.path);
             this._client.selectMailbox(options.path, callback);
         }
     };
@@ -399,23 +431,29 @@
             return;
         }
 
+        axe.debug(DEBUG_TAG, 'listing folders');
+
         var wellKnownFolders = {
             other: []
         };
 
         self._client.listMailboxes(function(error, mailbox) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error listing folders: ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
 
-            walkMailbox(mailbox);
+            axe.debug(DEBUG_TAG, 'folder list received!');
 
+            walkMailbox(mailbox);
             callback(null, wellKnownFolders);
         });
 
         function walkMailbox(mailbox) {
             if (mailbox.name && mailbox.path) {
+                axe.debug(DEBUG_TAG, 'name: ' + mailbox.name + ', path: ' + mailbox.path + (mailbox.flags ? (', flags: ' + mailbox.flags) : '') + (mailbox.specialUse ? (', special use: ' + mailbox.specialUse) : ''));
+
                 var folder = {
                     name: mailbox.name,
                     path: mailbox.path
@@ -478,7 +516,7 @@
                 byUid: true
             };
 
-        // initial request to XOR the following properties
+        // initial request to && (AND) the following properties
         query.all = true;
 
         if (options.unread === true) {
@@ -497,6 +535,8 @@
             query.uid = options.uid;
         }
 
+        axe.debug(DEBUG_TAG, 'searching in ' + options.path + ' for ' + query);
+
         if (client.selectedMailbox !== options.path) {
             client.selectMailbox(options.path, onMailboxSelected);
         } else {
@@ -505,11 +545,19 @@
 
         function onMailboxSelected(error) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
 
-            client.search(query, queryOptions, callback);
+            client.search(query, queryOptions, function(error, uids) {
+                if (error) {
+                    axe.error(DEBUG_TAG, 'error searching mailbox: ' + error + '\n' + error.stack);
+                    return callback(error);
+                }
+
+                callback(null, uids);
+            });
         }
     };
 
@@ -540,6 +588,8 @@
             query.push('modseq');
         }
 
+        axe.debug(DEBUG_TAG, 'listing messages in ' + options.path + ' for interval ' + interval);
+
         if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
@@ -548,16 +598,17 @@
 
         function onMailboxSelected(error) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
-
             self._client.listMessages(interval, query, queryOptions, onList);
         }
 
         // process what inbox returns into a usable form for our client
         function onList(error, messages) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error listing messages in ' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
@@ -602,6 +653,7 @@
                     return bodyPart.type === 'signed';
                 }).length > 0;
 
+                axe.debug(DEBUG_TAG, 'listing message: [uid: ' + cleansed.uid + '][encrypted: ' + cleansed.encrypted + '][signed: ' + cleansed.signed + ']');
                 cleansedMessages.push(cleansed);
             });
 
@@ -645,6 +697,8 @@
             }
         });
 
+        axe.debug(DEBUG_TAG, 'retrieving body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
+
         if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
@@ -654,6 +708,7 @@
         // open the mailbox and retrieve the message
         function onMailboxSelected(error) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
@@ -663,6 +718,7 @@
 
         function onPartsReady(error, messages) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error fetching body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
@@ -732,6 +788,8 @@
             remove: remove
         };
 
+        axe.debug(DEBUG_TAG, 'updating flags for uid ' + options.uid + ' in folder ' + options.path + ': ' + (remove.length > 0 ? (' removing ' + remove) : '') + (add.length > 0 ? (' adding ' + add) : ''));
+
         if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
@@ -740,6 +798,7 @@
 
         function onMailboxSelected(error) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
                 onFlagsAdded(error);
             }
 
@@ -762,6 +821,7 @@
 
         function onFlagsRemoved(error, messages) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error updating flags for uid ' + options.uid + ' in folder ' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
@@ -792,6 +852,8 @@
             return;
         }
 
+        axe.debug(DEBUG_TAG, 'moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
+
         if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
@@ -800,12 +862,18 @@
 
         function onMailboxSelected(error) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
 
 
-            self._client.moveMessages(interval, options.destination, queryOptions, callback);
+            self._client.moveMessages(interval, options.destination, queryOptions, function(error) {
+                if (error) {
+                    axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
+                }
+                callback(error);
+            });
         }
     };
 
@@ -827,6 +895,8 @@
             return;
         }
 
+        axe.debug(DEBUG_TAG, 'deleting uid ' + options.uid + ' from ' + options.path);
+
         if (self._client.selectedMailbox !== options.path) {
             self._client.selectMailbox(options.path, onMailboxSelected);
         } else {
@@ -835,12 +905,19 @@
 
         function onMailboxSelected(error) {
             if (error) {
+                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
 
 
-            self._client.deleteMessages(interval, queryOptions, callback);
+            self._client.deleteMessages(interval, queryOptions, function(error) {
+                if (error) {
+                    axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
+                }
+
+                callback(error);
+            });
         }
     };
 
