@@ -53,7 +53,7 @@ describe('ImapClient local integration tests', function() {
                                     'flags': '\\All'
                                 },
                                 'Drafts': {
-                                    'special-use': '\\Drafts'
+                                    'flags': '\\Drafts'
                                 },
                                 'Important': {
                                     'flags': '\\Important'
@@ -62,13 +62,13 @@ describe('ImapClient local integration tests', function() {
                                     'flags': '\\Sent'
                                 },
                                 'Spam': {
-                                    'special-use': '\\Junk'
+                                    'flags': '\\Junk'
                                 },
                                 'Starred': {
                                     'flags': '\\Flagged'
                                 },
                                 'Trash': {
-                                    'special-use': '\\Trash'
+                                    'flags': '\\Trash'
                                 }
                             }
                         }

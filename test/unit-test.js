@@ -117,13 +117,11 @@
                     }, {
                         name: 'drafts',
                         path: 'drafts',
-                        specialUse: '\\Drafts',
-                        flags: ''
+                        specialUse: '\\Drafts'
                     }, {
                         name: 'sent',
                         path: 'sent',
-                        specialUse: '',
-                        flags: '\\Sent'
+                        specialUse: '\\Sent'
                     }]
                 });
 

@@ -458,28 +458,28 @@
                     path: mailbox.path
                 };
 
-                if (mailbox.name.toUpperCase() === 'INBOX') {
+                if (mailbox.name.toUpperCase() === 'INBOX' && !wellKnownFolders.inbox) {
                     folder.type = 'Inbox';
                     wellKnownFolders.inbox = folder;
-                } else if (mailbox.specialUse === '\\Drafts' || mailbox.flags.indexOf('\\Drafts') >= 0) {
+                } else if (mailbox.specialUse === '\\Drafts' && !wellKnownFolders.drafts) {
                     folder.type = 'Drafts';
                     wellKnownFolders.drafts = folder;
-                } else if (mailbox.specialUse === '\\All' || mailbox.flags.indexOf('\\All') >= 0) {
+                } else if (mailbox.specialUse === '\\All' && !wellKnownFolders.all) {
                     folder.type = 'All';
                     wellKnownFolders.all = folder;
-                } else if (mailbox.specialUse === '\\Flagged' || mailbox.flags.indexOf('\\Flagged') >= 0) {
+                } else if (mailbox.specialUse === '\\Flagged' && !wellKnownFolders.flagged) {
                     folder.type = 'Flagged';
                     wellKnownFolders.flagged = folder;
-                } else if (mailbox.specialUse === '\\Sent' || mailbox.flags.indexOf('\\Sent') >= 0) {
+                } else if (mailbox.specialUse === '\\Sent' && !wellKnownFolders.sent) {
                     folder.type = 'Sent';
                     wellKnownFolders.sent = folder;
-                } else if (mailbox.specialUse === '\\Trash' || mailbox.flags.indexOf('\\Trash') >= 0) {
+                } else if (mailbox.specialUse === '\\Trash' && !wellKnownFolders.trash) {
                     folder.type = 'Trash';
                     wellKnownFolders.trash = folder;
-                } else if (mailbox.specialUse === '\\Junk' || mailbox.flags.indexOf('\\Junk') >= 0) {
+                } else if (mailbox.specialUse === '\\Junk' && !wellKnownFolders.junk) {
                     folder.type = 'Junk';
                     wellKnownFolders.junk = folder;
-                } else if (mailbox.specialUse === '\\Archive' || mailbox.flags.indexOf('\\Archive') >= 0) {
+                } else if (mailbox.specialUse === '\\Archive' && !wellKnownFolders.archive) {
                     folder.type = 'Archive';
                     wellKnownFolders.archive = folder;
                 } else {
