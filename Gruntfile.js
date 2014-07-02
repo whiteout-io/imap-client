@@ -66,6 +66,7 @@ module.exports = function(grunt) {
                     'mocha/mocha.js',
                     'mocha/mocha.css',
                     'chai/chai.js',
+                    'axe/axe.js',
                     'sinon/pkg/sinon.js',
                     'requirejs/require.js',
                     'tcp-socket/src/*.js',

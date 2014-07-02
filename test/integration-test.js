@@ -2,11 +2,11 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['chai', 'imap-client'], factory);
+        define(['chai', 'imap-client', 'axe'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('chai'), require('../src/imap-client'));
+        module.exports = factory(require('chai'), require('../src/imap-client'), require('axe'));
     }
-})(function(chai, ImapClient) {
+})(function(chai, ImapClient, axe) {
     'use strict';
 
     var expect = chai.expect,
@@ -26,10 +26,14 @@
     describe('ImapClient gmail integration tests', function() {
         this.timeout(5000);
 
+        // don't log in the tests
+        axe.removeAppender(axe.defaultAppender);
+
         var ic;
 
         beforeEach(function(done) {
             ic = new ImapClient(loginOptions);
+            ic.onSyncUpdate = function() {};
             ic.login(done);
         });
 
@@ -65,7 +69,7 @@
         it('should search messages', function(done) {
             ic.search({
                 path: 'INBOX',
-                unread: true,
+                unread: false,
                 answered: false
             }, function(error, uids) {
                 expect(error).to.not.exist;
