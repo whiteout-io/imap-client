@@ -611,9 +611,14 @@
                 return;
             }
 
-            // we rely on those parameters, everything else can be recovered from
+            // a message without uid will be ignored as malformed
             messages = messages.filter(function(message) {
-                return message.uid && message.envelope['message-id'];
+                if (!message.uid) {
+                    axe.warn(DEBUG_TAG, 'folder ' + options.path + ' contains message without uid. message will be ignored! subject ' + message.subject + ', ' + (message.envelope.from || [])[0]);
+                    return false;
+                }
+
+                return true;
             });
 
             var cleansedMessages = [];
@@ -624,7 +629,7 @@
 
                 var cleansed = {
                     uid: message.uid,
-                    id: message.envelope['message-id'].replace(/[<>]/g, ''),
+                    id: (message.envelope['message-id'] || '').replace(/[<>]/g, ''),
                     from: message.envelope.from || [],
                     replyTo: message.envelope['reply-to'] || [],
                     to: message.envelope.to || [],
