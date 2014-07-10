@@ -555,6 +555,8 @@
                     return callback(error);
                 }
 
+                axe.debug(DEBUG_TAG, 'searched in ' + options.path + ' for ' + query + ': ' + uids);
+
                 callback(null, uids);
             });
         }
@@ -735,6 +737,8 @@
                 return;
             }
 
+            axe.debug(DEBUG_TAG, 'successfully retrieved body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
+
             var message = messages[0];
             bodyParts.forEach(function(bodyPart) {
                 if (typeof bodyPart.partNumber === 'undefined') {
@@ -841,6 +845,7 @@
                 return;
             }
 
+            axe.debug(DEBUG_TAG, 'successfully updated flags for uid ' + options.uid + ' in folder ' + options.path + ': flags are ' + messages[0].flags + '. added ' + add + ' and removed ' + remove);
             callback(null, {
                 unread: messages[0].flags.indexOf(READ_FLAG) === -1,
                 answered: messages[0].flags.indexOf(ANSWERED_FLAG) > -1
@@ -886,6 +891,7 @@
                 if (error) {
                     axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
                 }
+                axe.debug(DEBUG_TAG, 'successfully moved uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
                 callback(error);
             });
         }
@@ -911,6 +917,7 @@
             if (error) {
                 axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
             }
+            axe.debug(DEBUG_TAG, 'successfully uploaded message to ' + options.path);
             callback(error);
         });
     };
@@ -953,6 +960,7 @@
                     axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
                 }
 
+                axe.debug(DEBUG_TAG, 'successfully deleted uid ' + options.uid + ' from ' + options.path);
                 callback(error);
             });
         }
