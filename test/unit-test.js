@@ -418,6 +418,24 @@
                 });
             });
 
+            it('should do nothing for malformed body parts', function(done) {
+                var parts = [{}, {}];
+
+                imap.getBodyParts({
+                    path: 'foobar',
+                    uid: 123,
+                    bodyParts: parts
+                }, function(error, cbParts) {
+                    expect(error).to.not.exist;
+                    expect(cbParts).to.equal(parts);
+
+                    expect(bboxMock.selectMailbox.called).to.be.false;
+                    expect(bboxMock.listMessages.called).to.be.false;
+
+                    done();
+                });
+            });
+
             it('should fail when list fails', function(done) {
                 bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.listMessages.yieldsAsync({});
@@ -581,7 +599,6 @@
                     expect(error).to.exist;
                     expect(flags).to.not.exist;
 
-
                     done();
                 });
             });
@@ -697,7 +714,6 @@
                     done();
                 });
             });
-
 
             it('should not fail due to not logged in', function() {
                 imap._loggedIn = false;
