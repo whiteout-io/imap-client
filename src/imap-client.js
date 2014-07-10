@@ -905,7 +905,7 @@
             return;
         }
 
-        axe.debug(DEBUG_TAG, 'uploading a message <' + options.message.length + '> bytes to ' + options.path);
+        axe.debug(DEBUG_TAG, 'uploading a message of ' + options.message.length + ' bytes to ' + options.path);
 
         self._client.upload(options.path, options.message, function(error) {
             if (error) {
