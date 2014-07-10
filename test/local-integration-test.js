@@ -239,6 +239,38 @@ describe('ImapClient local integration tests', function() {
         });
     });
 
+    it('should upload Message', function(done) {
+        var msg = 'MIME-Version: 1.0\r\nDate: Wed, 9 Jul 2014 15:07:47 +0200\r\nDelivered-To: test@test.com\r\nMessage-ID: <CAHftYYQo=5fqbtnv-DazXhL2j5AxVP1nWarjkztn-N9SV91Z2w@mail.gmail.com>\r\nSubject: test\r\nFrom: Test Test <test@test.com>\r\nTo: Test Test <test@test.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\ntest',
+            path = 'INBOX';
+
+        ic.listMessages({
+            path: path,
+            firstUid: 1
+        }, function(error, messages) {
+            expect(error).to.not.exist;
+            expect(messages).to.not.be.empty;
+            var msgCount = messages.length;
+
+            ic.uploadMessage({
+                path: path,
+                message: msg,
+                flags: ['\\Seen']
+            }, function(error) {
+                expect(error).to.not.exist;
+
+                ic.listMessages({
+                    path: path,
+                    firstUid: 1
+                }, function(error, messages) {
+                    expect(error).to.not.exist;
+                    expect(messages.length).to.equal(msgCount + 1);
+
+                    done();
+                });
+            });
+        });
+    });
+
     it('should move message', function(done) {
         var destination = '[Gmail]/Trash';
 

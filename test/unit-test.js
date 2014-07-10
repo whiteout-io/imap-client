@@ -668,6 +668,38 @@
 
         });
 
+        describe('#uploadMessage', function() {
+            var msg = 'asdasdasdasd',
+                path = 'INBOX';
+
+            it('should work', function(done) {
+                bboxMock.upload.withArgs(path, msg).yields();
+
+                imap.uploadMessage({
+                    path: path,
+                    message: msg
+                }, function(error) {
+                    expect(error).to.not.exist;
+                    expect(bboxMock.upload.calledOnce).to.be.true;
+
+                    done();
+                });
+            });
+
+            it('should fail due to move error', function(done) {
+                bboxMock.upload.yields({});
+
+                imap.uploadMessage({
+                    path: path,
+                    message: msg
+                }, function(error) {
+                    expect(error).to.exist;
+
+                    done();
+                });
+            });
+        });
+
         describe('#deleteMessage', function() {
             it('should work', function(done) {
                 bboxMock.selectMailbox.withArgs('INBOX').yields();

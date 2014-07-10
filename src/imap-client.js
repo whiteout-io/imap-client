@@ -892,6 +892,30 @@
     };
 
     /**
+     * Move a message to a folder
+     * @param {String} options.path The path the message should be uploaded to
+     * @param {String} options.message A RFC-2822 compliant message
+     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     */
+    ImapClient.prototype.uploadMessage = function(options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Cannot move message, cause: Not logged in!'));
+            return;
+        }
+
+        axe.debug(DEBUG_TAG, 'uploading a message <' + options.message.length + '> bytes to ' + options.path);
+
+        self._client.upload(options.path, options.message, function(error) {
+            if (error) {
+                axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
+            }
+            callback(error);
+        });
+    };
+
+    /**
      * Purges a message from a folder
      * @param {String} options.path The origin path where the message resides
      * @param {Number} options.uid The uid of the message
