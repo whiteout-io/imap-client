@@ -393,7 +393,6 @@
             }
         }
 
-
         self._listeningClient.onclose = onclose;
         self._client.onclose = onclose;
 
@@ -582,7 +581,6 @@
                 byUid: true
             };
 
-
         // only if client has CONDSTORE capability
         if (this._client.hasCapability('CONDSTORE')) {
             query.push('modseq');
@@ -689,6 +687,10 @@
 
         // formulate a query for each text part. for part 2.1 to be parsed, we need 2.1.MIME and 2.1
         bodyParts.forEach(function(bodyPart) {
+            if (typeof bodyPart.partNumber === 'undefined') {
+                return;
+            }
+
             if (bodyPart.partNumber === '') {
                 query.push('body.peek[]');
             } else {
@@ -696,6 +698,11 @@
                 query.push('body.peek[' + bodyPart.partNumber + ']');
             }
         });
+
+        if (query.length === 0) {
+            callback(null, bodyParts);
+            return;
+        }
 
         axe.debug(DEBUG_TAG, 'retrieving body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
 
@@ -725,6 +732,10 @@
 
             var message = messages[0];
             bodyParts.forEach(function(bodyPart) {
+                if (typeof bodyPart.partNumber === 'undefined') {
+                    return;
+                }
+
                 if (bodyPart.partNumber === '') {
                     bodyPart.raw = message['body[]'];
                 } else {
@@ -802,7 +813,6 @@
                 onFlagsAdded(error);
             }
 
-
             if (add.length === 0) {
                 onFlagsAdded(error);
             }
@@ -867,7 +877,6 @@
                 return;
             }
 
-
             self._client.moveMessages(interval, options.destination, queryOptions, function(error) {
                 if (error) {
                     axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
@@ -909,7 +918,6 @@
                 callback(error);
                 return;
             }
-
 
             self._client.deleteMessages(interval, queryOptions, function(error) {
                 if (error) {
