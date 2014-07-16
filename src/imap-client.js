@@ -41,6 +41,11 @@
             self._client = new BrowserBox(options.host, options.port, credentials);
             self._listeningClient = new BrowserBox(options.host, options.port, credentials);
         }
+
+        self._client.oncert = self._listeningClient.oncert = function(certificate) {
+            self.onCert(certificate);
+        };
+
         self._client.onerror = self._listeningClient.onerror = function(err) {
             // the error handler is the same for both clients. if one instance
             // of browserbox fails, just shutdown the client and avoid further
@@ -54,6 +59,7 @@
 
             self._errored = true;
             self._loggedIn = false;
+            self._listenerLoggedIn = false;
             self._listeningClient.close();
             self._client.close();
 
@@ -344,29 +350,19 @@
      * @param {Function} callback Callback when the login was successful
      */
     ImapClient.prototype.login = function(callback) {
-        var self = this,
-            authCount = 0;
+        var self = this;
 
         if (self._loggedIn) {
             axe.debug(DEBUG_TAG, 'refusing login while already logged in!');
-            callback(new Error('Already logged in!'));
-            return;
+            return callback();
         }
 
-        function onauth() {
-            authCount++;
+        self._client.onauth = function() {
+            axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
+            self._loggedIn = true;
+            callback();
+        };
 
-            if (authCount >= 2) {
-                axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
-                self._loggedIn = true;
-                callback();
-            }
-        }
-
-        self._listeningClient.onauth = onauth;
-        self._client.onauth = onauth;
-
-        self._listeningClient.connect();
         self._client.connect();
     };
 
@@ -374,41 +370,65 @@
      * Log out of the current IMAP session
      */
     ImapClient.prototype.logout = function(callback) {
-        var self = this,
-            closeCount = 0;
+        var self = this;
 
         if (!self._loggedIn) {
             axe.debug(DEBUG_TAG, 'refusing logout while already logged out!');
-            callback(new Error('Can not log out, cause: Not logged in!'));
-            return;
+            return callback();
         }
 
-        function onclose() {
-            closeCount++;
+        self._client.onclose = function() {
+            axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
+            self._loggedIn = false;
+            callback();
+        };
 
-            if (closeCount >= 2) {
-                axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
-                self._loggedIn = false;
-                callback();
-            }
-        }
-
-        self._listeningClient.onclose = onclose;
-        self._client.onclose = onclose;
-
-        self._listeningClient.close();
         self._client.close();
     };
 
     /**
-     * Starts listening for updates on a specific IMAP folder, calls back when a change occurrs,
+     * Starts dedicated listener for updates on a specific IMAP folder, calls back when a change occurrs,
      * or includes information in case of an error
+     
      * @param {String} options.path The path to the folder to subscribe to
-     * @param {String} callback The callback when a change in the mailbox occurs
+     * @param {String} callback(err) Invoked when listening folder has been selected, or an error occurred
      */
     ImapClient.prototype.listenForChanges = function(options, callback) {
-        axe.debug(DEBUG_TAG, 'listening for changes in ' + options.path);
-        this._listeningClient.selectMailbox(options.path, callback);
+        var self = this;
+
+        if (self._listenerLoggedIn) {
+            axe.debug(DEBUG_TAG, 'refusing login listener while already logged in!');
+            return callback();
+        }
+
+        self._listeningClient.onauth = function() {
+            axe.debug(DEBUG_TAG, 'listener login completed, ready to roll!');
+            self._listenerLoggedIn = true;
+            axe.debug(DEBUG_TAG, 'listening for changes in ' + options.path);
+            self._listeningClient.selectMailbox(options.path, callback);
+        };
+        self._listeningClient.connect();
+    };
+
+    /**
+     * Stops dedicated listener for updates
+     *
+     * @param {String} callback(err) Invoked when listenerstopped, or an error occurred
+     */
+    ImapClient.prototype.stopListeningForChanges = function(callback) {
+        var self = this;
+
+        if (!self._listenerLoggedIn) {
+            axe.debug(DEBUG_TAG, 'refusing logout listener already logged out!');
+            return callback();
+        }
+
+        self._listeningClient.onclose = function() {
+            axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
+            self._listenerLoggedIn = false;
+            callback();
+        };
+        self._listeningClient.close();
     };
 
     ImapClient.prototype.selectMailbox = function(options, callback) {

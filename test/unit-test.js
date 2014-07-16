@@ -34,18 +34,17 @@
                 imap.login(function(error) {
                     expect(error).to.not.exist;
                     expect(imap._loggedIn).to.be.true;
-                    expect(bboxMock.connect.calledTwice).to.be.true;
+                    expect(bboxMock.connect.calledOnce).to.be.true;
 
                     done();
                 });
-                bboxMock.onauth();
                 bboxMock.onauth();
             });
 
             it('should not login when logged in', function() {
                 imap._loggedIn = true;
                 imap.login(function(error) {
-                    expect(error).to.exist;
+                    expect(error).to.not.exist;
                 });
             });
         });
@@ -53,19 +52,18 @@
         describe('#logout', function() {
             it('should logout', function(done) {
                 imap.logout(function() {
-                    expect(bboxMock.close.calledTwice).to.be.true;
+                    expect(bboxMock.close.calledOnce).to.be.true;
                     expect(imap._loggedIn).to.be.false;
 
                     done();
                 });
-                bboxMock.onclose();
                 bboxMock.onclose();
             });
 
             it('should not logout when not logged in', function() {
                 imap._loggedIn = false;
                 imap.logout(function(error) {
-                    expect(error).to.exist;
+                    expect(error).to.not.exist;
                 });
             });
         });
@@ -760,8 +758,13 @@
 
                 imap.listenForChanges({
                     path: 'INBOX'
-                }, done);
-                bboxMock.onupdate('exists');
+                }, function(err) {
+                    expect(err).to.not.exist;
+                    expect(imap._listenerLoggedIn).to.be.true;
+                    expect(bboxMock.connect.calledOnce).to.be.true;
+                    done();
+                });
+                bboxMock.onauth();
             });
 
             it('should return an error when inbox could not be opened', function(done) {
@@ -771,10 +774,23 @@
                     path: 'INBOX'
                 }, function(err) {
                     expect(err).to.exist;
-
                     done();
                 });
-                bboxMock.onupdate('exists');
+                bboxMock.onauth();
+            });
+        });
+
+        describe('#stopListeningForChanges', function() {
+            it('should stop listening', function(done) {
+                imap._listenerLoggedIn = true;
+
+                imap.stopListeningForChanges(function(err) {
+                    expect(err).to.not.exist;
+                    expect(bboxMock.close.calledOnce).to.be.true;
+                    expect(imap._listenerLoggedIn).to.be.false;
+                    done();
+                });
+                bboxMock.onclose();
             });
         });
     });
