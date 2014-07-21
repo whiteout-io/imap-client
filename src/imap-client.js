@@ -34,7 +34,7 @@
             self._client = self._listeningClient = browserbox;
         } else {
             var credentials = {
-                useSSL: options.secure,
+                useSecureTransport: options.secure,
                 auth: options.auth,
                 ca: options.ca
             };
