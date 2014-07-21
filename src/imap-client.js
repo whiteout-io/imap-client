@@ -34,13 +34,18 @@
             self._client = self._listeningClient = browserbox;
         } else {
             var credentials = {
-                useSSL: options.secure,
+                useSecureTransport: options.secure,
                 auth: options.auth,
                 ca: options.ca
             };
             self._client = new BrowserBox(options.host, options.port, credentials);
             self._listeningClient = new BrowserBox(options.host, options.port, credentials);
         }
+
+        self._client.oncert = self._listeningClient.oncert = function(certificate) {
+            self.onCert(certificate);
+        };
+
         self._client.onerror = self._listeningClient.onerror = function(err) {
             // the error handler is the same for both clients. if one instance
             // of browserbox fails, just shutdown the client and avoid further
@@ -54,6 +59,7 @@
 
             self._errored = true;
             self._loggedIn = false;
+            self._listenerLoggedIn = false;
             self._listeningClient.close();
             self._client.close();
 
@@ -344,29 +350,19 @@
      * @param {Function} callback Callback when the login was successful
      */
     ImapClient.prototype.login = function(callback) {
-        var self = this,
-            authCount = 0;
+        var self = this;
 
         if (self._loggedIn) {
             axe.debug(DEBUG_TAG, 'refusing login while already logged in!');
-            callback(new Error('Already logged in!'));
-            return;
+            return callback();
         }
 
-        function onauth() {
-            authCount++;
+        self._client.onauth = function() {
+            axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
+            self._loggedIn = true;
+            callback();
+        };
 
-            if (authCount >= 2) {
-                axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
-                self._loggedIn = true;
-                callback();
-            }
-        }
-
-        self._listeningClient.onauth = onauth;
-        self._client.onauth = onauth;
-
-        self._listeningClient.connect();
         self._client.connect();
     };
 
@@ -374,41 +370,65 @@
      * Log out of the current IMAP session
      */
     ImapClient.prototype.logout = function(callback) {
-        var self = this,
-            closeCount = 0;
+        var self = this;
 
         if (!self._loggedIn) {
             axe.debug(DEBUG_TAG, 'refusing logout while already logged out!');
-            callback(new Error('Can not log out, cause: Not logged in!'));
-            return;
+            return callback();
         }
 
-        function onclose() {
-            closeCount++;
+        self._client.onclose = function() {
+            axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
+            self._loggedIn = false;
+            callback();
+        };
 
-            if (closeCount >= 2) {
-                axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
-                self._loggedIn = false;
-                callback();
-            }
-        }
-
-        self._listeningClient.onclose = onclose;
-        self._client.onclose = onclose;
-
-        self._listeningClient.close();
         self._client.close();
     };
 
     /**
-     * Starts listening for updates on a specific IMAP folder, calls back when a change occurrs,
+     * Starts dedicated listener for updates on a specific IMAP folder, calls back when a change occurrs,
      * or includes information in case of an error
+     
      * @param {String} options.path The path to the folder to subscribe to
-     * @param {String} callback The callback when a change in the mailbox occurs
+     * @param {String} callback(err) Invoked when listening folder has been selected, or an error occurred
      */
     ImapClient.prototype.listenForChanges = function(options, callback) {
-        axe.debug(DEBUG_TAG, 'listening for changes in ' + options.path);
-        this._listeningClient.selectMailbox(options.path, callback);
+        var self = this;
+
+        if (self._listenerLoggedIn) {
+            axe.debug(DEBUG_TAG, 'refusing login listener while already logged in!');
+            return callback();
+        }
+
+        self._listeningClient.onauth = function() {
+            axe.debug(DEBUG_TAG, 'listener login completed, ready to roll!');
+            self._listenerLoggedIn = true;
+            axe.debug(DEBUG_TAG, 'listening for changes in ' + options.path);
+            self._listeningClient.selectMailbox(options.path, callback);
+        };
+        self._listeningClient.connect();
+    };
+
+    /**
+     * Stops dedicated listener for updates
+     *
+     * @param {String} callback(err) Invoked when listenerstopped, or an error occurred
+     */
+    ImapClient.prototype.stopListeningForChanges = function(callback) {
+        var self = this;
+
+        if (!self._listenerLoggedIn) {
+            axe.debug(DEBUG_TAG, 'refusing logout listener already logged out!');
+            return callback();
+        }
+
+        self._listeningClient.onclose = function() {
+            axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
+            self._listenerLoggedIn = false;
+            callback();
+        };
+        self._listeningClient.close();
     };
 
     ImapClient.prototype.selectMailbox = function(options, callback) {
@@ -458,28 +478,28 @@
                     path: mailbox.path
                 };
 
-                if (mailbox.name.toUpperCase() === 'INBOX') {
+                if (mailbox.name.toUpperCase() === 'INBOX' && !wellKnownFolders.inbox) {
                     folder.type = 'Inbox';
                     wellKnownFolders.inbox = folder;
-                } else if (mailbox.specialUse === '\\Drafts' || mailbox.flags.indexOf('\\Drafts') >= 0) {
+                } else if (mailbox.specialUse === '\\Drafts' && !wellKnownFolders.drafts) {
                     folder.type = 'Drafts';
                     wellKnownFolders.drafts = folder;
-                } else if (mailbox.specialUse === '\\All' || mailbox.flags.indexOf('\\All') >= 0) {
+                } else if (mailbox.specialUse === '\\All' && !wellKnownFolders.all) {
                     folder.type = 'All';
                     wellKnownFolders.all = folder;
-                } else if (mailbox.specialUse === '\\Flagged' || mailbox.flags.indexOf('\\Flagged') >= 0) {
+                } else if (mailbox.specialUse === '\\Flagged' && !wellKnownFolders.flagged) {
                     folder.type = 'Flagged';
                     wellKnownFolders.flagged = folder;
-                } else if (mailbox.specialUse === '\\Sent' || mailbox.flags.indexOf('\\Sent') >= 0) {
+                } else if (mailbox.specialUse === '\\Sent' && !wellKnownFolders.sent) {
                     folder.type = 'Sent';
                     wellKnownFolders.sent = folder;
-                } else if (mailbox.specialUse === '\\Trash' || mailbox.flags.indexOf('\\Trash') >= 0) {
+                } else if (mailbox.specialUse === '\\Trash' && !wellKnownFolders.trash) {
                     folder.type = 'Trash';
                     wellKnownFolders.trash = folder;
-                } else if (mailbox.specialUse === '\\Junk' || mailbox.flags.indexOf('\\Junk') >= 0) {
+                } else if (mailbox.specialUse === '\\Junk' && !wellKnownFolders.junk) {
                     folder.type = 'Junk';
                     wellKnownFolders.junk = folder;
-                } else if (mailbox.specialUse === '\\Archive' || mailbox.flags.indexOf('\\Archive') >= 0) {
+                } else if (mailbox.specialUse === '\\Archive' && !wellKnownFolders.archive) {
                     folder.type = 'Archive';
                     wellKnownFolders.archive = folder;
                 } else {
@@ -555,6 +575,8 @@
                     return callback(error);
                 }
 
+                axe.debug(DEBUG_TAG, 'searched in ' + options.path + ' for ' + query + ': ' + uids);
+
                 callback(null, uids);
             });
         }
@@ -611,9 +633,14 @@
                 return;
             }
 
-            // we rely on those parameters, everything else can be recovered from
+            // a message without uid will be ignored as malformed
             messages = messages.filter(function(message) {
-                return message.uid && message.envelope['message-id'];
+                if (!message.uid) {
+                    axe.warn(DEBUG_TAG, 'folder ' + options.path + ' contains message without uid. message will be ignored! subject ' + message.subject + ', ' + (message.envelope.from || [])[0]);
+                    return false;
+                }
+
+                return true;
             });
 
             var cleansedMessages = [];
@@ -624,7 +651,7 @@
 
                 var cleansed = {
                     uid: message.uid,
-                    id: message.envelope['message-id'].replace(/[<>]/g, ''),
+                    id: (message.envelope['message-id'] || '').replace(/[<>]/g, ''),
                     from: message.envelope.from || [],
                     replyTo: message.envelope['reply-to'] || [],
                     to: message.envelope.to || [],
@@ -729,6 +756,8 @@
                 callback(error);
                 return;
             }
+
+            axe.debug(DEBUG_TAG, 'successfully retrieved body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
 
             var message = messages[0];
             bodyParts.forEach(function(bodyPart) {
@@ -836,6 +865,7 @@
                 return;
             }
 
+            axe.debug(DEBUG_TAG, 'successfully updated flags for uid ' + options.uid + ' in folder ' + options.path + ': flags are ' + messages[0].flags + '. added ' + add + ' and removed ' + remove);
             callback(null, {
                 unread: messages[0].flags.indexOf(READ_FLAG) === -1,
                 answered: messages[0].flags.indexOf(ANSWERED_FLAG) > -1
@@ -881,9 +911,35 @@
                 if (error) {
                     axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
                 }
+                axe.debug(DEBUG_TAG, 'successfully moved uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
                 callback(error);
             });
         }
+    };
+
+    /**
+     * Move a message to a folder
+     * @param {String} options.path The path the message should be uploaded to
+     * @param {String} options.message A RFC-2822 compliant message
+     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     */
+    ImapClient.prototype.uploadMessage = function(options, callback) {
+        var self = this;
+
+        if (!self._loggedIn) {
+            callback(new Error('Cannot move message, cause: Not logged in!'));
+            return;
+        }
+
+        axe.debug(DEBUG_TAG, 'uploading a message of ' + options.message.length + ' bytes to ' + options.path);
+
+        self._client.upload(options.path, options.message, function(error) {
+            if (error) {
+                axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
+            }
+            axe.debug(DEBUG_TAG, 'successfully uploaded message to ' + options.path);
+            callback(error);
+        });
     };
 
     /**
@@ -924,6 +980,7 @@
                     axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
                 }
 
+                axe.debug(DEBUG_TAG, 'successfully deleted uid ' + options.uid + ' from ' + options.path);
                 callback(error);
             });
         }

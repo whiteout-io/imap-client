@@ -3,11 +3,11 @@
   "version": "0.3.5",
   "scripts": {
     "pretest": "cd node_modules/node-forge/ && npm install && npm run minify && cd ../..",
-    "test": "grunt testlocal"
+    "test": "grunt"
   },
   "main": "src/imap-client.js",
   "dependencies": {
-    "browserbox": "https://github.com/whiteout-io/browserbox/tarball/v0.3.6",
+    "browserbox": "https://github.com/whiteout-io/browserbox/tarball/v0.3.7",
     "axe": "https://github.com/whiteout-io/axe/tarball/v0.0.2"
   },
   "devDependencies": {

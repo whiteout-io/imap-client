@@ -30,7 +30,7 @@ module.exports = function(grunt) {
         },
 
         mochaTest: {
-            gmail: {
+            tonline: {
                 options: {
                     reporter: 'spec'
                 },
@@ -105,6 +105,5 @@ module.exports = function(grunt) {
     // Default task(s).
     grunt.registerTask('deps', ['clean', 'copy']);
     grunt.registerTask('dev', ['deps', 'connect:dev']);
-    grunt.registerTask('testlocal', ['jshint', 'deps', 'mochaTest:unit', 'mocha_phantomjs', 'mochaTest:local']);
-    grunt.registerTask('default', ['jshint', 'deps', 'mochaTest:unit', 'mocha_phantomjs', 'mochaTest:local', 'mochaTest:gmail']);
+    grunt.registerTask('default', ['jshint', 'deps', 'mochaTest:unit', 'mocha_phantomjs', 'mochaTest:local', 'mochaTest:tonline']);
 };
