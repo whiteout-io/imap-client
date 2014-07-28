@@ -6,7 +6,7 @@ var chai = require('chai'),
     expect = chai.expect,
     ImapClient = require('../src/imap-client'),
     hoodiecrow = require('hoodiecrow'),
-    axe = require('axe'),
+    axe = require('axe-logger'),
     loginOptions = {
         port: 12345,
         host: 'localhost',

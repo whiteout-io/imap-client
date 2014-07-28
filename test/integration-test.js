@@ -2,9 +2,9 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['chai', 'imap-client', 'axe'], factory);
+        define(['chai', 'imap-client', 'axe-logger'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('chai'), require('../src/imap-client'), require('axe'));
+        module.exports = factory(require('chai'), require('../src/imap-client'), require('axe-logger'));
     }
 })(function(chai, ImapClient, axe) {
     'use strict';

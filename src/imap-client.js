@@ -2,9 +2,9 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['browserbox', 'axe'], factory);
+        define(['browserbox', 'axe-logger'], factory);
     } else if (typeof exports === 'object') {
-        module.exports = factory(require('browserbox'), require('axe'));
+        module.exports = factory(require('browserbox'), require('axe-logger'));
     }
 })(function(BrowserBox, axe) {
     'use strict';

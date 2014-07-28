@@ -4,7 +4,11 @@ require.config({
     baseUrl: 'lib',
     paths: {
         'test': '..',
-        'forge': 'forge.min'
+        'forge': 'forge.min',
+        'axe-logger': 'axe',
+        'wo-utf7': 'utf7',
+        'wo-stringencoding': 'stringencoding',
+        'wo-imap-handler' : 'imap-handler'
     },
     shim: {
         forge: {

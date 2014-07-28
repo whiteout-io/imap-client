@@ -66,16 +66,16 @@ module.exports = function(grunt) {
                     'mocha/mocha.js',
                     'mocha/mocha.css',
                     'chai/chai.js',
-                    'axe/axe.js',
+                    'axe-logger/axe.js',
                     'sinon/pkg/sinon.js',
                     'requirejs/require.js',
                     'tcp-socket/src/*.js',
                     'node-forge/js/forge.min.js',
                     'browserbox/src/*.js',
-                    'browserbox/node_modules/utf7/src/*.js',
-                    'browserbox/node_modules/imap-handler/src/*.js',
+                    'browserbox/node_modules/wo-utf7/src/*.js',
+                    'browserbox/node_modules/wo-imap-handler/src/*.js',
                     'browserbox/node_modules/mimefuncs/src/*.js',
-                    'browserbox/node_modules/mimefuncs/node_modules/stringencoding/dist/stringencoding.js'
+                    'browserbox/node_modules/mimefuncs/node_modules/wo-stringencoding/dist/stringencoding.js'
                 ],
                 dest: 'test/lib/'
             },
