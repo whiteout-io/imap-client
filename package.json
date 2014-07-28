@@ -1,13 +1,13 @@
 {
   "name": "imap-client",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "scripts": {
     "pretest": "cd node_modules/node-forge/ && npm install && npm run minify && cd ../..",
     "test": "grunt"
   },
   "main": "src/imap-client.js",
   "dependencies": {
-    "browserbox": "~0.3.8",
+    "browserbox": "~0.3.9",
     "axe-logger": "~0.0.2"
   },
   "devDependencies": {
@@ -23,7 +23,7 @@
     "sinon": "1.7.3",
     "requirejs": "2.1.x",
     "hoodiecrow": "1.1.x",
-    "tcp-socket": "^0.2.1",
+    "tcp-socket": "^0.3.1",
     "node-forge": "^0.2.33",
     "mocha": "^1.18.2",
     "grunt-mocha-test": "^0.10.2"

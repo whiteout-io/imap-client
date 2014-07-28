@@ -2,7 +2,7 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
-        define(['chai', 'sinon', 'browserbox', 'axe-logger', 'imap-client'], factory);
+        define(['chai', 'sinon', 'browserbox', 'axe', 'imap-client'], factory);
     } else if (typeof exports === 'object') {
         module.exports = factory(require('chai'), require('sinon'), require('browserbox'), require('axe-logger'), require('../src/imap-client'));
     }
