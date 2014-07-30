@@ -110,7 +110,6 @@
                 // setup fixture
                 bboxMock.listMailboxes.yieldsAsync(null, {
                     children: [{
-                        name: 'INBOX',
                         path: 'INBOX'
                     }, {
                         name: 'drafts',

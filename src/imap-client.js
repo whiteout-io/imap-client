@@ -481,37 +481,37 @@
         });
 
         function walkMailbox(mailbox) {
-            if (mailbox.name && mailbox.path && (mailbox.flags || []).indexOf("\\Noselect") === -1) {
-                // only list mailboxes here that have a path and name and are selectable
+            if (mailbox.path && (mailbox.flags || []).indexOf("\\Noselect") === -1) {
+                // only list mailboxes here that have a path and are selectable
                 axe.debug(DEBUG_TAG, 'name: ' + mailbox.name + ', path: ' + mailbox.path + (mailbox.flags ? (', flags: ' + mailbox.flags) : '') + (mailbox.specialUse ? (', special use: ' + mailbox.specialUse) : ''));
 
                 var folder = {
-                    name: mailbox.name,
+                    name: mailbox.name || mailbox.path,
                     path: mailbox.path
                 };
 
-                if (mailbox.name.toUpperCase() === 'INBOX' && !wellKnownFolders.inbox) {
+                if (folder.name.toUpperCase() === 'INBOX') {
                     folder.type = 'Inbox';
                     wellKnownFolders.Inbox.push(folder);
-                } else if (mailbox.specialUse === '\\Drafts' && !wellKnownFolders.drafts) {
+                } else if (mailbox.specialUse === '\\Drafts') {
                     folder.type = 'Drafts';
                     wellKnownFolders.Drafts.push(folder);
-                } else if (mailbox.specialUse === '\\All' && !wellKnownFolders.all) {
+                } else if (mailbox.specialUse === '\\All') {
                     folder.type = 'All';
                     wellKnownFolders.All.push(folder);
-                } else if (mailbox.specialUse === '\\Flagged' && !wellKnownFolders.flagged) {
+                } else if (mailbox.specialUse === '\\Flagged') {
                     folder.type = 'Flagged';
                     wellKnownFolders.Flagged.push(folder);
-                } else if (mailbox.specialUse === '\\Sent' && !wellKnownFolders.sent) {
+                } else if (mailbox.specialUse === '\\Sent') {
                     folder.type = 'Sent';
                     wellKnownFolders.Sent.push(folder);
-                } else if (mailbox.specialUse === '\\Trash' && !wellKnownFolders.trash) {
+                } else if (mailbox.specialUse === '\\Trash') {
                     folder.type = 'Trash';
                     wellKnownFolders.Trash.push(folder);
-                } else if (mailbox.specialUse === '\\Junk' && !wellKnownFolders.junk) {
+                } else if (mailbox.specialUse === '\\Junk') {
                     folder.type = 'Junk';
                     wellKnownFolders.Junk.push(folder);
-                } else if (mailbox.specialUse === '\\Archive' && !wellKnownFolders.archive) {
+                } else if (mailbox.specialUse === '\\Archive') {
                     folder.type = 'Archive';
                     wellKnownFolders.Archive.push(folder);
                 } else {
