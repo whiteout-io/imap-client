@@ -440,6 +440,9 @@
 
     /**
      * Provides the well known folders: Drafts, Sent, Inbox, Trash, Flagged, etc. No-op if not logged in.
+     * Since there may actually be multiple sent folders (e.g. one is default, others were created by Thunderbird,
+     * Outlook, another accidentally matched the naming), we return the well known folders as an array to avoid false positives.
+     *
      * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
      */
     ImapClient.prototype.listWellKnownFolders = function(callback) {
@@ -453,7 +456,15 @@
         axe.debug(DEBUG_TAG, 'listing folders');
 
         var wellKnownFolders = {
-            other: []
+            Inbox: [],
+            Drafts: [],
+            All: [],
+            Flagged: [],
+            Sent: [],
+            Trash: [],
+            Junk: [],
+            Archive: [],
+            Other: []
         };
 
         self._client.listMailboxes(function(error, mailbox) {
@@ -470,45 +481,47 @@
         });
 
         function walkMailbox(mailbox) {
-            if (mailbox.name && mailbox.path) {
+            if (mailbox.path && (mailbox.flags || []).indexOf("\\Noselect") === -1) {
+                // only list mailboxes here that have a path and are selectable
                 axe.debug(DEBUG_TAG, 'name: ' + mailbox.name + ', path: ' + mailbox.path + (mailbox.flags ? (', flags: ' + mailbox.flags) : '') + (mailbox.specialUse ? (', special use: ' + mailbox.specialUse) : ''));
 
                 var folder = {
-                    name: mailbox.name,
+                    name: mailbox.name || mailbox.path,
                     path: mailbox.path
                 };
 
-                if (mailbox.name.toUpperCase() === 'INBOX' && !wellKnownFolders.inbox) {
+                if (folder.name.toUpperCase() === 'INBOX') {
                     folder.type = 'Inbox';
-                    wellKnownFolders.inbox = folder;
-                } else if (mailbox.specialUse === '\\Drafts' && !wellKnownFolders.drafts) {
+                    wellKnownFolders.Inbox.push(folder);
+                } else if (mailbox.specialUse === '\\Drafts') {
                     folder.type = 'Drafts';
-                    wellKnownFolders.drafts = folder;
-                } else if (mailbox.specialUse === '\\All' && !wellKnownFolders.all) {
+                    wellKnownFolders.Drafts.push(folder);
+                } else if (mailbox.specialUse === '\\All') {
                     folder.type = 'All';
-                    wellKnownFolders.all = folder;
-                } else if (mailbox.specialUse === '\\Flagged' && !wellKnownFolders.flagged) {
+                    wellKnownFolders.All.push(folder);
+                } else if (mailbox.specialUse === '\\Flagged') {
                     folder.type = 'Flagged';
-                    wellKnownFolders.flagged = folder;
-                } else if (mailbox.specialUse === '\\Sent' && !wellKnownFolders.sent) {
+                    wellKnownFolders.Flagged.push(folder);
+                } else if (mailbox.specialUse === '\\Sent') {
                     folder.type = 'Sent';
-                    wellKnownFolders.sent = folder;
-                } else if (mailbox.specialUse === '\\Trash' && !wellKnownFolders.trash) {
+                    wellKnownFolders.Sent.push(folder);
+                } else if (mailbox.specialUse === '\\Trash') {
                     folder.type = 'Trash';
-                    wellKnownFolders.trash = folder;
-                } else if (mailbox.specialUse === '\\Junk' && !wellKnownFolders.junk) {
+                    wellKnownFolders.Trash.push(folder);
+                } else if (mailbox.specialUse === '\\Junk') {
                     folder.type = 'Junk';
-                    wellKnownFolders.junk = folder;
-                } else if (mailbox.specialUse === '\\Archive' && !wellKnownFolders.archive) {
+                    wellKnownFolders.Junk.push(folder);
+                } else if (mailbox.specialUse === '\\Archive') {
                     folder.type = 'Archive';
-                    wellKnownFolders.archive = folder;
+                    wellKnownFolders.Archive.push(folder);
                 } else {
                     folder.type = 'Other';
-                    wellKnownFolders.other.push(folder);
+                    wellKnownFolders.Other.push(folder);
                 }
             }
 
             if (mailbox.children) {
+                // walk the child mailboxes recursively
                 mailbox.children.forEach(walkMailbox);
             }
         }
@@ -666,11 +679,10 @@
                     sentDate: message.envelope.date ? new Date(message.envelope.date) : new Date(),
                     unread: (message.flags || []).indexOf('\\Seen') === -1,
                     answered: (message.flags || []).indexOf('\\Answered') > -1,
-                    bodystructure: message.bodystructure || {},
                     bodyParts: []
                 };
 
-                walkMimeTree(cleansed.bodystructure, cleansed);
+                walkMimeTree((message.bodystructure || {}), cleansed);
                 cleansed.encrypted = cleansed.bodyParts.filter(function(bodyPart) {
                     return bodyPart.type === 'encrypted';
                 }).length > 0;

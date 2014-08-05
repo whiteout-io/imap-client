@@ -49,16 +49,22 @@
 
                 expect(folders).to.exist;
 
-                expect(folders.inbox).to.exist;
-                expect(folders.inbox.name).to.exist;
-                expect(folders.inbox.type).to.exist;
-                expect(folders.inbox.path).to.exist;
+                expect(folders.Inbox).to.be.instanceof(Array);
+                expect(folders.Inbox[0]).to.exist;
+                expect(folders.Inbox[0].name).to.exist;
+                expect(folders.Inbox[0].type).to.exist;
+                expect(folders.Inbox[0].path).to.exist;
 
-                expect(folders.drafts).to.exist;
-                expect(folders.sent).to.exist;
-                expect(folders.trash).to.exist;
+                expect(folders.Drafts).to.be.instanceof(Array);
+                expect(folders.Drafts).to.not.be.empty;
 
-                expect(folders.other).to.be.instanceof(Array);
+                expect(folders.Sent).to.be.instanceof(Array);
+                expect(folders.Sent).to.not.be.empty;
+
+                expect(folders.Trash).to.be.instanceof(Array);
+                expect(folders.Trash).to.not.be.empty;
+
+                expect(folders.Other).to.be.instanceof(Array);
 
                 done();
             });
