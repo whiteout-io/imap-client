@@ -1008,7 +1008,7 @@
      *
      */
 
-    var mimeTreeMatchers = [matchEncrypted, matchSigned, matchText, matchHtml, matchAttachment];
+    var mimeTreeMatchers = [matchEncrypted, matchSigned, matchAttachment, matchText, matchHtml];
 
     /**
      * Helper function that walks the MIME tree in a dfs and calls the handlers
