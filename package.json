@@ -1,6 +1,6 @@
 {
   "name": "imap-client",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "scripts": {
     "pretest": "cd node_modules/node-forge/ && npm install && npm run minify && cd ../..",
     "test": "grunt"

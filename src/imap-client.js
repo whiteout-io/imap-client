@@ -35,6 +35,7 @@
         } else {
             var credentials = {
                 useSecureTransport: options.secure,
+                ignoreTLS: options.ignoreTLS,
                 auth: options.auth,
                 ca: options.ca
             };
