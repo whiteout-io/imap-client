@@ -159,7 +159,7 @@
                 // determine new uids
                 deltaNew = imapUidList.filter(function(i) {
                     return cached.uidlist.indexOf(i) < 0;
-                }).sort(sortNumericallyAscending);
+                }).sort(sortNumericallyDescending);
                 axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + deltaNew);
 
                 // notify about new messages in batches of _maxUpdateSize size
@@ -258,7 +258,7 @@
                     return;
                 }
 
-                imapUidList.sort(sortNumericallyAscending);
+                imapUidList.sort(sortNumericallyDescending);
                 axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + imapUidList);
                 // update cahced uid list
                 cached.uidlist = cached.uidlist.concat(imapUidList);
@@ -1158,8 +1158,8 @@
     /**
      * Compares numbers, sorts them ascending
      */
-    function sortNumericallyAscending(a, b) {
-        return a - b;
+    function sortNumericallyDescending(a, b) {
+        return b - a;
     }
 
     return ImapClient;
