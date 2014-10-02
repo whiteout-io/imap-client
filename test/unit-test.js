@@ -21,11 +21,12 @@
         beforeEach(function() {
             bboxMock = sinon.createStubInstance(browserbox);
             imap = new ImapClient({}, bboxMock);
+
             expect(imap._client).to.equal(bboxMock);
+            expect(imap._maxUpdateSize).to.equal(0);
+
             imap._loggedIn = true;
         });
-
-        afterEach(function() {});
 
         describe('#login', function() {
             it('should login', function(done) {

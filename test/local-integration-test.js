@@ -108,6 +108,28 @@ describe('ImapClient local integration tests', function() {
         });
     });
 
+    it('should notify about new messages', function(done) {
+        var invocations = 0; // counts the message updates
+        ic._maxUpdateSize = 1;
+
+        ic.onSyncUpdate = function(options) {
+            invocations++;
+         
+            expect(options.list.length).to.equal(1);
+
+            expect(options.type).to.equal('new');
+            if (invocations === 6) {
+                done();
+            }
+        };
+
+        ic.selectMailbox({
+            path: 'INBOX'
+        }, function(err) {
+            expect(err).to.not.exist;
+        });
+    });
+
     it('should list well known folders', function(done) {
         ic.listWellKnownFolders(function(error, folders) {
             expect(error).to.not.exist;

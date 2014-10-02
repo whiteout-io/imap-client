@@ -20,6 +20,7 @@
      * @param {String} options.auth.pass Password for login
      * @param {String} options.auth.xoauth2 xoauth2 token for login
      * @param {Array} options.ca Array of PEM-encoded certificates that should be pinned.
+     * @param {Number} options.maxUpdateSize (optional) The maximum number of messages to receive in an onSyncUpdate of type "new". 0 = all messages. Defaults to 0.
      */
     var ImapClient = function(options, browserbox) {
         var self = this;
@@ -27,6 +28,8 @@
         /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
          * @private */
         self._loggedIn = false;
+
+        self._maxUpdateSize = Math.abs(options.maxUpdateSize || 0);
 
         /* Instance of our imap library
          * @private */
@@ -124,7 +127,6 @@
         if (cached.exists !== mailbox.exists || cached.uidNext !== mailbox.uidNext) {
             axe.debug(DEBUG_TAG, 'possible updates available in ' + path + '. exists: ' + mailbox.exists + ', uidNext: ' + mailbox.uidNext);
 
-            // store the new values to cache
             cached.exists = mailbox.exists;
             cached.uidNext = mailbox.uidNext;
 
@@ -132,37 +134,47 @@
             self.search({
                 path: path,
                 client: client
-            }, function(err, uidlist) {
-                var deltaNew, deltaDeleted;
+            }, function(err, imapUidList) {
+                var deltaNew, deltaDeleted,
+                    batch;
 
-                if (cached.uidlist) {
-                    // new messages
-                    if ((deltaNew = uidlist.filter(function(i) {
-                        return cached.uidlist.indexOf(i) < 0;
-                    })) && deltaNew.length) {
-                        axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + deltaNew);
-                        self.onSyncUpdate({
-                            type: 'new',
-                            path: path,
-                            list: deltaNew
-                        });
-                    }
+                // normalize the uidlist
+                cached.uidlist = cached.uidlist || [];
 
-                    // deleted messages
-                    if ((deltaDeleted = cached.uidlist.filter(function(i) {
-                        return uidlist.indexOf(i) < 0;
-                    })) && deltaDeleted.length) {
-                        axe.debug(DEBUG_TAG, 'deleted uids in ' + path + ': ' + deltaDeleted);
-                        self.onSyncUpdate({
-                            type: 'deleted',
-                            path: path,
-                            list: deltaDeleted
-                        });
-                    }
+                // determine deleted uids
+                deltaDeleted = cached.uidlist.filter(function(i) {
+                    return imapUidList.indexOf(i) < 0;
+                });
+
+                // notify about deleted messages
+                if (deltaDeleted.length) {
+                    axe.debug(DEBUG_TAG, 'onSyncUpdate for deleted uids in ' + path + ': ' + deltaDeleted);
+                    self.onSyncUpdate({
+                        type: 'deleted',
+                        path: path,
+                        list: deltaDeleted
+                    });
                 }
 
-                // use the uidlist as the new sequence number array
-                cached.uidlist = uidlist;
+                // determine new uids
+                deltaNew = imapUidList.filter(function(i) {
+                    return cached.uidlist.indexOf(i) < 0;
+                }).sort(sortNumericallyDescending);
+                axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + deltaNew);
+
+                // notify about new messages in batches of _maxUpdateSize size
+                while (deltaNew.length) {
+                    batch = deltaNew.splice(0, (self._maxUpdateSize || deltaNew.length));
+                    axe.debug(DEBUG_TAG, 'onSyncUpdate for new uids in ' + path + ': ' + batch);
+                    self.onSyncUpdate({
+                        type: 'new',
+                        path: path,
+                        list: batch
+                    });
+                }
+
+                // update mailbox info
+                cached.uidlist = imapUidList;
 
                 // check for changed flags
                 self.checkModseq({
@@ -226,36 +238,44 @@
             // input format: "* EXISTS 123" where 123 is the count of messages in the mailbox
             cached.exists = value;
             self.search({
-                path: client.selectedMailbox,
+                path: path,
                 // search for messages with higher UID than last known uidNext
                 uid: cached.uidNext + ':*',
                 client: client
-            }, function(err, uidlist) {
+            }, function(err, imapUidList) {
                 if (err) {
                     return;
                 }
+
+                var batch;
 
                 // if we do not find anything or the returned item was already known then return
                 // if there was no new messages then we get back a single element array where the element
                 // is the message with the highest UID value ('*' -> highest UID)
                 // ie. if the largest UID in the mailbox is 100 and we search for 123:* then the query is
                 // translated to 100:123 as '*' is 100 and this matches the element 100 that we already know about
-                if (!uidlist.length || (uidlist.length === 1 && cached.uidlist.indexOf(uidlist[0]) >= 0)) {
+                if (!imapUidList.length || (imapUidList.length === 1 && cached.uidlist.indexOf(imapUidList[0]) >= 0)) {
                     return;
                 }
 
-                axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + uidlist);
-
+                imapUidList.sort(sortNumericallyDescending);
+                axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + imapUidList);
                 // update cahced uid list
-                cached.uidlist = cached.uidlist.concat(uidlist);
+                cached.uidlist = cached.uidlist.concat(imapUidList);
                 // predict the next UID, might not be the actual value set by the server
                 cached.uidNext = cached.uidlist[cached.uidlist.length - 1] + 1;
 
-                self.onSyncUpdate({
-                    type: 'new',
-                    path: path,
-                    list: uidlist
-                });
+                // notify about new messages in batches of _maxUpdateSize size
+                while (imapUidList.length) {
+                    batch = imapUidList.splice(0, (self._maxUpdateSize || imapUidList.length));
+                    axe.debug(DEBUG_TAG, 'onSyncUpdate for new uids in ' + path + ': ' + batch);
+                    self.onSyncUpdate({
+                        type: 'new',
+                        path: path,
+                        list: batch
+                    });
+                }
+
             });
         } else if (type === 'fetch') {
             axe.debug(DEBUG_TAG, 'fetch notice received for ' + path);
@@ -1133,6 +1153,13 @@
 
         message.bodyParts.push(bodyPart);
         return true;
+    }
+
+    /**
+     * Compares numbers, sorts them ascending
+     */
+    function sortNumericallyDescending(a, b) {
+        return b - a;
     }
 
     return ImapClient;
