@@ -165,7 +165,7 @@
                 // notify about new messages in batches of _maxUpdateSize size
                 while (deltaNew.length) {
                     batch = deltaNew.splice(0, (self._maxUpdateSize || deltaNew.length));
-                    axe.debug(DEBUG_TAG, 'onSyncUpdate for deleted uids in ' + path + ': ' + batch);
+                    axe.debug(DEBUG_TAG, 'onSyncUpdate for new uids in ' + path + ': ' + batch);
                     self.onSyncUpdate({
                         type: 'new',
                         path: path,
@@ -268,7 +268,7 @@
                 // notify about new messages in batches of _maxUpdateSize size
                 while (imapUidList.length) {
                     batch = imapUidList.splice(0, (self._maxUpdateSize || imapUidList.length));
-                    axe.debug(DEBUG_TAG, 'onSyncUpdate for deleted uids in ' + path + ': ' + batch);
+                    axe.debug(DEBUG_TAG, 'onSyncUpdate for new uids in ' + path + ': ' + batch);
                     self.onSyncUpdate({
                         type: 'new',
                         path: path,
