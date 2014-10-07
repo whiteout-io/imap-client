@@ -1,13 +1,13 @@
 {
   "name": "imap-client",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "scripts": {
     "pretest": "dir=$(pwd) && cd node_modules/browserbox/node_modules/tcp-socket/node_modules/node-forge/ && npm install && npm run minify && cd $dir",
     "test": "grunt"
   },
   "main": "src/imap-client.js",
   "dependencies": {
-    "browserbox": "https://github.com/whiteout-io/browserbox/tarball/dev/WO-559",
+    "browserbox": "~0.3.13",
     "axe-logger": "~0.0.2"
   },
   "devDependencies": {
