@@ -40,7 +40,8 @@
                 useSecureTransport: options.secure,
                 ignoreTLS: options.ignoreTLS,
                 auth: options.auth,
-                ca: options.ca
+                ca: options.ca,
+                tlsWorkerPath: options.tlsWorkerPath
             };
             self._client = new BrowserBox(options.host, options.port, credentials);
             self._listeningClient = new BrowserBox(options.host, options.port, credentials);
