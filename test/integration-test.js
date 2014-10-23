@@ -36,7 +36,7 @@
             ic = new ImapClient(loginOptions);
             ic.onSyncUpdate = function() {};
             ic.login(done);
-            ic.onCert = function () {};
+            ic.onCert = function() {};
         });
 
 
@@ -96,7 +96,8 @@
 
 
         it('should upload Message', function(done) {
-            var msg = 'MIME-Version: 1.0\r\nDate: Wed, 9 Jul 2014 15:07:47 +0200\r\nDelivered-To: test@test.com\r\nMessage-ID: <CAHftYYQo=5fqbtnv-DazXhL2j5AxVP1nWarjkztn-N9SV91Z2w@mail.gmail.com>\r\nSubject: integration test\r\nFrom: Test Test <test@test.com>\r\nTo: Test Test <test@test.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nintegration test',
+            var msgid = '<' + Math.random().toString(36).substring(7) + 'fqbtnv-DazXhL2j5AxVP1nWarjkztn-N9SV91Z2w@mail.gmail.com>';
+            var msg = 'MIME-Version: 1.0\r\nDate: Wed, 9 Jul 2014 15:07:47 +0200\r\nDelivered-To: test@test.com\r\nMessage-ID: ' + msgid + '\r\nSubject: integration test\r\nFrom: Test Test <test@test.com>\r\nTo: Test Test <test@test.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nintegration test',
                 path = 'INBOX';
 
             ic.listMessages({
@@ -109,9 +110,11 @@
 
                 ic.uploadMessage({
                     path: path,
-                    message: msg
-                }, function(error) {
+                    message: msg,
+                    messageId: msgid
+                }, function(error, uid) {
                     expect(error).to.not.exist;
+                    expect(uid > 0).to.be.true;
 
                     ic.listMessages({
                         path: path,

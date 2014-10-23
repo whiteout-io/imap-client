@@ -411,7 +411,7 @@
     /**
      * Starts dedicated listener for updates on a specific IMAP folder, calls back when a change occurrs,
      * or includes information in case of an error
-     
+     *
      * @param {String} options.path The path to the folder to subscribe to
      * @param {String} callback(err) Invoked when listening folder has been selected, or an error occurred
      */
@@ -554,6 +554,7 @@
      * @param {String} options.path The folder's path
      * @param {Boolean} options.answered (optional) Mails with or without the \Answered flag set.
      * @param {Boolean} options.unread (optional) Mails with or without the \Seen flag set.
+     * @param {String} options.messageId (optional) Mail with a specific message-id
      * @param {Function} callback(error, uids) invoked with the uids of messages matching the search terms, or an error object if an error occurred
      */
     ImapClient.prototype.search = function(options, callback) {
@@ -583,6 +584,10 @@
             query.answered = true;
         } else if (options.answered === false) {
             query.unanswered = true;
+        }
+
+        if (options.messageId) {
+            query.header = ['message-id', (/^<[\s\S]*>$/.test(options.messageId) ? options.messageId : '<' + options.messageId + '>')];
         }
 
         if (options.uid) {
@@ -955,7 +960,8 @@
      * Move a message to a folder
      * @param {String} options.path The path the message should be uploaded to
      * @param {String} options.message A RFC-2822 compliant message
-     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     * @param {String} options.messageId (optional) The message id
+     * @param {Function} callback(error, uid) Callback an error object in case something went wrong. If options.messageId was set, with the uid of the newly uploaded message.
      */
     ImapClient.prototype.uploadMessage = function(options, callback) {
         var self = this;
@@ -965,15 +971,46 @@
             return;
         }
 
+
         axe.debug(DEBUG_TAG, 'uploading a message of ' + options.message.length + ' bytes to ' + options.path);
 
+        // upload the message
         self._client.upload(options.path, options.message, function(error) {
             if (error) {
-                axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
+                return onError(error);
             }
-            axe.debug(DEBUG_TAG, 'successfully uploaded message to ' + options.path);
-            callback(error);
+
+            if (!options.messageId) {
+                return callback();
+            }
+
+            // disable the mailbox selected callbacks for now
+            self._client.onselectmailbox = self._client.onupdate = function() {};
+
+            // find out all the uids after uploading
+            self.search({
+                path: options.path,
+                messageId: options.messageId
+            }, function(error, uids) {
+                // re-enable callbacks
+                self._client.onselectmailbox = self._onSelectMailbox.bind(self, self._client);
+                self._client.onupdate = self._onUpdate.bind(self, self._client);
+
+                if (error) {
+                    return onError(error);
+                }
+
+                // find out the uid of message we just uploaded, i.e. the one uid in uidsAfter and not in uidsBefore
+                axe.debug(DEBUG_TAG, 'successfully uploaded message to ' + options.path);
+
+                callback(null, uids[0]);
+            });
         });
+
+        function onError(error) {
+            axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
+            callback(error);
+        }
     };
 
     /**

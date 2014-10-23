@@ -114,7 +114,7 @@ describe('ImapClient local integration tests', function() {
 
         ic.onSyncUpdate = function(options) {
             invocations++;
-         
+
             expect(options.list.length).to.equal(1);
 
             expect(options.type).to.equal('new');
@@ -265,7 +265,8 @@ describe('ImapClient local integration tests', function() {
     });
 
     it('should upload Message', function(done) {
-        var msg = 'MIME-Version: 1.0\r\nDate: Wed, 9 Jul 2014 15:07:47 +0200\r\nDelivered-To: test@test.com\r\nMessage-ID: <CAHftYYQo=5fqbtnv-DazXhL2j5AxVP1nWarjkztn-N9SV91Z2w@mail.gmail.com>\r\nSubject: test\r\nFrom: Test Test <test@test.com>\r\nTo: Test Test <test@test.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\ntest',
+        var msgid = '<CAHftYYQo=5fqbtnv-DazXhL2j5AxVP1nWarjkztn-N9SV91Z2w@mail.gmail.com>',
+            msg = 'MIME-Version: 1.0\r\nDate: Wed, 9 Jul 2014 15:07:47 +0200\r\nDelivered-To: test@test.com\r\nMessage-ID: ' + msgid + '\r\nSubject: test\r\nFrom: Test Test <test@test.com>\r\nTo: Test Test <test@test.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\ntest',
             path = 'INBOX';
 
         ic.listMessages({
@@ -279,9 +280,11 @@ describe('ImapClient local integration tests', function() {
             ic.uploadMessage({
                 path: path,
                 message: msg,
-                flags: ['\\Seen']
-            }, function(error) {
+                flags: ['\\Seen'],
+                messageId: msgid
+            }, function(error, uid) {
                 expect(error).to.not.exist;
+                expect(uid).to.exist;
 
                 ic.listMessages({
                     path: path,

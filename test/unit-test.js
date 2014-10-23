@@ -679,9 +679,36 @@
 
         describe('#uploadMessage', function() {
             var msg = 'asdasdasdasd',
-                path = 'INBOX';
+                path = 'INBOX',
+                msgId = '<asdasdasd>';
 
-            it('should work', function(done) {
+            it('should work with messageId', function(done) {
+                bboxMock.upload.withArgs(path, msg).yields();
+                bboxMock.search.withArgs({
+                    all: true,
+                    header: ['message-id', msgId]
+                }, {
+                    byUid: true
+                }).yieldsAsync(null, [1]);
+                bboxMock.selectMailbox.withArgs(path).yieldsAsync();
+
+                imap.uploadMessage({
+                    path: path,
+                    message: msg,
+                    messageId: msgId
+                }, function(error, uid) {
+                    expect(error).to.not.exist;
+                    expect(uid).to.equal(1);
+
+                    expect(bboxMock.upload.calledOnce).to.be.true;
+                    expect(bboxMock.search.calledOnce).to.be.true;
+                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
+
+                    done();
+                });
+            });
+
+            it('should work without messageId', function(done) {
                 bboxMock.upload.withArgs(path, msg).yields();
 
                 imap.uploadMessage({
@@ -689,7 +716,10 @@
                     message: msg
                 }, function(error) {
                     expect(error).to.not.exist;
+
                     expect(bboxMock.upload.calledOnce).to.be.true;
+                    expect(bboxMock.search.called).to.be.false;
+                    expect(bboxMock.selectMailbox.called).to.be.false;
 
                     done();
                 });
