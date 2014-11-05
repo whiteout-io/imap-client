@@ -224,10 +224,12 @@ describe('ImapClient local integration tests', function() {
             path: 'INBOX',
             uid: 1,
             unread: true,
+            flagged: true,
             answered: true
         }, function(error, flags) {
             expect(error).to.be.null;
             expect(flags.unread).to.be.true;
+            expect(flags.flagged).to.be.true;
             expect(flags.answered).to.be.true;
             done();
         });

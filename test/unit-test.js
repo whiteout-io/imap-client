@@ -272,7 +272,7 @@
                         subject: 'SHIAAAT',
                         date: new Date()
                     },
-                    flags: ['\\Seen', '\\Answered'],
+                    flags: ['\\Seen', '\\Answered', '\\Flagged'],
                     bodystructure: {
                         type: 'multipart/mixed',
                         childNodes: [{
@@ -336,6 +336,7 @@
                     expect(msgs[0].subject).to.equal('SHIAAAT');
                     expect(msgs[0].unread).to.be.false;
                     expect(msgs[0].answered).to.be.true;
+                    expect(msgs[0].flagged).to.be.true;
                     expect(msgs[0].references).to.deep.equal(['abc', 'def']);
 
                     expect(msgs[0].encrypted).to.be.false;
@@ -347,6 +348,7 @@
                     expect(msgs[0].bodyParts[1].type).to.equal('attachment');
                     expect(msgs[0].bodyParts[1].partNumber).to.equal('2');
 
+                    expect(msgs[1].flagged).to.be.false;
                     expect(msgs[1].bodyParts[0].type).to.equal('text');
                     expect(msgs[1].bodyParts[1].type).to.equal('encrypted');
                     expect(msgs[1].bodyParts[1].partNumber).to.equal('2');
@@ -494,29 +496,31 @@
             it('should update flags', function(done) {
                 bboxMock.selectMailbox.withArgs('INBOX').yields();
                 bboxMock.setFlags.withArgs('123:123', {
-                    add: ['\\Answered']
+                    add: ['\\Flagged', '\\Answered']
                 }, {
                     byUid: true
                 }).yields(null, [{
-                    flags: ['\\Answered']
+                    flags: ['\\Flagged', '\\Answered']
                 }]);
                 bboxMock.setFlags.withArgs('123:123', {
                     remove: ['\\Seen']
                 }, {
                     byUid: true
                 }).yields(null, [{
-                    flags: ['\\Answered']
+                    flags: ['\\Flagged', '\\Answered']
                 }]);
 
                 imap.updateFlags({
                     path: 'INBOX',
                     uid: 123,
                     unread: true,
+                    flagged: true,
                     answered: true
                 }, function(error, flags) {
                     expect(error).to.be.null;
                     expect(flags.unread).to.be.true;
                     expect(flags.answered).to.be.true;
+                    expect(flags.flagged).to.be.true;
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledTwice).to.be.true;

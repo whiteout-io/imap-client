@@ -700,6 +700,7 @@
                     }) : [],
                     sentDate: message.envelope.date ? new Date(message.envelope.date) : new Date(),
                     unread: (message.flags || []).indexOf('\\Seen') === -1,
+                    flagged: (message.flags || []).indexOf('\\Flagged') > -1,
                     answered: (message.flags || []).indexOf('\\Answered') > -1,
                     bodyParts: []
                 };
@@ -818,6 +819,7 @@
      * @param {Number} options.uid The uid of the message
      * @param {Boolean} options.unread (optional) Marks the message as unread
      * @param {Boolean} options.answered (optional) Marks the message as answered
+     * @param {Boolean} options.flagged (optional) Marks the message as answered
      * @param {Function} callback(error, flags) will be called the flags have been received from the server
      */
     ImapClient.prototype.updateFlags = function(options, callback) {
@@ -831,6 +833,7 @@
             remove = [],
             add = [],
             READ_FLAG = '\\Seen',
+            FLAGGED_FLAG = '\\Flagged',
             ANSWERED_FLAG = '\\Answered';
 
         if (!self._loggedIn) {
@@ -842,6 +845,12 @@
             remove.push(READ_FLAG);
         } else if (options.unread === false) {
             add.push(READ_FLAG);
+        }
+
+        if (options.flagged === true) {
+            add.push(FLAGGED_FLAG);
+        } else if (options.flagged === false) {
+            remove.push(FLAGGED_FLAG);
         }
 
         if (options.answered === true) {
@@ -902,7 +911,8 @@
             axe.debug(DEBUG_TAG, 'successfully updated flags for uid ' + options.uid + ' in folder ' + options.path + ': flags are ' + messages[0].flags + '. added ' + add + ' and removed ' + remove);
             callback(null, {
                 unread: messages[0].flags.indexOf(READ_FLAG) === -1,
-                answered: messages[0].flags.indexOf(ANSWERED_FLAG) > -1
+                answered: messages[0].flags.indexOf(ANSWERED_FLAG) > -1,
+                flagged: messages[0].flags.indexOf(FLAGGED_FLAG) > -1
             });
         }
     };
