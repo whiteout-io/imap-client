@@ -14,7 +14,7 @@
 
     describe('ImapClient', function() {
         var expect = chai.expect;
-        chai.Assertion.includeStack = true;
+        chai.config.includeStack = true;
 
         var imap, bboxMock;
 
