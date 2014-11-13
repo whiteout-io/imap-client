@@ -1,4 +1,4 @@
-# imap-client 
+# imap-client
 
 High-level UMD module wrapper for [browserbox](https://github.com/whiteout-io/browserbox). This module encapsulates the most commonly used IMAP commands.
 
@@ -88,7 +88,7 @@ Messages have the following attributes:
 * inReplyTo: The Message-ID that this message is a reply to
 * references: The Message-IDs that this message references
 * from, replyTo, to, cc, bcc: The Sender/Receivers
-* modseq: The MODSEQ number of this message
+* modseq: The MODSEQ number of this message (as a string – javascript numbers do not tolerate 64 bit uints)
 * subject: The message's subject
 * sentDate: The date the message was sent
 * unread: The unread flag
@@ -171,12 +171,12 @@ If there are updates available for an IMAP folder, you will receive the changed 
 ```
 var SYNC_TYPE_NEW = 'new';
 var SYNC_TYPE_DELETED = 'deleted';
-var SYNC_TYPE_MSGS = 'messages';    
+var SYNC_TYPE_MSGS = 'messages';
 
 imap.onSyncUpdate = function(options) {
         var updatedMesages = options.list,
         updatesMailbox = options.path
-        
+
     if (options.type === SYNC_TYPE_NEW) {
         // new messages available on imap
                 // updatedMesages is an array of the newly available UIDs
