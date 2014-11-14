@@ -79,7 +79,7 @@
          *          exists: 5,
          *          uidNext: 6,
          *          uidlist: [1, 2, 3, 4, 5],
-         *          highestModseq: 555
+         *          highestModseq: "555"
          *      }
          *  }
          *
@@ -302,7 +302,7 @@
     /**
      * Lists messages with the last check
      *
-     * @param {Number} options.highestModseq MODSEQ value
+     * @param {String} options.highestModseq MODSEQ value
      * @param {Function} callback Runs when the list is fetched
      */
     ImapClient.prototype.checkModseq = function(options, callback) {
@@ -411,7 +411,7 @@
     /**
      * Starts dedicated listener for updates on a specific IMAP folder, calls back when a change occurrs,
      * or includes information in case of an error
-     
+
      * @param {String} options.path The path to the folder to subscribe to
      * @param {String} callback(err) Invoked when listening folder has been selected, or an error occurred
      */
@@ -692,7 +692,7 @@
                     to: message.envelope.to || [],
                     cc: message.envelope.cc || [],
                     bcc: message.envelope.bcc || [],
-                    modseq: message.modseq || 0,
+                    modseq: message.modseq || '0',
                     subject: message.envelope.subject || '(no subject)',
                     inReplyTo: (message.envelope['in-reply-to'] || '').replace(/[<>]/g, ''),
                     references: references ? references.split(/\s+/).map(function(reference) {
