@@ -25,7 +25,7 @@
 
     describe('ImapClient t-online integration tests', function() {
         this.timeout(5000);
-        chai.Assertion.includeStack = true;
+        chai.config.includeStack = true;
 
         // don't log in the tests
         axe.removeAppender({});

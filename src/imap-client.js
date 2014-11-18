@@ -25,14 +25,23 @@
     var ImapClient = function(options, browserbox) {
         var self = this;
 
-        /* Holds the login state. Inbox executes the commands you feed it, i.e. you can do operations on your inbox before a successful login. Which should of cource not be possible. So, we need to track the login state here.
-         * @private */
+        /* 
+         * Holds the login state. Inbox executes the commands you feed it, i.e. you
+         * can do operations on your inbox before a successful login. Which should
+         * of course not be possible. So, we need to track the login state here.
+         */
         self._loggedIn = false;
+        self._listenerLoggedIn = false;
 
+        /*
+         * See function descriptiong
+         */
         self._maxUpdateSize = Math.abs(options.maxUpdateSize || 0);
 
-        /* Instance of our imap library
-         * @private */
+        /* 
+         * Instance of our imap library
+         * (only relevant in unit test environment)
+         */
         if (browserbox) {
             self._client = self._listeningClient = browserbox;
         } else {
@@ -47,28 +56,11 @@
             self._listeningClient = new BrowserBox(options.host, options.port, credentials);
         }
 
+        /*
+         * Calls the upper layer if the TLS certificate has to be updated
+         */
         self._client.oncert = self._listeningClient.oncert = function(certificate) {
             self.onCert(certificate);
-        };
-
-        self._client.onerror = self._listeningClient.onerror = function(err) {
-            // the error handler is the same for both clients. if one instance
-            // of browserbox fails, just shutdown the client and avoid further
-            // operations
-
-            axe.error(DEBUG_TAG, 'error in imap connection, disconnecting! error: ' + err + '\n' + err.stack);
-
-            if (self._errored) {
-                return;
-            }
-
-            self._errored = true;
-            self._loggedIn = false;
-            self._listenerLoggedIn = false;
-            self._listeningClient.close();
-            self._client.close();
-
-            self.onError(err);
         };
 
         /**
@@ -87,10 +79,54 @@
          */
         self.mailboxCache = {};
 
-        self._client.onselectmailbox = self._onSelectMailbox.bind(self, self._client);
-        self._client.onupdate = self._onUpdate.bind(self, self._client);
-        self._listeningClient.onselectmailbox = self._onSelectMailbox.bind(self, self._listeningClient);
-        self._listeningClient.onupdate = self._onUpdate.bind(self, self._listeningClient);
+        self._registerEventHandlers(self._client);
+        self._registerEventHandlers(self._listeningClient);
+    };
+
+    /**
+     * Register the event handlers for the respective imap client
+     */
+    ImapClient.prototype._registerEventHandlers = function(client) {
+        client.onselectmailbox = this._onSelectMailbox.bind(this, client);
+        client.onupdate = this._onUpdate.bind(this, client);
+        client.onclose = this._onClose.bind(this, client);
+        client.onerror = this._onError.bind(this, client);
+    };
+
+    /**
+     * Informs the upper layer if the main IMAP connection errors and cleans up.
+     * If the listening IMAP connection fails, it only logs the error.
+     */
+    ImapClient.prototype._onError = function(client, err) {
+        var msg = 'IMAP connection encountered an error! ' + err;
+
+        if (client === this._client) {
+            this._loggedIn = false;
+            client.close();
+            axe.error(DEBUG_TAG, new Error(msg));
+            this.onError(new Error(msg)); // report the error
+        } else if (client === this._listeningClient) {
+            this._listenerLoggedIn = false;
+            client.close();
+            axe.warn(DEBUG_TAG, new Error('Listening ' + msg));
+        }
+    };
+
+    /**
+     * Informs the upper layer if the main IMAP connection has been unexpectedly closed remotely.
+     * If the listening IMAP connection is closed unexpectedly, it only logs the error
+     */
+    ImapClient.prototype._onClose = function(client) {
+        var msg = 'IMAP connection closed unexpectedly!';
+
+        if (client === this._client && this._loggedIn) {
+            this._loggedIn = false;
+            axe.error(DEBUG_TAG, new Error(msg));
+            this.onError(new Error(msg)); // report the error
+        } else if (client === this._listeningClient && this._listenerLoggedIn) {
+            this._listenerLoggedIn = false;
+            axe.warn(DEBUG_TAG, new Error('Listening ' + msg));
+        }
     };
 
     /**
@@ -401,17 +437,17 @@
 
         self._client.onclose = function() {
             axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
-            self._loggedIn = false;
             callback();
         };
 
+        self._loggedIn = false;
         self._client.close();
     };
 
     /**
      * Starts dedicated listener for updates on a specific IMAP folder, calls back when a change occurrs,
      * or includes information in case of an error
-
+     
      * @param {String} options.path The path to the folder to subscribe to
      * @param {String} callback(err) Invoked when listening folder has been selected, or an error occurred
      */
@@ -447,9 +483,10 @@
 
         self._listeningClient.onclose = function() {
             axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
-            self._listenerLoggedIn = false;
             callback();
         };
+
+        self._listenerLoggedIn = false;
         self._listeningClient.close();
     };
 
