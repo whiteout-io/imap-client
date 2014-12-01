@@ -69,22 +69,53 @@
             });
         });
 
-        describe('#onError', function() {
-            it('should report an error', function() {
-                var count = 0;
-                imap.onError = function(err) {
-                    expect(err).to.exist;
-                    count++;
-                };
-                imap._client.onerror({});
-                imap._client.onerror({});
-                imap._client.onerror({});
+        describe('#_onError', function() {
+            it('should report error for main imap connection', function(done) {
+                imap.onError = function(error) {
+                    expect(error).to.exist;
+                    expect(imap._loggedIn).to.be.false;
+                    expect(bboxMock.close.calledOnce).to.be.true;
 
-                expect(imap._loggedIn).to.be.false;
-                expect(imap._errored).to.be.true;
-                expect(bboxMock.close.calledTwice).to.be.true; // once for client and for listeningClient
-                expect(count).to.equal(1); // onError must only be called once
+                    done();
+                };
+
+                bboxMock.onerror();
             });
+
+            it('should not error for listening imap connection', function() {
+                imap._loggedIn = false;
+                imap._listenerLoggedIn = true;
+                imap._client = {}; // _client !== _listeningClient
+
+                bboxMock.onerror();
+
+                expect(imap._listenerLoggedIn).to.be.false;
+                expect(bboxMock.close.calledOnce).to.be.true;
+            });
+        });
+
+        describe('#_onClose', function() {
+            it('should error for main imap connection', function(done) {
+                imap.onError = function(error) {
+                    expect(error).to.exist;
+                    expect(imap._loggedIn).to.be.false;
+
+                    done();
+                };
+
+                bboxMock.onclose();
+            });
+
+            it('should not error for listening imap connection', function() {
+                imap._loggedIn = false;
+                imap._listenerLoggedIn = true;
+                imap._client = {}; // _client !== _listeningClient
+
+                bboxMock.onclose();
+
+                expect(imap._listenerLoggedIn).to.be.false;
+            });
+
         });
 
         describe('#selectMailbox', function() {
