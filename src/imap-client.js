@@ -857,7 +857,7 @@
      * @param {Boolean} options.unread (optional) Marks the message as unread
      * @param {Boolean} options.answered (optional) Marks the message as answered
      * @param {Boolean} options.flagged (optional) Marks the message as answered
-     * @param {Function} callback(error, flags) will be called the flags have been received from the server
+     * @param {Function} callback(error) will be called the flags have been updated
      */
     ImapClient.prototype.updateFlags = function(options, callback) {
         var self = this,
@@ -929,28 +929,24 @@
             self._client.setFlags(interval, queryAdd, queryOptions, onFlagsAdded);
         }
 
-        function onFlagsAdded(error, messages) {
+        function onFlagsAdded(error) {
             if (error || remove.length === 0) {
-                onFlagsRemoved(error, messages);
+                onFlagsRemoved(error);
                 return;
             }
 
             self._client.setFlags(interval, queryRemove, queryOptions, onFlagsRemoved);
         }
 
-        function onFlagsRemoved(error, messages) {
+        function onFlagsRemoved(error) {
             if (error) {
                 axe.error(DEBUG_TAG, 'error updating flags for uid ' + options.uid + ' in folder ' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
                 return;
             }
 
-            axe.debug(DEBUG_TAG, 'successfully updated flags for uid ' + options.uid + ' in folder ' + options.path + ': flags are ' + messages[0].flags + '. added ' + add + ' and removed ' + remove);
-            callback(null, {
-                unread: messages[0].flags.indexOf(READ_FLAG) === -1,
-                answered: messages[0].flags.indexOf(ANSWERED_FLAG) > -1,
-                flagged: messages[0].flags.indexOf(FLAGGED_FLAG) > -1
-            });
+            axe.debug(DEBUG_TAG, 'successfully updated flags for uid ' + options.uid + ' in folder ' + options.path + ': added ' + add + ' and removed ' + remove);
+            callback();
         }
     };
 

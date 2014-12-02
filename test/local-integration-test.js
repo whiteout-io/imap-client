@@ -226,11 +226,8 @@ describe('ImapClient local integration tests', function() {
             unread: true,
             flagged: true,
             answered: true
-        }, function(error, flags) {
-            expect(error).to.be.null;
-            expect(flags.unread).to.be.true;
-            expect(flags.flagged).to.be.true;
-            expect(flags.answered).to.be.true;
+        }, function(error) {
+            expect(error).to.not.exist;
             done();
         });
     });

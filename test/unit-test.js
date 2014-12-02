@@ -217,7 +217,7 @@
                     path: 'foobar',
                     answered: true
                 }, function(error, uids) {
-                    expect(error).to.be.null;
+                    expect(error).to.not.exist;
                     expect(uids.length).to.equal(3);
                     done();
                 });
@@ -236,7 +236,7 @@
                     path: 'foobar',
                     answered: false
                 }, function(error, uids) {
-                    expect(error).to.be.null;
+                    expect(error).to.not.exist;
                     expect(uids.length).to.equal(3);
                     done();
                 });
@@ -255,7 +255,7 @@
                     path: 'foobar',
                     unread: false
                 }, function(error, uids) {
-                    expect(error).to.be.null;
+                    expect(error).to.not.exist;
                     expect(uids.length).to.equal(3);
                     done();
                 });
@@ -274,7 +274,7 @@
                     path: 'foobar',
                     unread: true
                 }, function(error, uids) {
-                    expect(error).to.be.null;
+                    expect(error).to.not.exist;
                     expect(uids.length).to.equal(3);
                     done();
                 });
@@ -353,7 +353,7 @@
                     firstUid: 1,
                     lastUid: 2
                 }, function(error, msgs) {
-                    expect(error).to.be.null;
+                    expect(error).to.not.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.listMessages.calledOnce).to.be.true;
 
@@ -547,11 +547,8 @@
                     unread: true,
                     flagged: true,
                     answered: true
-                }, function(error, flags) {
-                    expect(error).to.be.null;
-                    expect(flags.unread).to.be.true;
-                    expect(flags.answered).to.be.true;
-                    expect(flags.flagged).to.be.true;
+                }, function(error) {
+                    expect(error).to.not.exist;
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledTwice).to.be.true;
@@ -574,10 +571,8 @@
                     path: 'INBOX',
                     uid: 123,
                     answered: true
-                }, function(error, flags) {
-                    expect(error).to.be.null;
-                    expect(flags.unread).to.be.true;
-                    expect(flags.answered).to.be.true;
+                }, function(error) {
+                    expect(error).to.not.exist;
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledOnce).to.be.true;
@@ -600,10 +595,8 @@
                     path: 'INBOX',
                     uid: 123,
                     unread: true
-                }, function(error, flags) {
-                    expect(error).to.be.null;
-                    expect(flags.unread).to.be.true;
-                    expect(flags.answered).to.be.false;
+                }, function(error) {
+                    expect(error).to.not.exist;
 
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledOnce).to.be.true;
@@ -621,9 +614,8 @@
                     uid: 123,
                     unread: false,
                     answered: true
-                }, function(error, flags) {
+                }, function(error) {
                     expect(error).to.exist;
-                    expect(flags).to.not.exist;
 
                     done();
                 });
@@ -637,9 +629,8 @@
                     uid: 123,
                     unread: false,
                     answered: true
-                }, function(error, flags) {
+                }, function(error) {
                     expect(error).to.exist;
-                    expect(flags).to.not.exist;
 
                     done();
                 });
@@ -755,7 +746,7 @@
                     path: 'INBOX',
                     uid: 123,
                 }, function(error) {
-                    expect(error).to.be.null;
+                    expect(error).to.not.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.deleteMessages.calledOnce).to.be.true;
 

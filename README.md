@@ -119,8 +119,8 @@ imap.updateFlags({
     uid: someMessage.uid,
     unread: true/false/undefined, // (optional) Marks the message as un-/read, no action if omitted
     answered: true/false/undefined // (optional) Marks the message as answered, no action if omitted
-}, function (error, flags) {
-    // all done, called the flags received from the server
+}, function (error) {
+    // all done
 });
 ```
 
@@ -129,7 +129,7 @@ imap.updateFlags({
 Moves a message from mailbox A to mailbox B.
 
 ```
-imap.updateFlags({
+imap.moveMessage({
     path: 'foo/bar', // the origin folder
     uid: someMessage.uid, // the message's uid
     destination: 'bla/bli' // the destination folder
@@ -143,7 +143,7 @@ imap.updateFlags({
 Uploads a message to a folder
 
 ```
-imap.updateFlags({
+imap.uploadMessage({
     path: 'foo/bar', // the target folder
     message: '...' // RFC-2822 compliant string
 }, function (error) {
@@ -156,7 +156,7 @@ imap.updateFlags({
 Deletes a message from a folder
 
 ```
-imap.updateFlags({
+imap.deleteMessage({
     path: 'foo/bar', // the folder from which to delete the message
     uid: someMessage.uid, // the message's uid
 }, function (error) {
