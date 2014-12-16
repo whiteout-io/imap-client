@@ -491,10 +491,8 @@
     };
 
     ImapClient.prototype.selectMailbox = function(options, callback) {
-        if (this._client.selectedMailbox !== options.path) {
-            axe.debug(DEBUG_TAG, 'selecting mailbox ' + options.path);
-            this._client.selectMailbox(options.path, callback);
-        }
+        axe.debug(DEBUG_TAG, 'selecting mailbox ' + options.path);
+        this._client.selectMailbox(options.path, callback);
     };
 
     /**
@@ -604,7 +602,8 @@
 
         var query = {},
             queryOptions = {
-                byUid: true
+                byUid: true,
+                precheck: self._ensurePath(options.path, client)
             };
 
         // initial request to && (AND) the following properties
@@ -626,32 +625,17 @@
             query.uid = options.uid;
         }
 
-        axe.debug(DEBUG_TAG, 'searching in ' + options.path + ' for ' + query);
-
-        if (client.selectedMailbox !== options.path) {
-            client.selectMailbox(options.path, onMailboxSelected);
-        } else {
-            onMailboxSelected();
-        }
-
-        function onMailboxSelected(error) {
+        axe.debug(DEBUG_TAG, 'searching in ' + options.path + ' for ' + Object.keys(query).join(','));
+        client.search(query, queryOptions, function(error, uids) {
             if (error) {
-                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
-                callback(error);
-                return;
+                axe.error(DEBUG_TAG, 'error searching ' + options.path + ': ' + error + '\n' + error.stack);
+                return callback(error);
             }
 
-            client.search(query, queryOptions, function(error, uids) {
-                if (error) {
-                    axe.error(DEBUG_TAG, 'error searching mailbox: ' + error + '\n' + error.stack);
-                    return callback(error);
-                }
+            axe.debug(DEBUG_TAG, 'searched in ' + options.path + ' for ' + Object.keys(query).join(',') + ': ' + uids);
 
-                axe.debug(DEBUG_TAG, 'searched in ' + options.path + ' for ' + query + ': ' + uids);
-
-                callback(null, uids);
-            });
-        }
+            callback(null, uids);
+        });
     };
 
     /**
@@ -672,7 +656,8 @@
         var interval = (options.firstUid || 1) + ':' + (options.lastUid || '*'),
             query = ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]'],
             queryOptions = {
-                byUid: true
+                byUid: true,
+                precheck: self._ensurePath(options.path)
             };
 
         // only if client has CONDSTORE capability
@@ -682,20 +667,7 @@
 
         axe.debug(DEBUG_TAG, 'listing messages in ' + options.path + ' for interval ' + interval);
 
-        if (self._client.selectedMailbox !== options.path) {
-            self._client.selectMailbox(options.path, onMailboxSelected);
-        } else {
-            onMailboxSelected();
-        }
-
-        function onMailboxSelected(error) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
-                callback(error);
-                return;
-            }
-            self._client.listMessages(interval, query, queryOptions, onList);
-        }
+        self._client.listMessages(interval, query, queryOptions, onList);
 
         // process what inbox returns into a usable form for our client
         function onList(error, messages) {
@@ -769,7 +741,8 @@
         var self = this,
             query = [],
             queryOptions = {
-                byUid: true
+                byUid: true,
+                precheck: self._ensurePath(options.path)
             },
             interval = options.uid + ':' + options.uid,
             bodyParts = options.bodyParts;
@@ -805,22 +778,7 @@
 
         axe.debug(DEBUG_TAG, 'retrieving body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
 
-        if (self._client.selectedMailbox !== options.path) {
-            self._client.selectMailbox(options.path, onMailboxSelected);
-        } else {
-            onMailboxSelected();
-        }
-
-        // open the mailbox and retrieve the message
-        function onMailboxSelected(error) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
-                callback(error);
-                return;
-            }
-
-            self._client.listMessages(interval, query, queryOptions, onPartsReady);
-        }
+        self._client.listMessages(interval, query, queryOptions, onPartsReady);
 
         function onPartsReady(error, messages) {
             if (error) {
@@ -863,7 +821,8 @@
         var self = this,
             interval = options.uid + ':' + options.uid,
             queryOptions = {
-                byUid: true
+                byUid: true,
+                precheck: self._ensurePath(options.path)
             },
             queryAdd,
             queryRemove,
@@ -910,35 +869,22 @@
 
         axe.debug(DEBUG_TAG, 'updating flags for uid ' + options.uid + ' in folder ' + options.path + ': ' + (remove.length > 0 ? (' removing ' + remove) : '') + (add.length > 0 ? (' adding ' + add) : ''));
 
-        if (self._client.selectedMailbox !== options.path) {
-            self._client.selectMailbox(options.path, onMailboxSelected);
-        } else {
-            onMailboxSelected();
+        if (add.length === 0) {
+            return onFlagsAdded();
         }
 
-        function onMailboxSelected(error) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
-                onFlagsAdded(error);
-            }
-
-            if (add.length === 0) {
-                onFlagsAdded(error);
-            }
-
-            self._client.setFlags(interval, queryAdd, queryOptions, onFlagsAdded);
-        }
+        self._client.setFlags(interval, queryAdd, queryOptions, onFlagsAdded);
 
         function onFlagsAdded(error) {
             if (error || remove.length === 0) {
-                onFlagsRemoved(error);
+                done(error);
                 return;
             }
 
-            self._client.setFlags(interval, queryRemove, queryOptions, onFlagsRemoved);
+            self._client.setFlags(interval, queryRemove, queryOptions, done);
         }
 
-        function onFlagsRemoved(error) {
+        function done(error) {
             if (error) {
                 axe.error(DEBUG_TAG, 'error updating flags for uid ' + options.uid + ' in folder ' + options.path + ' : ' + error + '\n' + error.stack);
                 callback(error);
@@ -961,7 +907,8 @@
         var self = this,
             interval = options.uid + ':' + options.uid,
             queryOptions = {
-                byUid: true
+                byUid: true,
+                precheck: self._ensurePath(options.path)
             };
 
         if (!self._loggedIn) {
@@ -971,27 +918,13 @@
 
         axe.debug(DEBUG_TAG, 'moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
 
-        if (self._client.selectedMailbox !== options.path) {
-            self._client.selectMailbox(options.path, onMailboxSelected);
-        } else {
-            onMailboxSelected();
-        }
-
-        function onMailboxSelected(error) {
+        self._client.moveMessages(interval, options.destination, queryOptions, function(error) {
             if (error) {
-                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
-                callback(error);
-                return;
+                axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
             }
-
-            self._client.moveMessages(interval, options.destination, queryOptions, function(error) {
-                if (error) {
-                    axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
-                }
-                axe.debug(DEBUG_TAG, 'successfully moved uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
-                callback(error);
-            });
-        }
+            axe.debug(DEBUG_TAG, 'successfully moved uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
+            callback(error);
+        });
     };
 
     /**
@@ -1029,7 +962,8 @@
         var self = this,
             interval = options.uid + ':' + options.uid,
             queryOptions = {
-                byUid: true
+                byUid: true,
+                precheck: self._ensurePath(options.path)
             };
 
         if (!self._loggedIn) {
@@ -1039,28 +973,37 @@
 
         axe.debug(DEBUG_TAG, 'deleting uid ' + options.uid + ' from ' + options.path);
 
-        if (self._client.selectedMailbox !== options.path) {
-            self._client.selectMailbox(options.path, onMailboxSelected);
-        } else {
-            onMailboxSelected();
-        }
-
-        function onMailboxSelected(error) {
+        self._client.deleteMessages(interval, queryOptions, function(error) {
             if (error) {
-                axe.error(DEBUG_TAG, 'error selecting mailbox' + options.path + ' : ' + error + '\n' + error.stack);
-                callback(error);
-                return;
+                axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
             }
 
-            self._client.deleteMessages(interval, queryOptions, function(error) {
-                if (error) {
-                    axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
-                }
+            axe.debug(DEBUG_TAG, 'successfully deleted uid ' + options.uid + ' from ' + options.path);
+            callback(error);
+        });
+    };
 
-                axe.debug(DEBUG_TAG, 'successfully deleted uid ' + options.uid + ' from ' + options.path);
-                callback(error);
-            });
-        }
+    //
+    // Helper methods
+    //
+
+    /**
+     * Makes sure that the respective instance of browserbox is in the correct mailbox to run the command
+     *
+     * @param {String} path The mailbox path
+     */
+    ImapClient.prototype._ensurePath = function(path, client) {
+        var self = this;
+        client = client || self._client;
+
+        return function(next) {
+            if (client.selectedMailbox === path) {
+                return next();
+            }
+
+            axe.debug(DEBUG_TAG, 'selecting mailbox ' + path);
+            client.selectMailbox(path, next);
+        };
     };
 
     /*
