@@ -16,8 +16,8 @@
         port: 993,
         host: 'secureimap.t-online.de',
         auth: {
-            user: 'throwaway.felix@gmail.com',
-            pass: 'Sha5aico'
+            user: 'whiteout.testaccount@t-online.de',
+            pass: 'HelloSafer'
         },
         secure: true,
         tlsWorkerPath: 'lib/tcp-socket-tls-worker.js'

@@ -715,9 +715,11 @@
         });
 
         describe('#_ensurePath', function() {
+            var ctx = {};
+
             it('should switch mailboxes', function(done) {
-                bboxMock.selectMailbox.withArgs('qweasdzxc').yields();
-                imap._ensurePath('qweasdzxc')(function(err) {
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields();
+                imap._ensurePath('qweasdzxc')(ctx, function(err) {
                     expect(err).to.not.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     done();
@@ -725,8 +727,8 @@
             });
 
             it('should error during switching mailboxes', function(done) {
-                bboxMock.selectMailbox.withArgs('qweasdzxc').yields(new Error());
-                imap._ensurePath('qweasdzxc')(function(err) {
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields(new Error());
+                imap._ensurePath('qweasdzxc')(ctx, function(err) {
                     expect(err).to.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     done();

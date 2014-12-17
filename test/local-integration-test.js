@@ -6,7 +6,6 @@ var chai = require('chai'),
     expect = chai.expect,
     ImapClient = require('../src/imap-client'),
     hoodiecrow = require('hoodiecrow'),
-    axe = require('axe-logger'),
     loginOptions = {
         port: 12345,
         host: 'localhost',
@@ -17,66 +16,64 @@ var chai = require('chai'),
         secure: false
     };
 
-// don't log in the tests
-axe.removeAppender(axe.defaultAppender);
-
 describe('ImapClient local integration tests', function() {
     var ic, imap;
 
     chai.config.includeStack = true;
     before(function() {
         imap = hoodiecrow({
-                storage: {
-                    'INBOX': {
-                        messages: [{
-                            raw: 'Message-Id: <abcde>\r\nSubject: hello 1\r\n\r\nWorld 1!'
-                        }, {
-                            raw: 'Message-Id: <abcde>\r\nSubject: hello 2\r\n\r\nWorld 2!',
-                            flags: ['\\Seen']
-                        }, {
-                            raw: 'Message-Id: <abcde>\r\nSubject: hello 3\r\n\r\nWorld 3!'
-                        }, {
-                            raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
-                        }, {
-                            raw: 'Content-Type: multipart/encrypted; boundary="Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69"; protocol="application/pgp-encrypted";\r\nSubject: [whiteout] attachment only\r\nFrom: Felix Hammerl <felix.hammerl@gmail.com>\r\nDate: Thu, 16 Jan 2014 14:55:56 +0100\r\nContent-Transfer-Encoding: 7bit\r\nMessage-Id: <3ECDF9DC-895E-4475-B2A9-52AF1F117652@gmail.com>\r\nContent-Description: OpenPGP encrypted message\r\nTo: safewithme.testuser@gmail.com\r\n\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: application/pgp-encrypted\r\nContent-Description: PGP/MIME Versions Identification\r\n\r\nVersion: 1\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: inline;\r\n    filename=encrypted.asc\r\nContent-Type: application/octet-stream;\r\n    name=encrypted.asc\r\nContent-Description: OpenPGP encrypted message\r\n\r\ninsert pgp here.\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69--',
-                        }, {
-                            raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--',
-                        }]
-                    },
-                    '': {
-                        'separator': '/',
-                        'folders': {
-                            '[Gmail]': {
-                                'flags': ['\\Noselect'],
-                                'folders': {
-                                    'All Mail': {
-                                        'flags': '\\All'
-                                    },
-                                    'Drafts': {
-                                        'flags': '\\Drafts'
-                                    },
-                                    'Important': {
-                                        'flags': '\\Important'
-                                    },
-                                    'Sent Mail': {
-                                        'flags': '\\Sent'
-                                    },
-                                    'Spam': {
-                                        'flags': '\\Junk'
-                                    },
-                                    'Starred': {
-                                        'flags': '\\Flagged'
-                                    },
-                                    'Trash': {
-                                        'flags': '\\Trash'
-                                    }
+            storage: {
+                'INBOX': {
+                    messages: [{
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 1\r\n\r\nWorld 1!'
+                    }, {
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 2\r\n\r\nWorld 2!',
+                        flags: ['\\Seen']
+                    }, {
+                        raw: 'Message-Id: <abcde>\r\nSubject: hello 3\r\n\r\nWorld 3!'
+                    }, {
+                        raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--'
+                    }, {
+                        raw: 'Content-Type: multipart/encrypted; boundary="Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69"; protocol="application/pgp-encrypted";\r\nSubject: [whiteout] attachment only\r\nFrom: Felix Hammerl <felix.hammerl@gmail.com>\r\nDate: Thu, 16 Jan 2014 14:55:56 +0100\r\nContent-Transfer-Encoding: 7bit\r\nMessage-Id: <3ECDF9DC-895E-4475-B2A9-52AF1F117652@gmail.com>\r\nContent-Description: OpenPGP encrypted message\r\nTo: safewithme.testuser@gmail.com\r\n\r\nThis is an OpenPGP/MIME encrypted message (RFC 2440 and 3156)\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Type: application/pgp-encrypted\r\nContent-Description: PGP/MIME Versions Identification\r\n\r\nVersion: 1\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69\r\nContent-Transfer-Encoding: 7bit\r\nContent-Disposition: inline;\r\n    filename=encrypted.asc\r\nContent-Type: application/octet-stream;\r\n    name=encrypted.asc\r\nContent-Description: OpenPGP encrypted message\r\n\r\ninsert pgp here.\r\n\r\n--Apple-Mail=_CC38E51A-DB4D-420E-AD14-02653EB88B69--',
+                    }, {
+                        raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--'
+                    }]
+                },
+                '': {
+                    'separator': '/',
+                    'folders': {
+                        '[Gmail]': {
+                            'flags': ['\\Noselect'],
+                            'folders': {
+                                'All Mail': {
+                                    'flags': '\\All'
+                                },
+                                'Drafts': {
+                                    'flags': '\\Drafts'
+                                },
+                                'Important': {
+                                    'flags': '\\Important'
+                                },
+                                'Sent Mail': {
+                                    'flags': '\\Sent'
+                                },
+                                'Spam': {
+                                    'flags': '\\Junk'
+                                },
+                                'Starred': {
+                                    'flags': '\\Flagged'
+                                },
+                                'Trash': {
+                                    'flags': '\\Trash'
                                 }
                             }
                         }
                     }
                 }
-            }),
-            imap.listen(loginOptions.port);
+            }
+        });
+
+        imap.listen(loginOptions.port);
     });
 
     after(function(done) {
@@ -91,21 +88,6 @@ describe('ImapClient local integration tests', function() {
 
     afterEach(function(done) {
         ic.logout(done);
-    });
-
-    it('should throw', function(done) {
-        var ic = new ImapClient(loginOptions);
-        ic.onError = function(err) {
-            expect(err.message).to.equal('Sync handler not set');
-            ic.logout(done);
-        };
-        ic.login(function() {
-            ic.listMessages({
-                path: 'INBOX',
-                firstUid: 1,
-                lastUid: 3
-            }, function() {});
-        });
     });
 
     it('should notify about new messages', function(done) {
@@ -305,21 +287,29 @@ describe('ImapClient local integration tests', function() {
             expect(error).to.not.exist;
             expect(messages).to.be.empty;
 
-            ic.moveMessage({
+            ic.listMessages({
                 path: 'INBOX',
-                uid: 3,
-                destination: destination
-            }, function(error) {
+                firstUid: 1
+            }, function(error, messages) {
                 expect(error).to.not.exist;
+                expect(messages).to.not.be.empty;
 
-                ic.listMessages({
-                    path: destination,
-                    firstUid: 1
-                }, function(error, messages) {
+                ic.moveMessage({
+                    path: 'INBOX',
+                    uid: messages[0].uid,
+                    destination: destination
+                }, function(error) {
                     expect(error).to.not.exist;
-                    expect(messages).to.not.be.empty;
 
-                    done();
+                    ic.listMessages({
+                        path: destination,
+                        firstUid: 1
+                    }, function(error, messages) {
+                        expect(error).to.not.exist;
+                        expect(messages).to.not.be.empty;
+
+                        done();
+                    });
                 });
             });
         });
@@ -352,7 +342,7 @@ describe('ImapClient local integration tests', function() {
 
             // the listening client does not cause an error, so we let it fail silently
             // in the background and check back after a 1 s delay
-            setTimeout(function () {
+            setTimeout(function() {
                 expect(ic._listenerLoggedIn).to.be.false;
                 done();
             }, 1000);

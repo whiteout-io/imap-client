@@ -996,13 +996,15 @@
         var self = this;
         client = client || self._client;
 
-        return function(next) {
+        return function(ctx, next) {
             if (client.selectedMailbox === path) {
                 return next();
             }
 
             axe.debug(DEBUG_TAG, 'selecting mailbox ' + path);
-            client.selectMailbox(path, next);
+            client.selectMailbox(path, {
+                ctx: ctx
+            }, next);
         };
     };
 
