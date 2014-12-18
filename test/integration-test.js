@@ -24,11 +24,11 @@
     };
 
     describe('ImapClient t-online integration tests', function() {
-        this.timeout(5000);
+        this.timeout(50000);
         chai.config.includeStack = true;
 
         // don't log in the tests
-        axe.removeAppender({});
+        axe.removeAppender(axe.defaultAppender);
 
         var ic;
 
@@ -36,7 +36,10 @@
             ic = new ImapClient(loginOptions);
             ic.onSyncUpdate = function() {};
             ic.login(done);
-            ic.onCert = function () {};
+            ic.onCert = function() {};
+            ic.onError = function(error) {
+                console.error(error);
+            };
         });
 
 

@@ -205,12 +205,9 @@
 
         describe('#search', function() {
             it('should search answered', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
                     all: true,
                     answered: true
-                }, {
-                    byUid: true
                 }).yieldsAsync(null, [1, 3, 5]);
 
                 imap.search({
@@ -224,12 +221,9 @@
             });
 
             it('should search unanswered', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
                     all: true,
                     unanswered: true
-                }, {
-                    byUid: true
                 }).yieldsAsync(null, [1, 3, 5]);
 
                 imap.search({
@@ -243,12 +237,9 @@
             });
 
             it('should search read', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
                     all: true,
                     seen: true
-                }, {
-                    byUid: true
                 }).yieldsAsync(null, [1, 3, 5]);
 
                 imap.search({
@@ -262,12 +253,9 @@
             });
 
             it('should search unread', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.search.withArgs({
                     all: true,
                     unseen: true
-                }, {
-                    byUid: true
                 }).yieldsAsync(null, [1, 3, 5]);
 
                 imap.search({
@@ -343,10 +331,7 @@
                         }]
                     }
                 }];
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
-                bboxMock.listMessages.withArgs('1:2', ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]'], {
-                    byUid: true
-                }).yieldsAsync(null, listing);
+                bboxMock.listMessages.withArgs('1:2', ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]']).yieldsAsync(null, listing);
 
                 imap.listMessages({
                     path: 'foobar',
@@ -354,7 +339,6 @@
                     lastUid: 2
                 }, function(error, msgs) {
                     expect(error).to.not.exist;
-                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.listMessages.calledOnce).to.be.true;
 
                     expect(msgs.length).to.equal(2);
@@ -389,21 +373,7 @@
                 });
             });
 
-            it('should not list messages by uid due to select mailbox error', function(done) {
-                bboxMock.selectMailbox.yields({});
-
-                imap.listMessages({
-                    path: 'foobar',
-                    firstUid: 1,
-                    lastUid: 2
-                }, function(error) {
-                    expect(error).to.exist;
-                    done();
-                });
-            });
-
             it('should not list messages by uid due to list error', function(done) {
-                bboxMock.selectMailbox.yields();
                 bboxMock.listMessages.yields({});
 
                 imap.listMessages({
@@ -426,10 +396,7 @@
 
         describe('#getBodyParts', function() {
             it('should get the plain text body', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
-                bboxMock.listMessages.withArgs('123:123', ['body.peek[1.mime]', 'body.peek[1]', 'body.peek[2.mime]', 'body.peek[2]'], {
-                    byUid: true
-                }).yieldsAsync(null, [{
+                bboxMock.listMessages.withArgs('123:123', ['body.peek[1.mime]', 'body.peek[1]', 'body.peek[2.mime]', 'body.peek[2]']).yieldsAsync(null, [{
                     'body[1.mime]': 'qwe',
                     'body[1]': 'asd',
                     'body[2.mime]': 'bla',
@@ -469,7 +436,6 @@
                     expect(error).to.not.exist;
                     expect(cbParts).to.equal(parts);
 
-                    expect(bboxMock.selectMailbox.called).to.be.false;
                     expect(bboxMock.listMessages.called).to.be.false;
 
                     done();
@@ -477,25 +443,7 @@
             });
 
             it('should fail when list fails', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync();
                 bboxMock.listMessages.yieldsAsync({});
-
-                imap.getBodyParts({
-                    path: 'foobar',
-                    uid: 123,
-                    bodyParts: [{
-                        partNumber: '1'
-                    }, {
-                        partNumber: '2'
-                    }]
-                }, function(error) {
-                    expect(error).to.exist;
-                    done();
-                });
-            });
-
-            it('should fail when select mailbox fails', function(done) {
-                bboxMock.selectMailbox.withArgs('foobar').yieldsAsync({});
 
                 imap.getBodyParts({
                     path: 'foobar',
@@ -525,18 +473,13 @@
 
         describe('#updateFlags', function() {
             it('should update flags', function(done) {
-                bboxMock.selectMailbox.withArgs('INBOX').yields();
                 bboxMock.setFlags.withArgs('123:123', {
                     add: ['\\Flagged', '\\Answered']
-                }, {
-                    byUid: true
                 }).yields(null, [{
                     flags: ['\\Flagged', '\\Answered']
                 }]);
                 bboxMock.setFlags.withArgs('123:123', {
                     remove: ['\\Seen']
-                }, {
-                    byUid: true
                 }).yields(null, [{
                     flags: ['\\Flagged', '\\Answered']
                 }]);
@@ -550,7 +493,6 @@
                 }, function(error) {
                     expect(error).to.not.exist;
 
-                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledTwice).to.be.true;
 
                     done();
@@ -558,11 +500,8 @@
             });
 
             it('should update flags and skip remove', function(done) {
-                bboxMock.selectMailbox.withArgs('INBOX').yields();
                 bboxMock.setFlags.withArgs('123:123', {
                     add: ['\\Answered']
-                }, {
-                    byUid: true
                 }).yields(null, [{
                     flags: ['\\Answered']
                 }]);
@@ -574,7 +513,6 @@
                 }, function(error) {
                     expect(error).to.not.exist;
 
-                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledOnce).to.be.true;
 
                     done();
@@ -582,11 +520,8 @@
             });
 
             it('should update flags and skip add', function(done) {
-                bboxMock.selectMailbox.withArgs('INBOX').yields();
                 bboxMock.setFlags.withArgs('123:123', {
                     remove: ['\\Seen']
-                }, {
-                    byUid: true
                 }).yields(null, [{
                     flags: []
                 }]);
@@ -598,7 +533,6 @@
                 }, function(error) {
                     expect(error).to.not.exist;
 
-                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.setFlags.calledOnce).to.be.true;
 
                     done();
@@ -606,23 +540,7 @@
             });
 
             it('should fail due to set flags error', function(done) {
-                bboxMock.selectMailbox.yieldsAsync();
                 bboxMock.setFlags.yieldsAsync({});
-
-                imap.updateFlags({
-                    path: 'INBOX',
-                    uid: 123,
-                    unread: false,
-                    answered: true
-                }, function(error) {
-                    expect(error).to.exist;
-
-                    done();
-                });
-            });
-
-            it('should fail due to select mailbox error', function(done) {
-                bboxMock.selectMailbox.yieldsAsync({});
 
                 imap.updateFlags({
                     path: 'INBOX',
@@ -646,10 +564,7 @@
 
         describe('#moveMessage', function() {
             it('should work', function(done) {
-                bboxMock.selectMailbox.withArgs('INBOX').yields();
-                bboxMock.moveMessages.withArgs('123:123', 'asdasd', {
-                    byUid: true
-                }).yields();
+                bboxMock.moveMessages.withArgs('123:123', 'asdasd').yields();
 
                 imap.moveMessage({
                     path: 'INBOX',
@@ -657,7 +572,6 @@
                     destination: 'asdasd'
                 }, function(error) {
                     expect(error).to.not.exist;
-                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.moveMessages.calledOnce).to.be.true;
 
                     done();
@@ -665,22 +579,7 @@
             });
 
             it('should fail due to move error', function(done) {
-                bboxMock.selectMailbox.yields();
                 bboxMock.moveMessages.yields({});
-
-                imap.moveMessage({
-                    path: 'INBOX',
-                    uid: 123,
-                    destination: 'asdasd'
-                }, function(error) {
-                    expect(error).to.exist;
-
-                    done();
-                });
-            });
-
-            it('should fail due to select mailbox error', function(done) {
-                bboxMock.selectMailbox.yieldsAsync({});
 
                 imap.moveMessage({
                     path: 'INBOX',
@@ -737,17 +636,13 @@
 
         describe('#deleteMessage', function() {
             it('should work', function(done) {
-                bboxMock.selectMailbox.withArgs('INBOX').yields();
-                bboxMock.deleteMessages.withArgs('123:123', {
-                    byUid: true
-                }).yields(null);
+                bboxMock.deleteMessages.withArgs('123:123').yields(null);
 
                 imap.deleteMessage({
                     path: 'INBOX',
                     uid: 123,
                 }, function(error) {
                     expect(error).to.not.exist;
-                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     expect(bboxMock.deleteMessages.calledOnce).to.be.true;
 
                     done();
@@ -756,20 +651,7 @@
             });
 
             it('should not fail due to delete error', function(done) {
-                bboxMock.selectMailbox.yields();
                 bboxMock.deleteMessages.yields({});
-
-                imap.deleteMessage({
-                    path: 'INBOX',
-                    uid: 123,
-                }, function(error) {
-                    expect(error).to.exist;
-                    done();
-                });
-            });
-
-            it('should fail due to select mailbox error', function(done) {
-                bboxMock.selectMailbox.yieldsAsync({});
 
                 imap.deleteMessage({
                     path: 'INBOX',
@@ -799,18 +681,19 @@
                     expect(err).to.not.exist;
                     expect(imap._listenerLoggedIn).to.be.true;
                     expect(bboxMock.connect.calledOnce).to.be.true;
+                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     done();
                 });
                 bboxMock.onauth();
             });
 
             it('should return an error when inbox could not be opened', function(done) {
-                bboxMock.selectMailbox.withArgs('INBOX').yields({});
-
+                bboxMock.selectMailbox.withArgs('INBOX').yields(new Error());
                 imap.listenForChanges({
                     path: 'INBOX'
                 }, function(err) {
                     expect(err).to.exist;
+                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
                     done();
                 });
                 bboxMock.onauth();
@@ -828,6 +711,28 @@
                     done();
                 });
                 bboxMock.onclose();
+            });
+        });
+
+        describe('#_ensurePath', function() {
+            var ctx = {};
+
+            it('should switch mailboxes', function(done) {
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields();
+                imap._ensurePath('qweasdzxc')(ctx, function(err) {
+                    expect(err).to.not.exist;
+                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
+                    done();
+                });
+            });
+
+            it('should error during switching mailboxes', function(done) {
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields(new Error());
+                imap._ensurePath('qweasdzxc')(ctx, function(err) {
+                    expect(err).to.exist;
+                    expect(bboxMock.selectMailbox.calledOnce).to.be.true;
+                    done();
+                });
             });
         });
     });
