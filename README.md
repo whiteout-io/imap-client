@@ -166,7 +166,8 @@ imap.deleteMessage({
 
 ### #onSyncUpdate
 
-If there are updates available for an IMAP folder, you will receive the changed UIDs in the `#onSyncUpdate` callback. The IMAP client invokes the callback if there are new/changes messages after a mailbox has been selected and on IMAP expunge/exists/fetch updates have been pushed from the server
+If there are updates available for an IMAP folder, you will receive the changed UIDs in the `#onSyncUpdate` callback. The IMAP client invokes the callback if there are new/changes messages after a mailbox has been selected and on IMAP expunge/exists/fetch updates have been pushed from the server.
+If this handler is not set, you will not receive updates from IMAP.
 
 ```
 var SYNC_TYPE_NEW = 'new';

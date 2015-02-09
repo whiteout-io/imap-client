@@ -145,6 +145,10 @@
             return;
         }
 
+        if (!self.onSyncUpdate) {
+            return;
+        }
+
         axe.debug(DEBUG_TAG, 'selected mailbox ' + path);
 
         // populate the cahce object for current path
@@ -241,6 +245,10 @@
         var self = this,
             path = client.selectedMailbox,
             cached = self.mailboxCache[path];
+
+        if (!self.onSyncUpdate) {
+            return;
+        }
 
         // If both clients are currently listening the same mailbox, ignore data from listeningClient
         if (client === self._listeningClient && self._listeningClient.selectedMailbox === self._client.selectedMailbox) {
@@ -347,6 +355,10 @@
             client = options.client || self._client,
             path = client.selectedMailbox;
 
+        if (!self.onSyncUpdate) {
+            return;
+        }
+
         // do nothing if we do not have highestModseq value. it should be at least 1. if it is
         // undefined then the server does not support CONDSTORE extension
         if (!highestModseq || !path) {
@@ -398,9 +410,7 @@
      * @param {Array} options.list List of uids/messages
      * @param {String} options.path Selected mailbox
      */
-    ImapClient.prototype.onSyncUpdate = function( /* options */ ) {
-        this.onError(new Error('Sync handler not set'));
-    };
+    ImapClient.prototype.onSyncUpdate = false;
 
     /**
      * Log in to an IMAP Session. No-op if already logged in.
