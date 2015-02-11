@@ -75,7 +75,8 @@ module.exports = function(grunt) {
                     'browserbox/node_modules/wo-utf7/src/*.js',
                     'browserbox/node_modules/wo-imap-handler/src/*.js',
                     'browserbox/node_modules/mimefuncs/src/*.js',
-                    'browserbox/node_modules/mimefuncs/node_modules/wo-stringencoding/dist/stringencoding.js'
+                    'browserbox/node_modules/mimefuncs/node_modules/wo-stringencoding/dist/stringencoding.js',
+                    'es6-promise/dist/es6-promise.js'
                 ],
                 dest: 'test/lib/'
             },

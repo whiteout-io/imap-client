@@ -175,9 +175,8 @@
             self.search({
                 path: path,
                 client: client
-            }, function(err, imapUidList) {
-                var deltaNew, deltaDeleted,
-                    batch;
+            }).then(function(imapUidList) {
+                var deltaNew, deltaDeleted, batch;
 
                 // normalize the uidlist
                 cached.uidlist = cached.uidlist || [];
@@ -218,25 +217,21 @@
                 cached.uidlist = imapUidList;
 
                 // check for changed flags
-                self.checkModseq({
+                self._checkModseq({
                     highestModseq: mailbox.highestModseq,
                     client: client
-                }, function(error) {
-                    if (error) {
-                        axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
-                    }
+                }).catch(function(error) {
+                    axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
                 });
             });
         } else {
-            axe.debug(DEBUG_TAG, 'no changes in message count in ' + path + '. exists: ' + mailbox.exists + ', uidNext: ' + mailbox.uidNext);
             // check for changed flags
-            self.checkModseq({
+            axe.debug(DEBUG_TAG, 'no changes in message count in ' + path + '. exists: ' + mailbox.exists + ', uidNext: ' + mailbox.uidNext);
+            self._checkModseq({
                 highestModseq: mailbox.highestModseq,
                 client: client
-            }, function(error) {
-                if (error) {
-                    axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
-                }
+            }).catch(function(error) {
+                axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
             });
         }
     };
@@ -287,11 +282,7 @@
                 // search for messages with higher UID than last known uidNext
                 uid: cached.uidNext + ':*',
                 client: client
-            }, function(err, imapUidList) {
-                if (err) {
-                    return;
-                }
-
+            }).then(function(imapUidList) {
                 var batch;
 
                 // if we do not find anything or the returned item was already known then return
@@ -320,7 +311,8 @@
                         list: batch
                     });
                 }
-
+            }).catch(function(error) {
+                axe.error(DEBUG_TAG, 'error handling exists notice: ' + error + '\n' + error.stack);
             });
         } else if (type === 'fetch') {
             axe.debug(DEBUG_TAG, 'fetch notice received for ' + path);
@@ -349,53 +341,52 @@
      * @param {String} options.highestModseq MODSEQ value
      * @param {Function} callback Runs when the list is fetched
      */
-    ImapClient.prototype.checkModseq = function(options, callback) {
+    ImapClient.prototype._checkModseq = function(options, callback) {
         var self = this,
             highestModseq = options.highestModseq,
             client = options.client || self._client,
             path = client.selectedMailbox;
 
-        if (!self.onSyncUpdate) {
-            return;
-        }
-
         // do nothing if we do not have highestModseq value. it should be at least 1. if it is
         // undefined then the server does not support CONDSTORE extension
         if (!highestModseq || !path) {
             axe.info(DEBUG_TAG, 'can not check MODSEQ, server does not support CONDSTORE extension');
-            return callback(null, []);
+            return new Promise(function(resolve) {
+                resolve([]);
+            });
         }
 
         var cached = self.mailboxCache[path];
 
         // only do this when we actually do have a last know change number
-        if (cached && cached.highestModseq && cached.highestModseq !== highestModseq) {
-            axe.debug(DEBUG_TAG, 'listing changes since MODSEQ ' + highestModseq + ' for ' + path);
-            client.listMessages('1:*', ['uid', 'flags', 'modseq'], {
-                byUid: true,
-                changedSince: cached.highestModseq
-            }, function(err, messages) {
-                if (err) {
-                    return callback(err);
-                }
-
-                cached.highestModseq = highestModseq;
-
-                if (!messages || !messages.length) {
-                    return callback(null, []);
-                }
-
-                axe.debug(DEBUG_TAG, 'changes since MODSEQ ' + highestModseq + ' for ' + path + ' available!');
-                self.onSyncUpdate({
-                    type: 'messages',
-                    path: path,
-                    list: messages
-                });
-                callback(null, messages);
+        if (!(cached && cached.highestModseq && cached.highestModseq !== highestModseq)) {
+            return new Promise(function(resolve) {
+                resolve([]);
             });
-        } else {
-            return callback(null, []);
         }
+
+        axe.debug(DEBUG_TAG, 'listing changes since MODSEQ ' + highestModseq + ' for ' + path);
+        return client.listMessages('1:*', ['uid', 'flags', 'modseq'], {
+            byUid: true,
+            changedSince: cached.highestModseq
+        }).then(function(messages) {
+            cached.highestModseq = highestModseq;
+
+            if (!messages || !messages.length) {
+                return callback(null, []);
+            }
+
+            axe.debug(DEBUG_TAG, 'changes since MODSEQ ' + highestModseq + ' for ' + path + ' available!');
+            self.onSyncUpdate({
+                type: 'messages',
+                path: path,
+                list: messages
+            });
+
+            return messages;
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error handling exists notice: ' + error + '\n' + error.stack);
+        });
     };
 
     /**
@@ -415,43 +406,49 @@
     /**
      * Log in to an IMAP Session. No-op if already logged in.
      *
-     * @param {Function} callback Callback when the login was successful
+     * @return {Prmomise}
      */
-    ImapClient.prototype.login = function(callback) {
+    ImapClient.prototype.login = function() {
         var self = this;
 
-        if (self._loggedIn) {
-            axe.debug(DEBUG_TAG, 'refusing login while already logged in!');
-            return callback();
-        }
+        return new Promise(function(resolve) {
+            if (self._loggedIn) {
+                axe.debug(DEBUG_TAG, 'refusing login while already logged in!');
+                return resolve();
+            }
 
-        self._client.onauth = function() {
-            axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
-            self._loggedIn = true;
-            callback();
-        };
+            self._client.onauth = function() {
+                axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
+                self._loggedIn = true;
+                resolve();
+            };
 
-        self._client.connect();
+            self._client.connect();
+        });
     };
 
     /**
      * Log out of the current IMAP session
+     *
+     * @return {Promise}
      */
-    ImapClient.prototype.logout = function(callback) {
+    ImapClient.prototype.logout = function() {
         var self = this;
 
-        if (!self._loggedIn) {
-            axe.debug(DEBUG_TAG, 'refusing logout while already logged out!');
-            return callback();
-        }
+        return new Promise(function(resolve) {
+            if (!self._loggedIn) {
+                axe.debug(DEBUG_TAG, 'refusing logout while already logged out!');
+                return resolve();
+            }
 
-        self._client.onclose = function() {
-            axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
-            callback();
-        };
+            self._client.onclose = function() {
+                axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
+                resolve();
+            };
 
-        self._loggedIn = false;
-        self._client.close();
+            self._loggedIn = false;
+            self._client.close();
+        });
     };
 
     /**
@@ -461,21 +458,23 @@
      * @param {String} options.path The path to the folder to subscribe to
      * @param {String} callback(err) Invoked when listening folder has been selected, or an error occurred
      */
-    ImapClient.prototype.listenForChanges = function(options, callback) {
+    ImapClient.prototype.listenForChanges = function(options) {
         var self = this;
 
-        if (self._listenerLoggedIn) {
-            axe.debug(DEBUG_TAG, 'refusing login listener while already logged in!');
-            return callback();
-        }
+        return new Promise(function(resolve, reject) {
+            if (self._listenerLoggedIn) {
+                axe.debug(DEBUG_TAG, 'refusing login listener while already logged in!');
+                return resolve();
+            }
 
-        self._listeningClient.onauth = function() {
-            axe.debug(DEBUG_TAG, 'listener login completed, ready to roll!');
-            self._listenerLoggedIn = true;
-            axe.debug(DEBUG_TAG, 'listening for changes in ' + options.path);
-            self._listeningClient.selectMailbox(options.path, callback);
-        };
-        self._listeningClient.connect();
+            self._listeningClient.onauth = function() {
+                axe.debug(DEBUG_TAG, 'listener login completed, ready to roll!');
+                self._listenerLoggedIn = true;
+                axe.debug(DEBUG_TAG, 'listening for changes in ' + options.path);
+                self._listeningClient.selectMailbox(options.path).then(resolve).catch(reject);
+            };
+            self._listeningClient.connect();
+        });
     };
 
     /**
@@ -483,26 +482,28 @@
      *
      * @param {String} callback(err) Invoked when listenerstopped, or an error occurred
      */
-    ImapClient.prototype.stopListeningForChanges = function(callback) {
+    ImapClient.prototype.stopListeningForChanges = function() {
         var self = this;
 
-        if (!self._listenerLoggedIn) {
-            axe.debug(DEBUG_TAG, 'refusing logout listener already logged out!');
-            return callback();
-        }
+        return new Promise(function(resolve) {
+            if (!self._listenerLoggedIn) {
+                axe.debug(DEBUG_TAG, 'refusing logout listener already logged out!');
+                return resolve();
+            }
 
-        self._listeningClient.onclose = function() {
-            axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
-            callback();
-        };
+            self._listeningClient.onclose = function() {
+                axe.debug(DEBUG_TAG, 'logout completed, kthxbye!');
+                resolve();
+            };
 
-        self._listenerLoggedIn = false;
-        self._listeningClient.close();
+            self._listenerLoggedIn = false;
+            self._listeningClient.close();
+        });
     };
 
-    ImapClient.prototype.selectMailbox = function(options, callback) {
+    ImapClient.prototype.selectMailbox = function(options) {
         axe.debug(DEBUG_TAG, 'selecting mailbox ' + options.path);
-        this._client.selectMailbox(options.path, callback);
+        return this._client.selectMailbox(options.path);
     };
 
     /**
@@ -510,17 +511,16 @@
      * Since there may actually be multiple sent folders (e.g. one is default, others were created by Thunderbird,
      * Outlook, another accidentally matched the naming), we return the well known folders as an array to avoid false positives.
      *
-     * @param {Function} callback(error, folders) will be invoked as soon as traversal is done;
+     * @return {Promise<Array>} Array of folders
      */
-    ImapClient.prototype.listWellKnownFolders = function(callback) {
+    ImapClient.prototype.listWellKnownFolders = function() {
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not list well known folders, cause: Not logged in!'));
-            return;
+            return new Promise(function() {
+                throw new Error('Can not list well known folders, cause: Not logged in!');
+            });
         }
-
-        axe.debug(DEBUG_TAG, 'listing folders');
 
         var wellKnownFolders = {
             Inbox: [],
@@ -534,17 +534,15 @@
             Other: []
         };
 
-        self._client.listMailboxes(function(error, mailbox) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error listing folders: ' + error + '\n' + error.stack);
-                callback(error);
-                return;
-            }
+        axe.debug(DEBUG_TAG, 'listing folders');
 
+        return self._client.listMailboxes().then(function(mailbox) {
             axe.debug(DEBUG_TAG, 'folder list received!');
-
             walkMailbox(mailbox);
-            callback(null, wellKnownFolders);
+            return wellKnownFolders;
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error listing folders: ' + error + '\n' + error.stack);
+            throw error;
         });
 
         function walkMailbox(mailbox) {
@@ -599,15 +597,17 @@
      * @param {String} options.path The folder's path
      * @param {Boolean} options.answered (optional) Mails with or without the \Answered flag set.
      * @param {Boolean} options.unread (optional) Mails with or without the \Seen flag set.
-     * @param {Function} callback(error, uids) invoked with the uids of messages matching the search terms, or an error object if an error occurred
+     *
+     * @returns {Promise<Array>} Array of uids for messages matching the search terms
      */
-    ImapClient.prototype.search = function(options, callback) {
+    ImapClient.prototype.search = function(options) {
         var self = this,
             client = options.client || self._client;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not search messages, cause: Not logged in!'));
-            return;
+            return new Promise(function() {
+                throw new Error('Can not search messages, cause: Not logged in!');
+            });
         }
 
         var query = {},
@@ -636,15 +636,12 @@
         }
 
         axe.debug(DEBUG_TAG, 'searching in ' + options.path + ' for ' + Object.keys(query).join(','));
-        client.search(query, queryOptions, function(error, uids) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error searching ' + options.path + ': ' + error + '\n' + error.stack);
-                return callback(error);
-            }
-
+        return client.search(query, queryOptions).then(function(uids) {
             axe.debug(DEBUG_TAG, 'searched in ' + options.path + ' for ' + Object.keys(query).join(',') + ': ' + uids);
-
-            callback(null, uids);
+            return uids;
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error searching ' + options.path + ': ' + error + '\n' + error.stack);
+            throw error;
         });
     };
 
@@ -653,14 +650,16 @@
      * @param {String} options.path The folder's path
      * @param {Number} options.firstUid The uid of the first message. if omitted, defaults to 1
      * @param {Number} options.lastUid (optional) The uid of the last message. if omitted, defaults to *
-     * @param {Function} callback(error, messages) will be called at completion, contains an array of messages with their respective envelope data, or information if an error occurred.
+     
+     * @returns {Promise<Array>} Array of messages with their respective envelope data.
      */
-    ImapClient.prototype.listMessages = function(options, callback) {
+    ImapClient.prototype.listMessages = function(options) {
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Can not list messages, cause: Not logged in!'));
-            return;
+            return new Promise(function() {
+                throw new Error('Can not list messages, cause: Not logged in!');
+            });
         }
 
         var interval = (options.firstUid || 1) + ':' + (options.lastUid || '*'),
@@ -676,25 +675,10 @@
         }
 
         axe.debug(DEBUG_TAG, 'listing messages in ' + options.path + ' for interval ' + interval);
-
-        self._client.listMessages(interval, query, queryOptions, onList);
-
-        // process what inbox returns into a usable form for our client
-        function onList(error, messages) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error listing messages in ' + options.path + ' : ' + error + '\n' + error.stack);
-                callback(error);
-                return;
-            }
-
+        return self._client.listMessages(interval, query, queryOptions).then(function(messages) {
             // a message without uid will be ignored as malformed
             messages = messages.filter(function(message) {
-                if (!message.uid) {
-                    axe.warn(DEBUG_TAG, 'folder ' + options.path + ' contains message without uid. message will be ignored! subject ' + message.subject + ', ' + (message.envelope.from || [])[0]);
-                    return false;
-                }
-
-                return true;
+                return !!message.uid;
             });
 
             var cleansedMessages = [];
@@ -736,8 +720,11 @@
                 cleansedMessages.push(cleansed);
             });
 
-            callback(null, cleansedMessages);
-        }
+            return cleansedMessages;
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error listing messages in ' + options.path + ': ' + error + '\n' + error.stack);
+            throw error;
+        });
     };
 
     /**
@@ -745,9 +732,10 @@
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
      * @param {Array} options.bodyParts Parts of a message, as returned by #listMessages
-     * @param {Function} callback(error, flags) will be called the body parts have been received from the server
+     
+     * @returns {Promise<Array>} Body parts that have been received from the server
      */
-    ImapClient.prototype.getBodyParts = function(options, callback) {
+    ImapClient.prototype.getBodyParts = function(options) {
         var self = this,
             query = [],
             queryOptions = {
@@ -755,16 +743,12 @@
                 precheck: self._ensurePath(options.path)
             },
             interval = options.uid + ':' + options.uid,
-            bodyParts = options.bodyParts;
+            bodyParts = options.bodyParts || [];
 
         if (!self._loggedIn) {
-            callback(new Error('Can not get bodyParts for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!'));
-            return;
-        }
-
-        if (bodyParts.length === 0) {
-            callback(null, bodyParts);
-            return;
+            return new Promise(function() {
+                throw new Error('Can not get bodyParts for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!');
+            });
         }
 
         // formulate a query for each text part. for part 2.1 to be parsed, we need 2.1.MIME and 2.1
@@ -782,24 +766,21 @@
         });
 
         if (query.length === 0) {
-            callback(null, bodyParts);
-            return;
+            return new Promise(function(resolve) {
+                resolve(bodyParts);
+            });
         }
 
         axe.debug(DEBUG_TAG, 'retrieving body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
-
-        self._client.listMessages(interval, query, queryOptions, onPartsReady);
-
-        function onPartsReady(error, messages) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error fetching body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + error + '\n' + error.stack);
-                callback(error);
-                return;
-            }
-
+        return self._client.listMessages(interval, query, queryOptions).then(function(messages) {
             axe.debug(DEBUG_TAG, 'successfully retrieved body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
 
             var message = messages[0];
+            if (!message) {
+                // message has been deleted while waiting for the command to return
+                return bodyParts;
+            }
+
             bodyParts.forEach(function(bodyPart) {
                 if (typeof bodyPart.partNumber === 'undefined') {
                     return;
@@ -814,8 +795,11 @@
                 delete bodyPart.partNumber;
             });
 
-            callback(null, bodyParts);
-        }
+            return bodyParts;
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error fetching body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + error + '\n' + error.stack);
+            throw error;
+        });
     };
 
     /**
@@ -825,9 +809,10 @@
      * @param {Boolean} options.unread (optional) Marks the message as unread
      * @param {Boolean} options.answered (optional) Marks the message as answered
      * @param {Boolean} options.flagged (optional) Marks the message as answered
-     * @param {Function} callback(error) will be called the flags have been updated
+     *
+     * @returns {Promise}
      */
-    ImapClient.prototype.updateFlags = function(options, callback) {
+    ImapClient.prototype.updateFlags = function(options) {
         var self = this,
             interval = options.uid + ':' + options.uid,
             queryOptions = {
@@ -843,8 +828,9 @@
             ANSWERED_FLAG = '\\Answered';
 
         if (!self._loggedIn) {
-            callback(new Error('Can not update flags, cause: Not logged in!'));
-            return;
+            return new Promise(function() {
+                throw new Error('Can not update flags, cause: Not logged in!');
+            });
         }
 
         if (options.unread === true) {
@@ -866,8 +852,9 @@
         }
 
         if (add.length === 0 && remove.length === 0) {
-            callback(new Error('Empty calls are not permitted'));
-            return;
+            return new Promise(function() {
+                throw new Error('Can not update flags, cause: Not logged in!');
+            });
         }
 
         queryAdd = {
@@ -878,32 +865,22 @@
         };
 
         axe.debug(DEBUG_TAG, 'updating flags for uid ' + options.uid + ' in folder ' + options.path + ': ' + (remove.length > 0 ? (' removing ' + remove) : '') + (add.length > 0 ? (' adding ' + add) : ''));
-
-        if (add.length === 0) {
-            return onFlagsAdded();
-        }
-
-        self._client.setFlags(interval, queryAdd, queryOptions, onFlagsAdded);
-
-        function onFlagsAdded(error) {
-            if (error || remove.length === 0) {
-                done(error);
-                return;
+        return new Promise(function(resolve) {
+            if (add.length > 0) {
+                resolve(self._client.setFlags(interval, queryAdd, queryOptions));
+            } else {
+                resolve();
             }
-
-            self._client.setFlags(interval, queryRemove, queryOptions, done);
-        }
-
-        function done(error) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error updating flags for uid ' + options.uid + ' in folder ' + options.path + ' : ' + error + '\n' + error.stack);
-                callback(error);
-                return;
+        }).then(function() {
+            if (remove.length > 0) {
+                return self._client.setFlags(interval, queryRemove, queryOptions);
             }
-
+        }).then(function() {
             axe.debug(DEBUG_TAG, 'successfully updated flags for uid ' + options.uid + ' in folder ' + options.path + ': added ' + add + ' and removed ' + remove);
-            callback();
-        }
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error updating flags for uid ' + options.uid + ' in folder ' + options.path + ' : ' + error + '\n' + error.stack);
+            throw error;
+        });
     };
 
     /**
@@ -911,9 +888,10 @@
      * @param {String} options.path The origin path where the message resides
      * @param {Number} options.uid The uid of the message
      * @param {String} options.destination The destination folder
-     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     *
+     * @returns {Promise}
      */
-    ImapClient.prototype.moveMessage = function(options, callback) {
+    ImapClient.prototype.moveMessage = function(options) {
         var self = this,
             interval = options.uid + ':' + options.uid,
             queryOptions = {
@@ -922,18 +900,17 @@
             };
 
         if (!self._loggedIn) {
-            callback(new Error('Cannot move message, cause: Not logged in!'));
-            return;
+            return new Promise(function() {
+                throw new Error('Cannot move message, cause: Not logged in!');
+            });
         }
 
         axe.debug(DEBUG_TAG, 'moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
-
-        self._client.moveMessages(interval, options.destination, queryOptions, function(error) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
-            }
+        return self._client.moveMessages(interval, options.destination, queryOptions).then(function() {
             axe.debug(DEBUG_TAG, 'successfully moved uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
-            callback(error);
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
+            throw error;
         });
     };
 
@@ -941,24 +918,24 @@
      * Move a message to a folder
      * @param {String} options.path The path the message should be uploaded to
      * @param {String} options.message A RFC-2822 compliant message
-     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     *
+     * @returns {Promise}
      */
-    ImapClient.prototype.uploadMessage = function(options, callback) {
+    ImapClient.prototype.uploadMessage = function(options) {
         var self = this;
 
         if (!self._loggedIn) {
-            callback(new Error('Cannot move message, cause: Not logged in!'));
-            return;
+            return new Promise(function() {
+                throw new Error('Cannot move message, cause: Not logged in!');
+            });
         }
 
         axe.debug(DEBUG_TAG, 'uploading a message of ' + options.message.length + ' bytes to ' + options.path);
-
-        self._client.upload(options.path, options.message, function(error) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
-            }
+        return self._client.upload(options.path, options.message).then(function() {
             axe.debug(DEBUG_TAG, 'successfully uploaded message to ' + options.path);
-            callback(error);
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
+            throw error;
         });
     };
 
@@ -966,9 +943,10 @@
      * Purges a message from a folder
      * @param {String} options.path The origin path where the message resides
      * @param {Number} options.uid The uid of the message
-     * @param {Function} callback(error) Callback with an error object in case something went wrong.
+     *
+     * @returns {Promise}
      */
-    ImapClient.prototype.deleteMessage = function(options, callback) {
+    ImapClient.prototype.deleteMessage = function(options) {
         var self = this,
             interval = options.uid + ':' + options.uid,
             queryOptions = {
@@ -977,19 +955,17 @@
             };
 
         if (!self._loggedIn) {
-            callback(new Error('Cannot delete message, cause: Not logged in!'));
-            return;
+            return new Promise(function() {
+                throw new Error('Cannot delete message, cause: Not logged in!');
+            });
         }
 
         axe.debug(DEBUG_TAG, 'deleting uid ' + options.uid + ' from ' + options.path);
-
-        self._client.deleteMessages(interval, queryOptions, function(error) {
-            if (error) {
-                axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
-            }
-
+        return self._client.deleteMessages(interval, queryOptions).then(function() {
             axe.debug(DEBUG_TAG, 'successfully deleted uid ' + options.uid + ' from ' + options.path);
-            callback(error);
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
+            throw error;
         });
     };
 

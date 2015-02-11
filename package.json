@@ -7,10 +7,11 @@
   },
   "main": "src/imap-client.js",
   "dependencies": {
-    "browserbox": "~0.7.0",
+    "browserbox": "~0.8.0",
     "axe-logger": "~0.0.2"
   },
   "devDependencies": {
+    "es6-promise": "^2.0.1",
     "chai": "~1.9.2",
     "grunt": "~0.4.1",
     "grunt-mocha-phantomjs": "~0.4.0",

@@ -19,6 +19,7 @@
 	"unused": true,
 
 	"predef": [
+		"Promise",
 		"define", 
 		"importScripts", 
 		"self",
@@ -36,7 +37,8 @@
 		"console",
 		"process",
 		"describe",
-		"it"
+		"it",
+		"ES6Promise"
 	],
 
 	"globals": {
