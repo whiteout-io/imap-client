@@ -339,9 +339,10 @@
      * Lists messages with the last check
      *
      * @param {String} options.highestModseq MODSEQ value
-     * @param {Function} callback Runs when the list is fetched
+     *
+     * @return {Promise}
      */
-    ImapClient.prototype._checkModseq = function(options, callback) {
+    ImapClient.prototype._checkModseq = function(options) {
         var self = this,
             highestModseq = options.highestModseq,
             client = options.client || self._client,
@@ -373,7 +374,7 @@
             cached.highestModseq = highestModseq;
 
             if (!messages || !messages.length) {
-                return callback(null, []);
+                return [];
             }
 
             axe.debug(DEBUG_TAG, 'changes since MODSEQ ' + highestModseq + ' for ' + path + ' available!');
@@ -456,7 +457,8 @@
      * or includes information in case of an error
      
      * @param {String} options.path The path to the folder to subscribe to
-     * @param {String} callback(err) Invoked when listening folder has been selected, or an error occurred
+     *
+     * @return {Promise}
      */
     ImapClient.prototype.listenForChanges = function(options) {
         var self = this;
@@ -480,7 +482,7 @@
     /**
      * Stops dedicated listener for updates
      *
-     * @param {String} callback(err) Invoked when listenerstopped, or an error occurred
+     * @return {Promise}
      */
     ImapClient.prototype.stopListeningForChanges = function() {
         var self = this;
