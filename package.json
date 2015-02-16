@@ -1,16 +1,17 @@
 {
   "name": "imap-client",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "scripts": {
     "pretest": "dir=$(pwd) && cd node_modules/browserbox/node_modules/tcp-socket/node_modules/node-forge/ && npm install && npm run minify && cd $dir",
     "test": "grunt"
   },
   "main": "src/imap-client.js",
   "dependencies": {
-    "browserbox": "~0.7.0",
+    "browserbox": "~0.8.0",
     "axe-logger": "~0.0.2"
   },
   "devDependencies": {
+    "es6-promise": "^2.0.1",
     "chai": "~1.9.2",
     "grunt": "~0.4.1",
     "grunt-mocha-phantomjs": "~0.4.0",

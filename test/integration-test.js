@@ -2,8 +2,10 @@
     'use strict';
 
     if (typeof define === 'function' && define.amd) {
+        ES6Promise.polyfill(); // load ES6 Promises polyfill
         define(['chai', 'imap-client', 'axe'], factory);
     } else if (typeof exports === 'object') {
+        require('es6-promise').polyfill(); // load ES6 Promises polyfill
         module.exports = factory(require('chai'), require('../src/imap-client'), require('axe-logger'));
     }
 })(function(chai, ImapClient, axe) {
@@ -35,22 +37,20 @@
         beforeEach(function(done) {
             ic = new ImapClient(loginOptions);
             ic.onSyncUpdate = function() {};
-            ic.login(done);
             ic.onCert = function() {};
             ic.onError = function(error) {
                 console.error(error);
             };
+            ic.login().then(done);
         });
 
 
         afterEach(function(done) {
-            ic.logout(done);
+            ic.logout().then(done);
         });
 
         it('should list well known folders', function(done) {
-            ic.listWellKnownFolders(function(error, folders) {
-                expect(error).to.not.exist;
-
+            ic.listWellKnownFolders().then(function(folders) {
                 expect(folders).to.exist;
 
                 expect(folders.Inbox).to.be.instanceof(Array);
@@ -69,9 +69,7 @@
                 expect(folders.Trash).to.not.be.empty;
 
                 expect(folders.Other).to.be.instanceof(Array);
-
-                done();
-            });
+            }).then(done);
         });
 
         it('should search messages', function(done) {
@@ -79,74 +77,63 @@
                 path: 'INBOX',
                 unread: false,
                 answered: false
-            }, function(error, uids) {
-                expect(error).to.not.exist;
+            }).then(function(uids) {
                 expect(uids).to.not.be.empty;
-                done();
-            });
+            }).then(done);
         });
 
         it('should list messages by uid', function(done) {
             ic.listMessages({
                 path: 'INBOX',
                 firstUid: 1
-            }, function(error, messages) {
-                expect(error).to.not.exist;
+            }).then(function(messages) {
                 expect(messages).to.not.be.empty;
-                done();
-            });
+            }).then(done);
         });
 
 
         it('should upload Message', function(done) {
             var msg = 'MIME-Version: 1.0\r\nDate: Wed, 9 Jul 2014 15:07:47 +0200\r\nDelivered-To: test@test.com\r\nMessage-ID: <CAHftYYQo=5fqbtnv-DazXhL2j5AxVP1nWarjkztn-N9SV91Z2w@mail.gmail.com>\r\nSubject: integration test\r\nFrom: Test Test <test@test.com>\r\nTo: Test Test <test@test.com>\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nintegration test',
-                path = 'INBOX';
+                path = 'INBOX',
+                msgCount;
 
             ic.listMessages({
                 path: path,
                 firstUid: 1
-            }, function(error, messages) {
-                expect(error).to.not.exist;
+            }).then(function(messages) {
                 expect(messages).to.not.be.empty;
-                var msgCount = messages.length;
+                msgCount = messages.length;
 
-                ic.uploadMessage({
+                return ic.uploadMessage({
                     path: path,
                     message: msg
-                }, function(error) {
-                    expect(error).to.not.exist;
-
-                    ic.listMessages({
-                        path: path,
-                        firstUid: 1
-                    }, function(error, messages) {
-                        expect(error).to.not.exist;
-                        expect(messages.length).to.equal(msgCount + 1);
-
-                        done();
-                    });
                 });
-            });
+            }).then(function() {
+                return ic.listMessages({
+                    path: path,
+                    firstUid: 1
+                });
+            }).then(function(messages) {
+                expect(messages.length).to.equal(msgCount + 1);
+            }).then(done);
         });
 
         it('should get message parts', function(done) {
+            var msg;
             ic.listMessages({
                 path: 'INBOX',
                 firstUid: 1
-            }, function(error, messages) {
-                var msg = messages.pop();
-                ic.getBodyParts({
+            }).then(function(messages) {
+                msg = messages.pop();
+                return ic.getBodyParts({
                     path: 'INBOX',
                     uid: msg.uid,
                     bodyParts: msg.bodyParts
-                }, function(error, bodyParts) {
-                    expect(error).to.not.exist;
-                    expect(msg.bodyParts).to.equal(bodyParts);
-                    expect(bodyParts[0].raw).to.not.be.empty;
-
-                    done();
                 });
-            });
+            }).then(function(bodyParts) {
+                expect(msg.bodyParts).to.equal(bodyParts);
+                expect(bodyParts[0].raw).to.not.be.empty;
+            }).then(done);
         });
     });
 });
