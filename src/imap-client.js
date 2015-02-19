@@ -599,6 +599,7 @@
      * @param {String} options.path The folder's path
      * @param {Boolean} options.answered (optional) Mails with or without the \Answered flag set.
      * @param {Boolean} options.unread (optional) Mails with or without the \Seen flag set.
+     * @param {Array} options.header (optional) Query an arbitrary header, e.g. ['Subject', 'Foobar'], or ['X-Foo', 'bar']
      *
      * @returns {Promise<Array>} Array of uids for messages matching the search terms
      */
@@ -618,7 +619,7 @@
                 precheck: self._ensurePath(options.path, client)
             };
 
-        // initial request to && (AND) the following properties
+        // initial request to AND the following properties
         query.all = true;
 
         if (options.unread === true) {
@@ -631,6 +632,10 @@
             query.answered = true;
         } else if (options.answered === false) {
             query.unanswered = true;
+        }
+
+        if (options.header) {
+            query.header = options.header;
         }
 
         if (options.uid) {

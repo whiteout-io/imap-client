@@ -62,8 +62,9 @@ Returns the uids of messages containing the search terms in the options.
 
 ```
 imap.search({
-        answered: true
-        unread: true
+        answered: true,
+        unread: true,
+        header: ['X-Foobar', '123qweasdzxc']
 }, function(error, uids) {
         console.log(‘uids: ‘ + uids.join(‘, ‘))
 });

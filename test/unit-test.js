@@ -212,6 +212,20 @@
                 }).then(done);
             });
 
+            it('should search header', function(done) {
+                bboxMock.search.withArgs({
+                    all: true,
+                    header: ['Foo', 'bar']
+                }).returns(resolves([1, 3, 5]));
+
+                imap.search({
+                    path: 'foobar',
+                    header: ['Foo', 'bar']
+                }).then(function(uids) {
+                    expect(uids.length).to.equal(3);
+                }).then(done);
+            });
+
             it('should search read', function(done) {
                 bboxMock.search.withArgs({
                     all: true,

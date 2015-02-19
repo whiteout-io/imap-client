@@ -27,12 +27,12 @@ describe('ImapClient local integration tests', function() {
             storage: {
                 'INBOX': {
                     messages: [{
-                        raw: 'Message-Id: <abcde>\r\nSubject: hello 1\r\n\r\nWorld 1!'
+                        raw: 'Message-Id: <abcde>\r\nX-Foobar: 123qweasdzxc\r\nSubject: hello 1\r\n\r\nWorld 1!'
                     }, {
-                        raw: 'Message-Id: <abcde>\r\nSubject: hello 2\r\n\r\nWorld 2!',
+                        raw: 'Message-Id: <qwe>\r\nSubject: hello 2\r\n\r\nWorld 2!',
                         flags: ['\\Seen']
                     }, {
-                        raw: 'Message-Id: <abcde>\r\nSubject: hello 3\r\n\r\nWorld 3!'
+                        raw: 'Message-Id: <asd>\r\nSubject: hello 3\r\n\r\nWorld 3!'
                     }, {
                         raw: 'MIME-Version: 1.0\r\nDate: Tue, 01 Oct 2013 07:08:55 GMT\r\nMessage-Id: <1380611335900.56da46df@Nodemailer>\r\nFrom: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hello\r\nContent-Type: multipart/mixed;\r\n boundary="----Nodemailer-0.5.3-dev-?=_1-1380611336047"\r\n\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nHello world\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="foo.txt"\r\nContent-Disposition: attachment; filename="foo.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nZm9vZm9vZm9vZm9vZm9v\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047\r\nContent-Type: text/plain; name="bar.txt"\r\nContent-Disposition: attachment; filename="bar.txt"\r\nContent-Transfer-Encoding: base64\r\n\r\nYmFyYmFyYmFyYmFyYmFy\r\n------Nodemailer-0.5.3-dev-?=_1-1380611336047--'
                     }, {
@@ -139,11 +139,19 @@ describe('ImapClient local integration tests', function() {
     it('should search messages', function(done) {
         ic.search({
             path: 'INBOX',
-            subject: 'blablubb',
             unread: false,
             answered: false
         }).then(function(uids) {
             expect(uids).to.not.be.empty;
+        }).then(done);
+    });
+
+    it('should search messages for header', function(done) {
+        ic.search({
+            path: 'INBOX',
+            header: ['X-Foobar', '123qweasdzxc']
+        }).then(function(uids) {
+            expect(uids).to.deep.equal([1]);
         }).then(done);
     });
 
