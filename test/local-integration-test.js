@@ -94,17 +94,13 @@ describe('ImapClient local integration tests', function() {
 
     it('should notify about new messages', function(done) {
         var invocations = 0; // counts the message updates
-        ic._maxUpdateSize = 1;
 
         ic.onSyncUpdate = function(options) {
             invocations++;
 
-            expect(options.list.length).to.equal(1);
-
+            expect(options.list.length).to.equal(6);
             expect(options.type).to.equal('new');
-            if (invocations === 6) {
-                done();
-            }
+            done();
         };
 
         ic.selectMailbox({

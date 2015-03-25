@@ -25,7 +25,6 @@
             imap = new ImapClient({}, bboxMock);
 
             expect(imap._client).to.equal(bboxMock);
-            expect(imap._maxUpdateSize).to.equal(0);
 
             imap._loggedIn = true;
         });
@@ -437,7 +436,12 @@
                 imap._loggedIn = false;
                 imap.getBodyParts({
                     path: 'foobar',
-                    uid: 123
+                    uid: 123,
+                    bodyParts: [{
+                        partNumber: '1'
+                    }, {
+                        partNumber: '2'
+                    }]
                 }).catch(function() {
                     done();
                 });
@@ -449,7 +453,7 @@
                 bboxMock.setFlags.withArgs('123:123', {
                     add: ['\\Flagged', '\\Answered']
                 }).returns(resolves());
-                
+
                 bboxMock.setFlags.withArgs('123:123', {
                     remove: ['\\Seen']
                 }).returns(resolves());
@@ -650,7 +654,9 @@
             var ctx = {};
 
             it('should switch mailboxes', function(done) {
-                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields();
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {
+                    ctx: ctx
+                }).yields();
                 imap._ensurePath('qweasdzxc')(ctx, function(err) {
                     expect(err).to.not.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
@@ -659,7 +665,9 @@
             });
 
             it('should error during switching mailboxes', function(done) {
-                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields(new Error());
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {
+                    ctx: ctx
+                }).yields(new Error());
                 imap._ensurePath('qweasdzxc')(ctx, function(err) {
                     expect(err).to.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
