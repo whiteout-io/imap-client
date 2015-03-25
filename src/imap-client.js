@@ -592,6 +592,69 @@
     };
 
     /**
+     * Creates a folder with the provided path under the personal namespace
+     *
+     * @param {String or Array} options.path
+     *                   The folder's path. If path is a hierarchy as an array (e.g. ['foo', 'bar', 'baz'] to create foo/bar/bar),
+     *                   will create a hierarchy with all intermediate folders if needed.
+     * @returns {Promise<Array>} Array of uids for messages matching the search terms
+     */
+    ImapClient.prototype.createFolder = function(options) {
+        var self = this,
+            path = options.path,
+            prefix, delimiter;
+
+        if (!Array.isArray(path)) {
+            path = [path];
+        }
+
+        return self._checkOnline().then(function() {
+            return self._client.listNamespaces();
+
+        }).then(function(namespaces) {
+            // try to get the namespace prefix and delimiter
+            if (namespaces && namespaces.personal && namespaces.personal[0]) {
+                // personal namespace is available
+                delimiter = namespaces.personal[0].delimiter;
+                prefix = namespaces.personal[0].prefix.split(delimiter).shift();
+                path.unshift(prefix);
+                return;
+            }
+
+            // personal namespaces are not available, find the delimiter by listing the folders
+            return self._client.listMailboxes().then(function(response) {
+                findDelimiter(response);
+            });
+
+        }).then(function() {
+            if (!delimiter) {
+                throw new Error('Could not determine delimiter for mailbox hierarchy');
+            }
+
+            // create path [prefix/]foo/bar/baz
+            return self._client.createMailbox(path.join(delimiter));
+
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error creating folder ' + options.path + ': ' + error + '\n' + error.stack);
+            throw error;
+        });
+
+        // Helper function to find the hierarchy delimiter from a client.listMailboxes() response
+        function findDelimiter(mailbox) {
+            if ((mailbox.path || '').toUpperCase() === 'INBOX') {
+                // found the INBOX, use its hierarchy delimiter, we're done.
+                delimiter = mailbox.delimiter;
+                return;
+            }
+
+            if (mailbox.children) {
+                // walk the child mailboxes recursively
+                mailbox.children.forEach(findDelimiter);
+            }
+        }
+    };
+
+    /**
      * Returns the uids of messages containing the search terms in the options
      * @param {String} options.path The folder's path
      * @param {Boolean} options.answered (optional) Mails with or without the \Answered flag set.

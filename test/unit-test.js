@@ -182,6 +182,90 @@
             });
         });
 
+        describe('#createFolder', function() {
+            it('should create folder with namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves({
+                    "personal": [{
+                        "prefix": "BLA/",
+                        "delimiter": "/"
+                    }],
+                    "users": false,
+                    "shared": false
+                }));
+                bboxMock.createMailbox.withArgs('BLA/foo').returns(resolves());
+
+                imap.createFolder({
+                    path: 'foo'
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    done();
+                });
+            });
+
+            it('should create folder without namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves());
+                bboxMock.listMailboxes.returns(resolves({
+                    "root": true,
+                    "children": [{
+                        "name": "INBOX",
+                        "delimiter": "/",
+                        "path": "INBOX"
+                    }]
+                }));
+                bboxMock.createMailbox.withArgs('foo').returns(resolves());
+
+                imap.createFolder({
+                    path: 'foo'
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    done();
+                });
+            });
+
+            it('should create folder hierarchy with namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves({
+                    "personal": [{
+                        "prefix": "BLA/",
+                        "delimiter": "/"
+                    }],
+                    "users": false,
+                    "shared": false
+                }));
+                bboxMock.createMailbox.withArgs('foo/bar').returns(resolves());
+
+                imap.createFolder({
+                    path: ['foo', 'bar']
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    done();
+                });
+            });
+
+            it('should create folder hierarchy without namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves());
+                bboxMock.listMailboxes.returns(resolves({
+                    "root": true,
+                    "children": [{
+                        "name": "INBOX",
+                        "delimiter": "/",
+                        "path": "INBOX"
+                    }]
+                }));
+                bboxMock.createMailbox.withArgs('foo').returns(resolves());
+
+                imap.createFolder({
+                    path: ['foo', 'bar']
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    done();
+                });
+            });
+        });
+
         describe('#search', function() {
             it('should search answered', function(done) {
                 bboxMock.search.withArgs({

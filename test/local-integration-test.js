@@ -142,6 +142,38 @@ describe('ImapClient local integration tests', function() {
         }).then(done);
     });
 
+    it('should create folder', function(done) {
+        ic.createFolder({
+            path: 'foo'
+        }).then(function() {
+            return ic.listWellKnownFolders();
+        }).then(function(folders) {
+            var hasFoo = false;
+            
+            folders.Other.forEach(function(folder) {
+                hasFoo = hasFoo || folder.path === 'foo';
+            });
+
+            expect(hasFoo).to.be.true;
+        }).then(done);
+    });
+
+    it('should create folder hierarchy', function(done) {
+        ic.createFolder({
+            path: ['bar', 'baz']
+        }).then(function() {
+            return ic.listWellKnownFolders();
+        }).then(function(folders) {
+            var hasFoo = false;
+            
+            folders.Other.forEach(function(folder) {
+                hasFoo = hasFoo || folder.path === 'bar/baz';
+            });
+
+            expect(hasFoo).to.be.true;
+        }).then(done);
+    });
+
     it('should search messages for header', function(done) {
         ic.search({
             path: 'INBOX',
