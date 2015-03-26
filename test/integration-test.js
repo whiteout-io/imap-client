@@ -103,6 +103,9 @@
                 });
 
                 expect(hasFoo).to.be.true;
+                expect(ic._delimiter).to.exist;
+                expect(ic._prefix).to.exist;
+                expect(hasFoo).to.be.true;
             }).then(done);
         });
 

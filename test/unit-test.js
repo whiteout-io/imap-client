@@ -199,6 +199,8 @@
                 }).then(function() {
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
                     expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
                     done();
                 });
             });
@@ -220,6 +222,8 @@
                 }).then(function() {
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
                     expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
                     done();
                 });
             });
@@ -234,12 +238,19 @@
                     "shared": false
                 }));
                 bboxMock.createMailbox.withArgs('foo/bar').returns(resolves());
+                bboxMock.createMailbox.withArgs('foo/baz').returns(resolves());
 
                 imap.createFolder({
                     path: ['foo', 'bar']
                 }).then(function() {
+                    return imap.createFolder({
+                        path: ['foo', 'baz']
+                    });
+                }).then(function() {
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
-                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledTwice).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
                     done();
                 });
             });
@@ -261,6 +272,8 @@
                 }).then(function() {
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
                     expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
                     done();
                 });
             });

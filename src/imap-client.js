@@ -556,6 +556,7 @@
 
                 if (folder.name.toUpperCase() === 'INBOX') {
                     folder.type = 'Inbox';
+                    self._delimiter = mailbox.delimiter;
                     wellKnownFolders.Inbox.push(folder);
                 } else if (mailbox.specialUse === '\\Drafts') {
                     folder.type = 'Drafts';
@@ -601,38 +602,52 @@
      */
     ImapClient.prototype.createFolder = function(options) {
         var self = this,
-            path = options.path,
-            prefix, delimiter;
+            path = options.path;
 
         if (!Array.isArray(path)) {
             path = [path];
         }
 
         return self._checkOnline().then(function() {
-            return self._client.listNamespaces();
-
-        }).then(function(namespaces) {
-            // try to get the namespace prefix and delimiter
-            if (namespaces && namespaces.personal && namespaces.personal[0]) {
-                // personal namespace is available
-                delimiter = namespaces.personal[0].delimiter;
-                prefix = namespaces.personal[0].prefix.split(delimiter).shift();
-                path.unshift(prefix);
+            // spare the check
+            if (typeof self._delimiter !== 'undefined' && typeof self._prefix !== 'undefined') {
                 return;
             }
 
-            // personal namespaces are not available, find the delimiter by listing the folders
-            return self._client.listMailboxes().then(function(response) {
-                findDelimiter(response);
+            // try to get the namespace prefix and delimiter
+            return self._client.listNamespaces().then(function(namespaces) {
+                if (namespaces && namespaces.personal && namespaces.personal[0]) {
+                    // personal namespace is available
+                    self._delimiter = namespaces.personal[0].delimiter;
+                    self._prefix = namespaces.personal[0].prefix.split(self._delimiter).shift();
+                    return;
+                }
+
+                // no namespaces, falling back to empty prefix
+                self._prefix = "";
+
+                // if we already have the delimiter, there's no need to retrieve the lengthy folder list
+                if (self._delimiter) {
+                    return;
+                }
+
+                // find the delimiter by listing the folders
+                return self._client.listMailboxes().then(function(response) {
+                    findDelimiter(response);
+                });
             });
 
         }).then(function() {
-            if (!delimiter) {
+            if (!self._delimiter) {
                 throw new Error('Could not determine delimiter for mailbox hierarchy');
             }
 
+            if (self._prefix) {
+                path.unshift(self._prefix);
+            }
+
             // create path [prefix/]foo/bar/baz
-            return self._client.createMailbox(path.join(delimiter));
+            return self._client.createMailbox(path.join(self._delimiter));
 
         }).catch(function(error) {
             axe.error(DEBUG_TAG, 'error creating folder ' + options.path + ': ' + error + '\n' + error.stack);
@@ -643,7 +658,7 @@
         function findDelimiter(mailbox) {
             if ((mailbox.path || '').toUpperCase() === 'INBOX') {
                 // found the INBOX, use its hierarchy delimiter, we're done.
-                delimiter = mailbox.delimiter;
+                self._delimiter = mailbox.delimiter;
                 return;
             }
 

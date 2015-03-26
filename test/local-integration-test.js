@@ -149,12 +149,14 @@ describe('ImapClient local integration tests', function() {
             return ic.listWellKnownFolders();
         }).then(function(folders) {
             var hasFoo = false;
-            
+
             folders.Other.forEach(function(folder) {
                 hasFoo = hasFoo || folder.path === 'foo';
             });
 
             expect(hasFoo).to.be.true;
+            expect(ic._delimiter).to.exist;
+            expect(ic._prefix).to.exist;
         }).then(done);
     });
 
@@ -165,7 +167,7 @@ describe('ImapClient local integration tests', function() {
             return ic.listWellKnownFolders();
         }).then(function(folders) {
             var hasFoo = false;
-            
+
             folders.Other.forEach(function(folder) {
                 hasFoo = hasFoo || folder.path === 'bar/baz';
             });
