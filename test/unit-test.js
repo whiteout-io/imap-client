@@ -452,6 +452,95 @@
                 }).then(done);
             });
 
+            it('should list messages by uid', function(done) {
+                var listing = [{
+                    uid: 1,
+                    envelope: {
+                        'message-id': 'beepboop',
+                        from: ['zuhause@aol.com'],
+                        'reply-to': ['zzz@aol.com'],
+                        to: ['bankrupt@duh.com'],
+                        subject: 'SHIAAAT',
+                        date: new Date()
+                    },
+                    flags: ['\\Seen', '\\Answered', '\\Flagged'],
+                    bodystructure: {
+                        type: 'multipart/mixed',
+                        childNodes: [{
+                            part: '1',
+                            type: 'text/plain'
+                        }, {
+                            part: '2',
+                            type: 'text/plain',
+                            size: 211,
+                            disposition: 'attachment',
+                            dispositionParameters: {
+                                filename: 'foobar.md'
+                            }
+                        }]
+                    },
+                    'body[header.fields (references)]': 'References: <abc>\n <def>\n\n'
+                }, {
+                    uid: 4,
+                    envelope: {
+                        'message-id': 'ajabwelvzbslvnasd',
+                    },
+                    bodystructure: {
+                        type: 'multipart/mixed',
+                        childNodes: [{
+                            part: '1',
+                            type: 'text/plain',
+                        }, {
+                            part: '2',
+                            type: 'multipart/encrypted',
+                            childNodes: [{
+                                part: '2.1',
+                                type: 'application/pgp-encrypted',
+                            }, {
+                                part: '2.2',
+                                type: 'application/octet-stream',
+                            }]
+                        }]
+                    }
+                }];
+                bboxMock.listMessages.withArgs('1,4', ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]']).returns(resolves(listing));
+
+                imap.listMessages({
+                    path: 'foobar',
+                    uids: [1,4]
+                }).then(function(msgs) {
+                    expect(bboxMock.listMessages.calledOnce).to.be.true;
+
+                    expect(msgs.length).to.equal(2);
+
+                    expect(msgs[0].uid).to.equal(1);
+                    expect(msgs[0].id).to.equal('beepboop');
+                    expect(msgs[0].from).to.be.instanceof(Array);
+                    expect(msgs[0].replyTo).to.be.instanceof(Array);
+                    expect(msgs[0].to).to.be.instanceof(Array);
+                    expect(msgs[0].subject).to.equal('SHIAAAT');
+                    expect(msgs[0].unread).to.be.false;
+                    expect(msgs[0].answered).to.be.true;
+                    expect(msgs[0].flagged).to.be.true;
+                    expect(msgs[0].references).to.deep.equal(['abc', 'def']);
+
+                    expect(msgs[0].encrypted).to.be.false;
+                    expect(msgs[1].encrypted).to.be.true;
+
+                    expect(msgs[0].bodyParts).to.not.be.empty;
+                    expect(msgs[0].bodyParts[0].type).to.equal('text');
+                    expect(msgs[0].bodyParts[0].partNumber).to.equal('1');
+                    expect(msgs[0].bodyParts[1].type).to.equal('attachment');
+                    expect(msgs[0].bodyParts[1].partNumber).to.equal('2');
+
+                    expect(msgs[1].flagged).to.be.false;
+                    expect(msgs[1].bodyParts[0].type).to.equal('text');
+                    expect(msgs[1].bodyParts[1].type).to.equal('encrypted');
+                    expect(msgs[1].bodyParts[1].partNumber).to.equal('2');
+                    expect(msgs[1].references).to.deep.equal([]);
+                }).then(done);
+            });
+
             it('should not list messages by uid due to list error', function(done) {
                 bboxMock.listMessages.returns(rejects());
 
