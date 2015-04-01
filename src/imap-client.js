@@ -518,12 +518,6 @@
     ImapClient.prototype.listWellKnownFolders = function() {
         var self = this;
 
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Can not list well known folders, cause: Not logged in!');
-            });
-        }
-
         var wellKnownFolders = {
             Inbox: [],
             Drafts: [],
@@ -538,10 +532,13 @@
 
         axe.debug(DEBUG_TAG, 'listing folders');
 
-        return self._client.listMailboxes().then(function(mailbox) {
+        return self._checkOnline().then(function() {
+            return self._client.listMailboxes();
+        }).then(function(mailbox) {
             axe.debug(DEBUG_TAG, 'folder list received!');
             walkMailbox(mailbox);
             return wellKnownFolders;
+
         }).catch(function(error) {
             axe.error(DEBUG_TAG, 'error listing folders: ' + error + '\n' + error.stack);
             throw error;
@@ -559,6 +556,7 @@
 
                 if (folder.name.toUpperCase() === 'INBOX') {
                     folder.type = 'Inbox';
+                    self._delimiter = mailbox.delimiter;
                     wellKnownFolders.Inbox.push(folder);
                 } else if (mailbox.specialUse === '\\Drafts') {
                     folder.type = 'Drafts';
@@ -595,6 +593,83 @@
     };
 
     /**
+     * Creates a folder with the provided path under the personal namespace
+     *
+     * @param {String or Array} options.path
+     *                   The folder's path. If path is a hierarchy as an array (e.g. ['foo', 'bar', 'baz'] to create foo/bar/bar),
+     *                   will create a hierarchy with all intermediate folders if needed.
+     * @returns {Promise<Array>} Array of uids for messages matching the search terms
+     */
+    ImapClient.prototype.createFolder = function(options) {
+        var self = this,
+            path = options.path;
+
+        if (!Array.isArray(path)) {
+            path = [path];
+        }
+
+        return self._checkOnline().then(function() {
+            // spare the check
+            if (typeof self._delimiter !== 'undefined' && typeof self._prefix !== 'undefined') {
+                return;
+            }
+
+            // try to get the namespace prefix and delimiter
+            return self._client.listNamespaces().then(function(namespaces) {
+                if (namespaces && namespaces.personal && namespaces.personal[0]) {
+                    // personal namespace is available
+                    self._delimiter = namespaces.personal[0].delimiter;
+                    self._prefix = namespaces.personal[0].prefix.split(self._delimiter).shift();
+                    return;
+                }
+
+                // no namespaces, falling back to empty prefix
+                self._prefix = "";
+
+                // if we already have the delimiter, there's no need to retrieve the lengthy folder list
+                if (self._delimiter) {
+                    return;
+                }
+
+                // find the delimiter by listing the folders
+                return self._client.listMailboxes().then(function(response) {
+                    findDelimiter(response);
+                });
+            });
+
+        }).then(function() {
+            if (!self._delimiter) {
+                throw new Error('Could not determine delimiter for mailbox hierarchy');
+            }
+
+            if (self._prefix) {
+                path.unshift(self._prefix);
+            }
+
+            // create path [prefix/]foo/bar/baz
+            return self._client.createMailbox(path.join(self._delimiter));
+
+        }).catch(function(error) {
+            axe.error(DEBUG_TAG, 'error creating folder ' + options.path + ': ' + error + '\n' + error.stack);
+            throw error;
+        });
+
+        // Helper function to find the hierarchy delimiter from a client.listMailboxes() response
+        function findDelimiter(mailbox) {
+            if ((mailbox.path || '').toUpperCase() === 'INBOX') {
+                // found the INBOX, use its hierarchy delimiter, we're done.
+                self._delimiter = mailbox.delimiter;
+                return;
+            }
+
+            if (mailbox.children) {
+                // walk the child mailboxes recursively
+                mailbox.children.forEach(findDelimiter);
+            }
+        }
+    };
+
+    /**
      * Returns the uids of messages containing the search terms in the options
      * @param {String} options.path The folder's path
      * @param {Boolean} options.answered (optional) Mails with or without the \Answered flag set.
@@ -606,12 +681,6 @@
     ImapClient.prototype.search = function(options) {
         var self = this,
             client = options.client || self._client;
-
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Can not search messages, cause: Not logged in!');
-            });
-        }
 
         var query = {},
             queryOptions = {
@@ -643,7 +712,9 @@
         }
 
         axe.debug(DEBUG_TAG, 'searching in ' + options.path + ' for ' + Object.keys(query).join(','));
-        return client.search(query, queryOptions).then(function(uids) {
+        return self._checkOnline().then(function() {
+            return client.search(query, queryOptions);
+        }).then(function(uids) {
             axe.debug(DEBUG_TAG, 'searched in ' + options.path + ' for ' + Object.keys(query).join(',') + ': ' + uids);
             return uids;
         }).catch(function(error) {
@@ -663,12 +734,6 @@
     ImapClient.prototype.listMessages = function(options) {
         var self = this;
 
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Can not list messages, cause: Not logged in!');
-            });
-        }
-
         var interval = (options.firstUid || 1) + ':' + (options.lastUid || '*'),
             query = ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]'],
             queryOptions = {
@@ -682,7 +747,9 @@
         }
 
         axe.debug(DEBUG_TAG, 'listing messages in ' + options.path + ' for interval ' + interval);
-        return self._client.listMessages(interval, query, queryOptions).then(function(messages) {
+        return self._checkOnline().then(function() {
+            return self._client.listMessages(interval, query, queryOptions);
+        }).then(function(messages) {
             // a message without uid will be ignored as malformed
             messages = messages.filter(function(message) {
                 return !!message.uid;
@@ -752,12 +819,6 @@
             interval = options.uid + ':' + options.uid,
             bodyParts = options.bodyParts || [];
 
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Can not get bodyParts for uid ' + options.uid + ' in folder ' + options.path + ', cause: Not logged in!');
-            });
-        }
-
         // formulate a query for each text part. for part 2.1 to be parsed, we need 2.1.MIME and 2.1
         bodyParts.forEach(function(bodyPart) {
             if (typeof bodyPart.partNumber === 'undefined') {
@@ -779,7 +840,9 @@
         }
 
         axe.debug(DEBUG_TAG, 'retrieving body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
-        return self._client.listMessages(interval, query, queryOptions).then(function(messages) {
+        return self._checkOnline().then(function() {
+            return self._client.listMessages(interval, query, queryOptions);
+        }).then(function(messages) {
             axe.debug(DEBUG_TAG, 'successfully retrieved body parts for uid ' + options.uid + ' in folder ' + options.path + ': ' + query);
 
             var message = messages[0];
@@ -834,12 +897,6 @@
             FLAGGED_FLAG = '\\Flagged',
             ANSWERED_FLAG = '\\Answered';
 
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Can not update flags, cause: Not logged in!');
-            });
-        }
-
         if (options.unread === true) {
             remove.push(READ_FLAG);
         } else if (options.unread === false) {
@@ -872,12 +929,14 @@
         };
 
         axe.debug(DEBUG_TAG, 'updating flags for uid ' + options.uid + ' in folder ' + options.path + ': ' + (remove.length > 0 ? (' removing ' + remove) : '') + (add.length > 0 ? (' adding ' + add) : ''));
-        return new Promise(function(resolve) {
-            if (add.length > 0) {
-                resolve(self._client.setFlags(interval, queryAdd, queryOptions));
-            } else {
-                resolve();
-            }
+        return self._checkOnline().then(function() {
+            return new Promise(function(resolve) {
+                if (add.length > 0) {
+                    resolve(self._client.setFlags(interval, queryAdd, queryOptions));
+                } else {
+                    resolve();
+                }
+            });
         }).then(function() {
             if (remove.length > 0) {
                 return self._client.setFlags(interval, queryRemove, queryOptions);
@@ -906,14 +965,10 @@
                 precheck: self._ensurePath(options.path)
             };
 
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Cannot move message, cause: Not logged in!');
-            });
-        }
-
         axe.debug(DEBUG_TAG, 'moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
-        return self._client.moveMessages(interval, options.destination, queryOptions).then(function() {
+        return self._checkOnline().then(function() {
+            return self._client.moveMessages(interval, options.destination, queryOptions);
+        }).then(function() {
             axe.debug(DEBUG_TAG, 'successfully moved uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination);
         }).catch(function(error) {
             axe.error(DEBUG_TAG, 'error moving uid ' + options.uid + ' from ' + options.path + ' to ' + options.destination + ' : ' + error + '\n' + error.stack);
@@ -931,14 +986,10 @@
     ImapClient.prototype.uploadMessage = function(options) {
         var self = this;
 
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Cannot move message, cause: Not logged in!');
-            });
-        }
-
         axe.debug(DEBUG_TAG, 'uploading a message of ' + options.message.length + ' bytes to ' + options.path);
-        return self._client.upload(options.path, options.message).then(function() {
+        return self._checkOnline().then(function() {
+            return self._client.upload(options.path, options.message);
+        }).then(function() {
             axe.debug(DEBUG_TAG, 'successfully uploaded message to ' + options.path);
         }).catch(function(error) {
             axe.error(DEBUG_TAG, 'error uploading <' + options.message.length + '> bytes to ' + options.path + ' : ' + error + '\n' + error.stack);
@@ -961,14 +1012,10 @@
                 precheck: self._ensurePath(options.path)
             };
 
-        if (!self._loggedIn) {
-            return new Promise(function() {
-                throw new Error('Cannot delete message, cause: Not logged in!');
-            });
-        }
-
         axe.debug(DEBUG_TAG, 'deleting uid ' + options.uid + ' from ' + options.path);
-        return self._client.deleteMessages(interval, queryOptions).then(function() {
+        return self._checkOnline().then(function() {
+            return self._client.deleteMessages(interval, queryOptions);
+        }).then(function() {
             axe.debug(DEBUG_TAG, 'successfully deleted uid ' + options.uid + ' from ' + options.path);
         }).catch(function(error) {
             axe.error(DEBUG_TAG, 'error deleting uid ' + options.uid + ' from ' + options.path + ' : ' + error + '\n' + error.stack);
@@ -999,6 +1046,18 @@
                 ctx: ctx
             }, next);
         };
+    };
+
+    ImapClient.prototype._checkOnline = function() {
+        var self = this;
+
+        return new Promise(function(resolve) {
+            if (!self._loggedIn) {
+                throw new Error('Not logged in!');
+            }
+
+            resolve();
+        });
     };
 
     /*

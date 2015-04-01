@@ -2,6 +2,8 @@
 
 High-level UMD module wrapper for [browserbox](https://github.com/whiteout-io/browserbox). This module encapsulates the most commonly used IMAP commands.
 
+Needs ES6 Promises, [supply polyfills where necessary](https://github.com/jakearchibald/es6-promise).
+
 ## API
 
 ### Constructor
@@ -22,39 +24,52 @@ var imap = new ImapClient({
 });
 ```
 
-### #login(callback) and #logout(callback)
+### #login() and #logout()
 
 Log in to an IMAP Session. No-op if already logged in.
 
 ```
-imap.login(function() {
+imap.login().then(function() {
     // yay, we’re logged in
+})
 
-        imap.logout(function() {
-            // yay, we’re logged out
-        });
+imap.logout().then(function() {
+    // yay, we’re logged out
 });
 ```
 
-### #listenForChanges(callback) and #stopListeningForChanges(callback)
+### #listenForChanges() and #stopListeningForChanges()
 
 Set up a connection dedicated to listening for changes published by the IMAP server on one specific inbox.
 
 ```
 imap.listenForChanges({
     path: ‘mailboxpath’
-}, function() {
+}).then(function() {
     // the audience is listening
+    ...
+})
 
-        imap.stopListeningForChanges(function() {
-                // we’re not listening anymore
-        });
+imap.stopListeningForChanges().then(function() {
+    // we’re not listening anymore
 })
 ```
 
-### #listWellKnownFolders(callback)
+### #listWellKnownFolders()
 
 Lists folders, grouped to folders that are in the following categories: Inbox, Drafts, All, Flagged, Sent, Trash, Junk, Archive, Other.
+
+### #createFolder(path)
+
+Creates a folder...
+
+```
+imap.createFolder({
+    path: ['foo', 'bar']
+}).then(function() {
+    // folder created
+})
+```
 
 ### #search(options, callback)
 
@@ -62,11 +77,11 @@ Returns the uids of messages containing the search terms in the options.
 
 ```
 imap.search({
-        answered: true,
-        unread: true,
-        header: ['X-Foobar', '123qweasdzxc']
-}, function(error, uids) {
-        console.log(‘uids: ‘ + uids.join(‘, ‘))
+    answered: true,
+    unread: true,
+    header: ['X-Foobar', '123qweasdzxc']
+}).then(function(uids) {
+    console.log(‘uids: ‘ + uids.join(‘, ‘))
 });
 ```
 
@@ -76,10 +91,10 @@ Lists messages in the mailbox based on their UID.
 
 ```
 imap.listMessages({
-        path: ‘path’, the folder's path
-        firstUid: 15, (optional) the uid of the first messagem defaults to 1
-        lastUid: 30 (optional) the uid of the last message, defaults to ‘*’
-}, function(error, messages) {})
+    path: ‘path’, the folder's path
+    firstUid: 15, (optional) the uid of the first messagem defaults to 1
+    lastUid: 30 (optional) the uid of the last message, defaults to ‘*’
+}).then(function(messages) {})
 ```
 
 Messages have the following attributes:
@@ -102,10 +117,10 @@ Fetches parts of a message from the imap server
 
 ```
 imap.getBodyParts({
-path: 'foo/bar',
-uid: someMessage.uid,
-bodyParts: someMessage.bodyParts
-}, function(err) {
+    path: 'foo/bar',
+    uid: someMessage.uid,
+    bodyParts: someMessage.bodyParts
+}).then(function() {
     // all done, bodyparts can now be fed to the mailreader
 })
 ```
@@ -120,7 +135,7 @@ imap.updateFlags({
     uid: someMessage.uid,
     unread: true/false/undefined, // (optional) Marks the message as un-/read, no action if omitted
     answered: true/false/undefined // (optional) Marks the message as answered, no action if omitted
-}, function (error) {
+}).then(function(
     // all done
 });
 ```
@@ -134,7 +149,7 @@ imap.moveMessage({
     path: 'foo/bar', // the origin folder
     uid: someMessage.uid, // the message's uid
     destination: 'bla/bli' // the destination folder
-}, function (error) {
+}).then(function(
     // all done
 });
 ```
@@ -147,7 +162,7 @@ Uploads a message to a folder
 imap.uploadMessage({
     path: 'foo/bar', // the target folder
     message: '...' // RFC-2822 compliant string
-}, function (error) {
+}).then(function(
     // all done
 });
 ```
@@ -160,7 +175,7 @@ Deletes a message from a folder
 imap.deleteMessage({
     path: 'foo/bar', // the folder from which to delete the message
     uid: someMessage.uid, // the message's uid
-}, function (error) {
+}).then(function(
     // all done
 });
 ```
@@ -176,20 +191,20 @@ var SYNC_TYPE_DELETED = 'deleted';
 var SYNC_TYPE_MSGS = 'messages';
 
 imap.onSyncUpdate = function(options) {
-        var updatedMesages = options.list,
-        updatesMailbox = options.path
+    var updatedMesages = options.list,
+    updatesMailbox = options.path
 
     if (options.type === SYNC_TYPE_NEW) {
         // new messages available on imap
-                // updatedMesages is an array of the newly available UIDs
+        // updatedMesages is an array of the newly available UIDs
     } else if (options.type === SYNC_TYPE_DELETED) {
         // messages have been deleted
-                // updatedMesages is an array of the deleted UIDs
+        // updatedMesages is an array of the deleted UIDs
     } else if (options.type === SYNC_TYPE_MSGS) {
         // NB! several possible reasons why this could be called.
-                // updatedMesages is an array of objects
+        // updatedMesages is an array of objects
         // if an object in the array has uid value and flags array, it had a possible flag update
-        }
+    }
 };
 ```
 

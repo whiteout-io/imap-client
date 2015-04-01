@@ -25,7 +25,6 @@
             imap = new ImapClient({}, bboxMock);
 
             expect(imap._client).to.equal(bboxMock);
-            expect(imap._maxUpdateSize).to.equal(0);
 
             imap._loggedIn = true;
         });
@@ -178,6 +177,103 @@
 
                 // execute test case
                 imap.listWellKnownFolders().catch(function() {
+                    done();
+                });
+            });
+        });
+
+        describe('#createFolder', function() {
+            it('should create folder with namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves({
+                    "personal": [{
+                        "prefix": "BLA/",
+                        "delimiter": "/"
+                    }],
+                    "users": false,
+                    "shared": false
+                }));
+                bboxMock.createMailbox.withArgs('BLA/foo').returns(resolves());
+
+                imap.createFolder({
+                    path: 'foo'
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
+                    done();
+                });
+            });
+
+            it('should create folder without namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves());
+                bboxMock.listMailboxes.returns(resolves({
+                    "root": true,
+                    "children": [{
+                        "name": "INBOX",
+                        "delimiter": "/",
+                        "path": "INBOX"
+                    }]
+                }));
+                bboxMock.createMailbox.withArgs('foo').returns(resolves());
+
+                imap.createFolder({
+                    path: 'foo'
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
+                    done();
+                });
+            });
+
+            it('should create folder hierarchy with namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves({
+                    "personal": [{
+                        "prefix": "BLA/",
+                        "delimiter": "/"
+                    }],
+                    "users": false,
+                    "shared": false
+                }));
+                bboxMock.createMailbox.withArgs('foo/bar').returns(resolves());
+                bboxMock.createMailbox.withArgs('foo/baz').returns(resolves());
+
+                imap.createFolder({
+                    path: ['foo', 'bar']
+                }).then(function() {
+                    return imap.createFolder({
+                        path: ['foo', 'baz']
+                    });
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledTwice).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
+                    done();
+                });
+            });
+
+            it('should create folder hierarchy without namespaces', function(done) {
+                bboxMock.listNamespaces.returns(resolves());
+                bboxMock.listMailboxes.returns(resolves({
+                    "root": true,
+                    "children": [{
+                        "name": "INBOX",
+                        "delimiter": "/",
+                        "path": "INBOX"
+                    }]
+                }));
+                bboxMock.createMailbox.withArgs('foo').returns(resolves());
+
+                imap.createFolder({
+                    path: ['foo', 'bar']
+                }).then(function() {
+                    expect(bboxMock.listNamespaces.calledOnce).to.be.true;
+                    expect(bboxMock.createMailbox.calledOnce).to.be.true;
+                    expect(imap._delimiter).to.exist;
+                    expect(imap._prefix).to.exist;
                     done();
                 });
             });
@@ -437,7 +533,12 @@
                 imap._loggedIn = false;
                 imap.getBodyParts({
                     path: 'foobar',
-                    uid: 123
+                    uid: 123,
+                    bodyParts: [{
+                        partNumber: '1'
+                    }, {
+                        partNumber: '2'
+                    }]
                 }).catch(function() {
                     done();
                 });
@@ -449,7 +550,7 @@
                 bboxMock.setFlags.withArgs('123:123', {
                     add: ['\\Flagged', '\\Answered']
                 }).returns(resolves());
-                
+
                 bboxMock.setFlags.withArgs('123:123', {
                     remove: ['\\Seen']
                 }).returns(resolves());
@@ -650,7 +751,9 @@
             var ctx = {};
 
             it('should switch mailboxes', function(done) {
-                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields();
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {
+                    ctx: ctx
+                }).yields();
                 imap._ensurePath('qweasdzxc')(ctx, function(err) {
                     expect(err).to.not.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;
@@ -659,7 +762,9 @@
             });
 
             it('should error during switching mailboxes', function(done) {
-                bboxMock.selectMailbox.withArgs('qweasdzxc', {ctx: ctx}).yields(new Error());
+                bboxMock.selectMailbox.withArgs('qweasdzxc', {
+                    ctx: ctx
+                }).yields(new Error());
                 imap._ensurePath('qweasdzxc')(ctx, function(err) {
                     expect(err).to.exist;
                     expect(bboxMock.selectMailbox.calledOnce).to.be.true;

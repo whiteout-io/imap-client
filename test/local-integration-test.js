@@ -94,17 +94,13 @@ describe('ImapClient local integration tests', function() {
 
     it('should notify about new messages', function(done) {
         var invocations = 0; // counts the message updates
-        ic._maxUpdateSize = 1;
 
         ic.onSyncUpdate = function(options) {
             invocations++;
 
-            expect(options.list.length).to.equal(1);
-
+            expect(options.list.length).to.equal(6);
             expect(options.type).to.equal('new');
-            if (invocations === 6) {
-                done();
-            }
+            done();
         };
 
         ic.selectMailbox({
@@ -143,6 +139,40 @@ describe('ImapClient local integration tests', function() {
             answered: false
         }).then(function(uids) {
             expect(uids).to.not.be.empty;
+        }).then(done);
+    });
+
+    it('should create folder', function(done) {
+        ic.createFolder({
+            path: 'foo'
+        }).then(function() {
+            return ic.listWellKnownFolders();
+        }).then(function(folders) {
+            var hasFoo = false;
+
+            folders.Other.forEach(function(folder) {
+                hasFoo = hasFoo || folder.path === 'foo';
+            });
+
+            expect(hasFoo).to.be.true;
+            expect(ic._delimiter).to.exist;
+            expect(ic._prefix).to.exist;
+        }).then(done);
+    });
+
+    it('should create folder hierarchy', function(done) {
+        ic.createFolder({
+            path: ['bar', 'baz']
+        }).then(function() {
+            return ic.listWellKnownFolders();
+        }).then(function(folders) {
+            var hasFoo = false;
+
+            folders.Other.forEach(function(folder) {
+                hasFoo = hasFoo || folder.path === 'bar/baz';
+            });
+
+            expect(hasFoo).to.be.true;
         }).then(done);
     });
 
