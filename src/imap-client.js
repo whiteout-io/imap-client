@@ -33,11 +33,6 @@
         self._loggedIn = false;
         self._listenerLoggedIn = false;
 
-        /*
-         * See function descriptiong
-         */
-        self._maxUpdateSize = Math.abs(options.maxUpdateSize || 0);
-
         /* 
          * Instance of our imap library
          * (only relevant in unit test environment)
@@ -168,6 +163,8 @@
         if (cached.exists !== mailbox.exists || cached.uidNext !== mailbox.uidNext) {
             axe.debug(DEBUG_TAG, 'possible updates available in ' + path + '. exists: ' + mailbox.exists + ', uidNext: ' + mailbox.uidNext);
 
+            var firstUpdate = cached.exists === 0;
+
             cached.exists = mailbox.exists;
             cached.uidNext = mailbox.uidNext;
 
@@ -176,13 +173,11 @@
                 path: path,
                 client: client
             }).then(function(imapUidList) {
-                var deltaNew, deltaDeleted, batch;
-
                 // normalize the uidlist
                 cached.uidlist = cached.uidlist || [];
 
                 // determine deleted uids
-                deltaDeleted = cached.uidlist.filter(function(i) {
+                var deltaDeleted = cached.uidlist.filter(function(i) {
                     return imapUidList.indexOf(i) < 0;
                 });
 
@@ -197,32 +192,32 @@
                 }
 
                 // determine new uids
-                deltaNew = imapUidList.filter(function(i) {
+                var deltaNew = imapUidList.filter(function(i) {
                     return cached.uidlist.indexOf(i) < 0;
                 }).sort(sortNumericallyDescending);
-                axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + deltaNew);
 
-                // notify about new messages in batches of _maxUpdateSize size
-                while (deltaNew.length) {
-                    batch = deltaNew.splice(0, (self._maxUpdateSize || deltaNew.length));
-                    axe.debug(DEBUG_TAG, 'onSyncUpdate for new uids in ' + path + ': ' + batch);
+                // notify about new messages
+                if (deltaNew.length) {
+                    axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + deltaNew);
                     self.onSyncUpdate({
                         type: 'new',
                         path: path,
-                        list: batch
+                        list: deltaNew
                     });
                 }
 
                 // update mailbox info
                 cached.uidlist = imapUidList;
 
-                // check for changed flags
-                self._checkModseq({
-                    highestModseq: mailbox.highestModseq,
-                    client: client
-                }).catch(function(error) {
-                    axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
-                });
+                if (!firstUpdate) {
+                    axe.debug(DEBUG_TAG, 'no changes in message count in ' + path + '. exists: ' + mailbox.exists + ', uidNext: ' + mailbox.uidNext);
+                    self._checkModseq({
+                        highestModseq: mailbox.highestModseq,
+                        client: client
+                    }).catch(function(error) {
+                        axe.error(DEBUG_TAG, 'error checking modseq: ' + error + '\n' + error.stack);
+                    });
+                }
             });
         } else {
             // check for changed flags
@@ -283,8 +278,6 @@
                 uid: cached.uidNext + ':*',
                 client: client
             }).then(function(imapUidList) {
-                var batch;
-
                 // if we do not find anything or the returned item was already known then return
                 // if there was no new messages then we get back a single element array where the element
                 // is the message with the highest UID value ('*' -> highest UID)
@@ -301,16 +294,13 @@
                 // predict the next UID, might not be the actual value set by the server
                 cached.uidNext = cached.uidlist[cached.uidlist.length - 1] + 1;
 
-                // notify about new messages in batches of _maxUpdateSize size
-                while (imapUidList.length) {
-                    batch = imapUidList.splice(0, (self._maxUpdateSize || imapUidList.length));
-                    axe.debug(DEBUG_TAG, 'onSyncUpdate for new uids in ' + path + ': ' + batch);
-                    self.onSyncUpdate({
-                        type: 'new',
-                        path: path,
-                        list: batch
-                    });
-                }
+                // notify about new messages
+                axe.debug(DEBUG_TAG, 'new uids in ' + path + ': ' + imapUidList);
+                self.onSyncUpdate({
+                    type: 'new',
+                    path: path,
+                    list: imapUidList
+                });
             }).catch(function(error) {
                 axe.error(DEBUG_TAG, 'error handling exists notice: ' + error + '\n' + error.stack);
             });
@@ -366,8 +356,12 @@
             });
         }
 
+        var msgs = cached.uidlist.slice(-100);
+        var firstUid = msgs.shift();
+        var lastUid = msgs.pop();
+
         axe.debug(DEBUG_TAG, 'listing changes since MODSEQ ' + highestModseq + ' for ' + path);
-        return client.listMessages('1:*', ['uid', 'flags', 'modseq'], {
+        return client.listMessages(firstUid + ':' + lastUid, ['uid', 'flags', 'modseq'], {
             byUid: true,
             changedSince: cached.highestModseq
         }).then(function(messages) {
@@ -726,20 +720,27 @@
     /**
      * List messages in an IMAP folder based on their uid
      * @param {String} options.path The folder's path
-     * @param {Number} options.firstUid The uid of the first message. if omitted, defaults to 1
+     * @param {Number} options.firstUid (optional) If you want to fetch a range, this is the uid of the first message. if omitted, defaults to 1
      * @param {Number} options.lastUid (optional) The uid of the last message. if omitted, defaults to *
-     
+     * @param {Array} options.uids (optional) If used, fetched individual uids
+     *
      * @returns {Promise<Array>} Array of messages with their respective envelope data.
      */
     ImapClient.prototype.listMessages = function(options) {
         var self = this;
 
-        var interval = (options.firstUid || 1) + ':' + (options.lastUid || '*'),
-            query = ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]'],
+        var query = ['uid', 'bodystructure', 'flags', 'envelope', 'body.peek[header.fields (references)]'],
             queryOptions = {
                 byUid: true,
                 precheck: self._ensurePath(options.path)
-            };
+            },
+            interval;
+
+        if (options.uids) {
+            interval = options.uids.join(',');
+        } else {
+            interval = (options.firstUid || 1) + ':' + (options.lastUid || '*');
+        }
 
         // only if client has CONDSTORE capability
         if (this._client.hasCapability('CONDSTORE')) {
