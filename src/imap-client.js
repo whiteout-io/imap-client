@@ -182,7 +182,6 @@
                 });
 
                 // notify about deleted messages
-                // notify about deleted messages
                 if (deltaDeleted.length) {
                     axe.debug(DEBUG_TAG, 'onSyncUpdate for deleted uids in ' + path + ': ' + deltaDeleted);
                     self.onSyncUpdate({
