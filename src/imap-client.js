@@ -25,7 +25,7 @@
     var ImapClient = function(options, browserbox) {
         var self = this;
 
-        /* 
+        /*
          * Holds the login state. Inbox executes the commands you feed it, i.e. you
          * can do operations on your inbox before a successful login. Which should
          * of course not be possible. So, we need to track the login state here.
@@ -33,7 +33,7 @@
         self._loggedIn = false;
         self._listenerLoggedIn = false;
 
-        /* 
+        /*
          * Instance of our imap library
          * (only relevant in unit test environment)
          */
@@ -339,8 +339,14 @@
             path = client.selectedMailbox;
 
         // do nothing if we do not have highestModseq value. it should be at least 1. if it is
-        // undefined then the server does not support CONDSTORE extension
-        if (!highestModseq || !path) {
+        // undefined then the server does not support CONDSTORE extension.
+        // Yahoo supports a custom MODSEQ related extension called XYMHIGHESTMODSEQ which
+        // returns HIGHESTMODSEQ value when doing SELECT but does not allow to use the CHANGEDSINCE modifier
+        // or query the message MODSEQ value. Returned HIGHESTMODSEQ also happens to be a 64 bit number that
+        // is larger than Number.MAX_SAFE_INTEGER so it can't be used as a numeric value. To fix errors
+        // with Yahoo we double check if the CONDSTORE is listed as a capability or not as checking just
+        // the highestModseq value would give us a false positive.
+        if (!client.hasCapability('CONDSTORE') || !highestModseq || !path) {
             axe.info(DEBUG_TAG, 'can not check MODSEQ, server does not support CONDSTORE extension');
             return new Promise(function(resolve) {
                 resolve([]);
@@ -449,7 +455,7 @@
     /**
      * Starts dedicated listener for updates on a specific IMAP folder, calls back when a change occurrs,
      * or includes information in case of an error
-     
+
      * @param {String} options.path The path to the folder to subscribe to
      *
      * @return {Promise}
@@ -807,7 +813,7 @@
      * @param {String} options.path The folder's path
      * @param {Number} options.uid The uid of the message
      * @param {Array} options.bodyParts Parts of a message, as returned by #listMessages
-     
+
      * @returns {Promise<Array>} Body parts that have been received from the server
      */
     ImapClient.prototype.getBodyParts = function(options) {
