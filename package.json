@@ -7,7 +7,7 @@
   },
   "main": "src/imap-client.js",
   "dependencies": {
-    "browserbox": "~0.8.0",
+    "browserbox": "https://github.com/whiteout-io/browserbox/tarball/master",
     "axe-logger": "~0.0.2"
   },
   "devDependencies": {

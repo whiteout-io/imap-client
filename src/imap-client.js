@@ -45,7 +45,9 @@
                 ignoreTLS: options.ignoreTLS,
                 auth: options.auth,
                 ca: options.ca,
-                tlsWorkerPath: options.tlsWorkerPath
+                tlsWorkerPath: options.tlsWorkerPath,
+                enableCompression: true, // enable compression by default
+                compressionWorkerPath: options.compressionWorkerPath
             };
             self._client = new BrowserBox(options.host, options.port, credentials);
             self._listeningClient = new BrowserBox(options.host, options.port, credentials);
