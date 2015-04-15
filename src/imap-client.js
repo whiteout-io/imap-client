@@ -363,8 +363,8 @@
         }
 
         var msgs = cached.uidlist.slice(-100);
-        var firstUid = msgs.shift();
-        var lastUid = msgs.pop();
+        var firstUid = (msgs.shift() || '1');
+        var lastUid = (msgs.pop() || '*');
 
         axe.debug(DEBUG_TAG, 'listing changes since MODSEQ ' + highestModseq + ' for ' + path);
         return client.listMessages(firstUid + ':' + lastUid, ['uid', 'flags', 'modseq'], {
