@@ -26,9 +26,7 @@
         var self = this;
 
         /*
-         * Holds the login state. Inbox executes the commands you feed it, i.e. you
-         * can do operations on your inbox before a successful login. Which should
-         * of course not be possible. So, we need to track the login state here.
+         * Holds the login state.
          */
         self._loggedIn = false;
         self._listenerLoggedIn = false;
@@ -43,6 +41,7 @@
             var credentials = {
                 useSecureTransport: options.secure,
                 ignoreTLS: options.ignoreTLS,
+                requireTLS: options.requireTLS,
                 auth: options.auth,
                 ca: options.ca,
                 tlsWorkerPath: options.tlsWorkerPath,
