@@ -599,11 +599,12 @@
      * @param {String or Array} options.path
      *                   The folder's path. If path is a hierarchy as an array (e.g. ['foo', 'bar', 'baz'] to create foo/bar/bar),
      *                   will create a hierarchy with all intermediate folders if needed.
-     * @returns {Promise<Array>} Array of uids for messages matching the search terms
+     * @returns {Promise<String>} Fully qualified path of the folder just created
      */
     ImapClient.prototype.createFolder = function(options) {
         var self = this,
-            path = options.path;
+            path = options.path,
+            fullPath;
 
         if (!Array.isArray(path)) {
             path = [path];
@@ -647,8 +648,13 @@
                 path.unshift(self._prefix);
             }
 
+            fullPath = path.join(self._delimiter);
+
             // create path [prefix/]foo/bar/baz
-            return self._client.createMailbox(path.join(self._delimiter));
+            return self._client.createMailbox(fullPath);
+
+        }).then(function() {
+            return fullPath;
 
         }).catch(function(error) {
             axe.error(DEBUG_TAG, 'error creating folder ' + options.path + ': ' + error + '\n' + error.stack);

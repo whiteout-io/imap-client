@@ -196,7 +196,8 @@
 
                 imap.createFolder({
                     path: 'foo'
-                }).then(function() {
+                }).then(function(fullPath) {
+                    expect(fullPath).to.equal('BLA/foo');
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
                     expect(bboxMock.createMailbox.calledOnce).to.be.true;
                     expect(imap._delimiter).to.exist;
@@ -219,7 +220,8 @@
 
                 imap.createFolder({
                     path: 'foo'
-                }).then(function() {
+                }).then(function(fullPath) {
+                    expect(fullPath).to.equal('foo');
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
                     expect(bboxMock.createMailbox.calledOnce).to.be.true;
                     expect(imap._delimiter).to.exist;
@@ -242,11 +244,15 @@
 
                 imap.createFolder({
                     path: ['foo', 'bar']
-                }).then(function() {
+                }).then(function(fullPath) {
+                    expect(fullPath).to.equal('BLA/foo/bar');
+
                     return imap.createFolder({
                         path: ['foo', 'baz']
                     });
-                }).then(function() {
+                }).then(function(fullPath) {
+                    expect(fullPath).to.equal('BLA/foo/baz');
+
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
                     expect(bboxMock.createMailbox.calledTwice).to.be.true;
                     expect(imap._delimiter).to.exist;
@@ -269,7 +275,8 @@
 
                 imap.createFolder({
                     path: ['foo', 'bar']
-                }).then(function() {
+                }).then(function(fullPath) {
+                    expect(fullPath).to.equal('foo/bar');
                     expect(bboxMock.listNamespaces.calledOnce).to.be.true;
                     expect(bboxMock.createMailbox.calledOnce).to.be.true;
                     expect(imap._delimiter).to.exist;

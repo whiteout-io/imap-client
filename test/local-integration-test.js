@@ -145,8 +145,10 @@ describe('ImapClient local integration tests', function() {
     it('should create folder', function(done) {
         ic.createFolder({
             path: 'foo'
-        }).then(function() {
+        }).then(function(fullPath) {
+            expect(fullPath).to.equal('foo');
             return ic.listWellKnownFolders();
+
         }).then(function(folders) {
             var hasFoo = false;
 
@@ -163,7 +165,8 @@ describe('ImapClient local integration tests', function() {
     it('should create folder hierarchy', function(done) {
         ic.createFolder({
             path: ['bar', 'baz']
-        }).then(function() {
+        }).then(function(fullPath) {
+            expect(fullPath).to.equal('bar/baz');
             return ic.listWellKnownFolders();
         }).then(function(folders) {
             var hasFoo = false;

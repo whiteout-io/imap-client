@@ -94,8 +94,10 @@
         it('should create folder hierarchy', function(done) {
             ic.createFolder({
                 path: ['bar', 'baz']
-            }).then(function() {
+            }).then(function(fullPath) {
+                expect(fullPath).to.equal('INBOX.bar.baz');
                 return ic.listWellKnownFolders();
+                
             }).then(function(folders) {
                 var hasFoo = false;
                 folders.Other.forEach(function(folder) {

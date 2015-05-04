@@ -72,6 +72,7 @@ module.exports = function(grunt) {
                     'browserbox/node_modules/tcp-socket/src/*.js',
                     'browserbox/node_modules/tcp-socket/node_modules/node-forge/js/forge.min.js',
                     'browserbox/src/*.js',
+                    'browserbox/node_modules/wo-addressparser/src/*.js',
                     'browserbox/node_modules/wo-utf7/src/*.js',
                     'browserbox/node_modules/wo-imap-handler/src/*.js',
                     'browserbox/node_modules/mimefuncs/src/*.js',
