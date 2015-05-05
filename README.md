@@ -66,8 +66,9 @@ Creates a folder...
 ```
 imap.createFolder({
     path: ['foo', 'bar']
-}).then(function() {
+}).then(function(path) {
     // folder created
+    console.log('created folder: ' + path);
 })
 ```
 
