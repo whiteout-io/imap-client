@@ -662,6 +662,20 @@
                 }).then(done);
             });
 
+            it('should update flags and skip add', function(done) {
+                bboxMock.setFlags.withArgs('123:123', {
+                    remove: ['\\Answered']
+                }).returns(resolves());
+
+                imap.updateFlags({
+                    path: 'INBOX',
+                    uid: 123,
+                    answered: false
+                }).then(function() {
+                    expect(bboxMock.setFlags.calledOnce).to.be.true;
+                }).then(done);
+            });
+
             it('should update flags and skip remove', function(done) {
                 bboxMock.setFlags.withArgs('123:123', {
                     add: ['\\Answered']
