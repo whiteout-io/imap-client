@@ -925,7 +925,7 @@
 
         if (options.answered === true) {
             add.push(ANSWERED_FLAG);
-        } else if (options.answered === true) {
+        } else if (options.answered === false) {
             remove.push(ANSWERED_FLAG);
         }
 
