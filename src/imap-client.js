@@ -413,16 +413,26 @@
     ImapClient.prototype.login = function() {
         var self = this;
 
-        return new Promise(function(resolve) {
+        return new Promise(function(resolve, reject) {
             if (self._loggedIn) {
                 axe.debug(DEBUG_TAG, 'refusing login while already logged in!');
                 return resolve();
             }
+            var authenticating = true;
 
             self._client.onauth = function() {
                 axe.debug(DEBUG_TAG, 'login completed, ready to roll!');
                 self._loggedIn = true;
-                resolve();
+                authenticating = false;
+                return resolve();
+            };
+
+            self._client.onerror = function(error) {
+                if (!self._loggedIn && authenticating) {
+                    axe.debug(DEBUG_TAG, 'login failed! ' + error);
+                    authenticating = false;
+                    return reject(error);
+                }
             };
 
             self._client.connect();

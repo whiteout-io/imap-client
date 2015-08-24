@@ -40,6 +40,17 @@
                 bboxMock.onauth();
             });
 
+            it('should reject on login failure', function(done) {
+                imap._loggedIn = false;
+                imap.login()
+                .catch(function() {
+                    expect(imap._loggedIn).to.be.false;
+                    expect(bboxMock.connect.calledOnce).to.be.true;
+                    done();
+                });
+                bboxMock.onerror('login error');
+            });
+
             it('should not login when logged in', function(done) {
                 imap._loggedIn = true;
                 imap.login().then(done);
