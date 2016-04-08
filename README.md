@@ -1,5 +1,7 @@
 # imap-client
 
+Repos under this github org are not longer maintained. Please use the new [emailjs](https://github.com/eleith/emailjs) repos.
+
 High-level UMD module wrapper for [browserbox](https://github.com/whiteout-io/browserbox). This module encapsulates the most commonly used IMAP commands.
 
 Needs ES6 Promises, [supply polyfills where necessary](https://github.com/jakearchibald/es6-promise).
